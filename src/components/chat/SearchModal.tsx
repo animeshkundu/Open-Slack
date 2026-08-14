@@ -7,7 +7,7 @@ import {
   User,
   X,
 } from 'lucide-react';
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { useWorkspace } from '../../context/WorkspaceContext';
 import { searchWorkspaceMessages } from '../../lib/search';
 
@@ -35,6 +35,17 @@ export const SearchModal: React.FC = () => {
     if (!searchQuery.trim()) return [];
     return searchWorkspaceMessages(messages, channelMap, peerUsers, searchQuery);
   }, [messages, channelMap, peerUsers, searchQuery]);
+
+  useEffect(() => {
+    if (!isSearchOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsSearchOpen(false);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isSearchOpen, setIsSearchOpen]);
 
   if (!isSearchOpen) return null;
 
