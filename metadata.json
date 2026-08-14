@@ -1,0 +1,11 @@
+{
+  "name": "QuietSlack",
+  "description": "100% serverless, local-first, peer-to-peer workspace messaging platform with WebRTC mesh, Nostr signaling, Ed25519 cryptography, and Yjs CRDTs.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

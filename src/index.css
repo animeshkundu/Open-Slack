@@ -1,0 +1,69 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    /* Professional Polish Theme Tokens */
+    --slack-rail-bg: #19171D;
+    --slack-aubergine-dark: #350d36;
+    --slack-aubergine: #3F0E40;
+    --slack-aubergine-border: #522653;
+    --slack-aubergine-hover: #350d36;
+    --slack-aubergine-active: #1164A3;
+    --slack-sidebar-text: #9E9EA6;
+    --slack-sidebar-text-bright: #FFFFFF;
+    
+    /* Main Canvas Colors */
+    --slack-canvas-bg: #FFFFFF;
+    --slack-canvas-text: #1D1C1D;
+    --slack-canvas-subtle: #616061;
+    --slack-canvas-border: #E8E8E8;
+    --slack-canvas-hover: #F8F8F8;
+    
+    /* Accents */
+    --slack-green: #2BAC76;
+    --slack-green-hover: #249666;
+    --slack-red: #E01E5A;
+    --slack-blue: #1164A3;
+    --slack-blue-hover: #0c4d7d;
+    --slack-yellow: #ECB22E;
+  }
+
+  body {
+    background-color: #19171D;
+    color: #1D1C1D;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+    user-select: none;
+    overflow: hidden;
+  }
+}
+
+/* Custom Slack Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.16);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.30);
+}
+
+.dark-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+}
+.dark-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.30);
+}
+
+/* Selection */
+::selection {
+  background: rgba(17, 100, 163, 0.25);
+  color: inherit;
+}
+
+
