@@ -38,19 +38,20 @@ jobs:
 
       - name: Verify build output
         run: |
+          set -euo pipefail
           test -f dist/index.html
           test -f dist/404.html
           test -d dist/assets
-          # Ensure JS bundles were emitted and look minified (no pretty multi-line source)
-          js_file="$(find dist/assets -name '*.js' | head -n 1)"
-          test -n "$js_file"
-          # Minified bundles are typically a small number of very long lines
-          lines="$(wc -l < "$js_file")"
+
+          # Check the largest JS bundle is minified (few lines, large file)
+          largest_js="$(find dist/assets -name '*.js' -printf '%s %p\n' | sort -nr | head -n 1 | awk '{print $2}')"
+          test -n "$largest_js"
+          lines="$(wc -l < "$largest_js")"
           if [ "$lines" -gt 50 ]; then
-            echo "Expected minified JS bundle, but $js_file has $lines lines"
+            echo "Expected minified JS bundle, but $largest_js has $lines lines"
             exit 1
           fi
-          echo "Build artifact verification passed: $js_file ($lines lines)"
+          echo "Build artifact verification passed: $largest_js ($lines lines)"
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4

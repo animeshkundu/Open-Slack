@@ -47,19 +47,23 @@ jobs:
         run: npm run build
 
       - name: Verify production artifact
+        env:
+          REPO_NAME: ${{ github.event.repository.name }}
         run: |
+          set -euo pipefail
           test -f dist/index.html
           test -f dist/404.html
           test -d dist/assets
-          grep -q '/Open-Slack/' dist/index.html
-          js_file="$(find dist/assets -name '*.js' | head -n 1)"
-          test -n "$js_file"
-          lines="$(wc -l < "$js_file")"
+          grep -q "/${REPO_NAME}/" dist/index.html
+
+          largest_js="$(find dist/assets -name '*.js' -printf '%s %p\n' | sort -nr | head -n 1 | awk '{print $2}')"
+          test -n "$largest_js"
+          lines="$(wc -l < "$largest_js")"
           if [ "$lines" -gt 50 ]; then
-            echo "Expected minified JS bundle, but $js_file has $lines lines"
+            echo "Expected minified JS bundle, but $largest_js has $lines lines"
             exit 1
           fi
-          echo "Deploy artifact ready: $js_file ($lines lines)"
+          echo "Deploy artifact ready: $largest_js ($lines lines)"
 
       - name: Upload GitHub Pages artifact
         uses: actions/upload-pages-artifact@v3
@@ -91,14 +95,16 @@ jobs:
       - name: Verify deployed site responds
         env:
           PAGE_URL: ${{ needs.deploy.outputs.page_url }}
+          REPO_NAME: ${{ github.event.repository.name }}
+          OWNER: ${{ github.repository_owner }}
         run: |
           set -euo pipefail
-          # Fallback if output is empty (should not happen on success)
-          URL="${PAGE_URL:-https://animeshkundu.github.io/Open-Slack/}"
-          # Normalize trailing slash
+          FALLBACK="https://${OWNER}.github.io/${REPO_NAME}/"
+          URL="${PAGE_URL:-$FALLBACK}"
           URL="${URL%/}/"
           echo "Checking $URL"
 
+          code=""
           for i in 1 2 3 4 5 6; do
             code="$(curl -sS -o /tmp/pages-body.html -w '%{http_code}' -L --max-time 30 "$URL" || true)"
             echo "Attempt $i -> HTTP $code"
@@ -109,14 +115,14 @@ jobs:
           done
 
           test "$code" = "200"
-          grep -qi 'QuietSlack\|root\|Open-Slack' /tmp/pages-body.html
-          # Asset references should use the project base path
+          grep -qi 'QuietSlack\|root\|'"$REPO_NAME" /tmp/pages-body.html
           grep -E 'src=|href=' /tmp/pages-body.html | head -n 20
 
-          # Follow a hashed asset if present and ensure it is reachable
-          asset="$(grep -oE '/Open-Slack/assets/[^" ]+\.js' /tmp/pages-body.html | head -n 1 || true)"
+          asset="$(grep -oE "/${REPO_NAME}/assets/[^\" ]+\\.js" /tmp/pages-body.html | head -n 1 || true)"
           if [ -n "$asset" ]; then
-            asset_url="https://animeshkundu.github.io${asset}"
+            # Prefer the deployed host from PAGE_URL when available
+            host="$(echo "$URL" | sed -E 's#(https?://[^/]+).*#\1#')"
+            asset_url="${host}${asset}"
             echo "Checking asset $asset_url"
             asset_code="$(curl -sS -o /dev/null -w '%{http_code}' -L --max-time 30 "$asset_url")"
             test "$asset_code" = "200"

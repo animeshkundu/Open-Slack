@@ -37,13 +37,9 @@ test.describe('QuietSlack Smoke & Core UI Suite', () => {
     await expect(page.locator('#search-modal-card')).toBeVisible();
     await expect(page.locator('#search-modal-input')).toBeVisible();
 
-    // Type query and close
+    // Type query and close with Escape
     await page.locator('#search-modal-input').fill('Welcome');
     await page.keyboard.press('Escape');
-    // Backdrop click or Escape may not be wired; close via backdrop click
-    if (await page.locator('#search-modal-card').isVisible()) {
-      await page.locator('#search-modal-backdrop').click({ position: { x: 5, y: 5 } });
-    }
     await expect(page.locator('#search-modal-card')).not.toBeVisible();
   });
 
