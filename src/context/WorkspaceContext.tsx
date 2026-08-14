@@ -2,16 +2,22 @@ import React, { createContext, useContext, useEffect, useMemo, useRef, useState 
 import { IndexeddbPersistence } from 'y-indexeddb';
 import * as Y from 'yjs';
 import {
-  generateCryptoKeypairs,
   generateWorkspacePassphrase,
   getOrCreateIdentity,
   saveIdentity,
   sha256,
   signMessage,
 } from '../lib/crypto';
+import { FileTransferProgress } from '../lib/fileTransfer';
 import { DEFAULT_RELAYS, p2pNetwork } from '../lib/p2p';
 import { playSound } from '../lib/sound';
-import { requestStoragePersistence, storeLocalFile } from '../lib/storage';
+import {
+  autoPruneStorageIfExceeded,
+  getStorageQuotaEstimate,
+  requestStoragePersistence,
+  StorageQuotaInfo,
+  storeLocalFile,
+} from '../lib/storage';
 import {
   Attachment,
   Channel,
@@ -59,7 +65,7 @@ interface WorkspaceContextValue {
   setTyping: (isTyping: boolean) => void;
   peerUsers: Map<string, UserIdentity>;
   connectedPeerCount: number;
-  relayStatus: 'connecting' | 'connected' | 'disconnected';
+  relayStatus: 'connecting' | 'connected' | 'reconnecting' | 'disconnected';
 
   // Right Drawer & Panels
   rightPanel: RightPanelView;
@@ -82,9 +88,13 @@ interface WorkspaceContextValue {
   toggleHuddleMute: () => void;
   toggleHuddleVideo: () => void;
   toggleHuddleScreenShare: () => void;
+  mediaPermissionError: string | null;
+  clearMediaPermissionError: () => void;
 
-  // File Upload Helper
+  // File Upload & Chunking Helper
   uploadAttachment: (file: File) => Promise<Attachment>;
+  fileTransferProgress: FileTransferProgress | null;
+  storageQuota: StorageQuotaInfo | null;
 
   // Simulation / Peer testing helper
   simulatePeerMessage: () => void;
@@ -148,9 +158,17 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     new Map()
   );
 
-  // Network stats
+  // Network stats & Connection indicators
   const [connectedPeerCount, setConnectedPeerCount] = useState(0);
-  const [relayStatus, setRelayStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connected');
+  const [relayStatus, setRelayStatus] = useState<'connecting' | 'connected' | 'reconnecting' | 'disconnected'>('connected');
+
+  // File Transfer Progress & Quota
+  const [fileTransferProgress, setFileTransferProgress] = useState<FileTransferProgress | null>(null);
+  const [storageQuota, setStorageQuota] = useState<StorageQuotaInfo | null>(null);
+
+  // Media Permissions Error Banner
+  const [mediaPermissionError, setMediaPermissionError] = useState<string | null>(null);
+  const clearMediaPermissionError = () => setMediaPermissionError(null);
 
   // Huddle / Call State
   const [huddleState, setHuddleState] = useState<HuddleState>({
@@ -167,6 +185,8 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   // 1. Initialize User Identity & Persistence on Mount
   useEffect(() => {
     requestStoragePersistence();
+    getStorageQuotaEstimate().then(setStorageQuota);
+    autoPruneStorageIfExceeded(90);
 
     getOrCreateIdentity().then(({ identity: initIdentity, keys: initKeys }) => {
       setIdentity(initIdentity);
@@ -239,7 +259,6 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   useEffect(() => {
     if (!activeWorkspace || !identity) return;
 
-    // Clean previous
     if (providerRef.current) {
       providerRef.current.destroy();
     }
@@ -281,7 +300,6 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       yUsers.forEach((u, k) => {
         userMap.set(k, u);
       });
-      // Always include local identity
       if (identity) {
         userMap.set(identity.pubkey, identity);
       }
@@ -349,7 +367,6 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         },
         onPeerLeave: (peerId) => {
           setConnectedPeerCount(p2pNetwork.connectedPeers.size);
-          // Remove from huddle if in call
           setHuddleState((prev) => {
             const nextMap = new Map(prev.participants);
             nextMap.delete(peerId);
@@ -362,7 +379,6 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             next.set(remoteUser.pubkey, { ...remoteUser, isOnline: true });
             return next;
           });
-          // Also save in CRDT users map
           doc.transact(() => {
             yUsers.set(remoteUser.pubkey, remoteUser);
           });
@@ -408,6 +424,15 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             }
             return { ...prev, participants: nextMap };
           });
+        },
+        onFileProgress: (progress) => {
+          setFileTransferProgress(progress);
+          if (progress.percentage >= 100) {
+            setTimeout(() => setFileTransferProgress(null), 2500);
+          }
+        },
+        onConnectionStatusChange: (status) => {
+          setRelayStatus(status);
         },
       }
     );
@@ -490,7 +515,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           avatarUrl: '',
           status: '',
           lastSeen: Date.now(),
-          color: '#1264A3',
+          color: '#1164A3',
         };
         list.push({ channelId, pubkey, user: u });
       }
@@ -578,7 +603,6 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const openDirectMessage = async (peerPubkey: string): Promise<Channel> => {
     if (!identity || !ydocRef.current) throw new Error('Not ready');
-    // Check if DM channel already exists between these 2 users
     const existing = channels.find(
       (c) => c.isDirectMessage && c.members?.includes(peerPubkey) && c.members?.includes(identity.pubkey)
     );
@@ -736,8 +760,13 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   // Huddles (Voice / Video)
   const startOrJoinHuddle = async (channelId: string) => {
     const channel = channels.find((c) => c.id === channelId);
+    setMediaPermissionError(null);
+
     try {
-      // Get user audio stream (video optional)
+      if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+        throw new Error('Media devices not supported in this environment');
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: true,
         video: false,
@@ -769,9 +798,13 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       });
 
       playSound.huddleJoin();
-    } catch (err) {
+    } catch (err: any) {
       console.warn('Microphone permission not available, starting voice-ready interface:', err);
-      // Still start in ready state
+      const isDenied = err?.name === 'NotAllowedError' || err?.name === 'PermissionDeniedError';
+      if (isDenied) {
+        setMediaPermissionError('Microphone permission was denied. You joined the Huddle in listen-only mode.');
+      }
+
       const participants = new Map<string, HuddleParticipant>();
       if (identity) {
         participants.set(identity.pubkey, {
@@ -828,16 +861,23 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const toggleHuddleVideo = async () => {
+    setMediaPermissionError(null);
     if (!huddleState.isVideoOn) {
       try {
+        if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+          throw new Error('Camera not supported');
+        }
         const videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
         const videoTrack = videoStream.getVideoTracks()[0];
         if (localMediaStreamRef.current && videoTrack) {
           localMediaStreamRef.current.addTrack(videoTrack);
         }
         setHuddleState((prev) => ({ ...prev, isVideoOn: true }));
-      } catch (err) {
+      } catch (err: any) {
         console.warn('Camera error:', err);
+        if (err?.name === 'NotAllowedError' || err?.name === 'PermissionDeniedError') {
+          setMediaPermissionError('Camera permission was denied.');
+        }
       }
     } else {
       if (localMediaStreamRef.current) {
@@ -851,8 +891,12 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const toggleHuddleScreenShare = async () => {
+    setMediaPermissionError(null);
     if (!huddleState.isScreenSharing) {
       try {
+        if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getDisplayMedia) {
+          throw new Error('Screen sharing not supported');
+        }
         const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
         const screenTrack = screenStream.getVideoTracks()[0];
         screenTrack.onended = () => {
@@ -862,17 +906,32 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           localMediaStreamRef.current.addTrack(screenTrack);
         }
         setHuddleState((prev) => ({ ...prev, isScreenSharing: true }));
-      } catch (err) {
+      } catch (err: any) {
         console.warn('Screen share cancelled or failed:', err);
+        if (err?.name === 'NotAllowedError' || err?.name === 'PermissionDeniedError') {
+          setMediaPermissionError('Screen share permission was denied or cancelled.');
+        }
       }
     } else {
       setHuddleState((prev) => ({ ...prev, isScreenSharing: false }));
     }
   };
 
-  // Upload file helper
+  // Upload file helper: store in local IndexedDB and broadcast chunked stream
   const uploadAttachment = async (file: File): Promise<Attachment> => {
-    return await storeLocalFile(file);
+    const attachment = await storeLocalFile(file);
+    // Transmit over P2P network with 16KB chunking
+    p2pNetwork.broadcastFile(file, (progress) => {
+      setFileTransferProgress(progress);
+      if (progress.percentage >= 100) {
+        setTimeout(() => setFileTransferProgress(null), 2500);
+      }
+    }).catch((err) => {
+      console.warn('[Storage] Background chunk broadcast note:', err);
+    });
+
+    getStorageQuotaEstimate().then(setStorageQuota);
+    return attachment;
   };
 
   // Simulation Helper for testing multi-peer interactions in single browser / demo
@@ -968,7 +1027,11 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     toggleHuddleMute,
     toggleHuddleVideo,
     toggleHuddleScreenShare,
+    mediaPermissionError,
+    clearMediaPermissionError,
     uploadAttachment,
+    fileTransferProgress,
+    storageQuota,
     simulatePeerMessage,
   };
 

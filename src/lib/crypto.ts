@@ -31,9 +31,9 @@ export async function sha256(data: string | ArrayBuffer): Promise<string> {
 
 // Deterministic User Avatar color generator
 const AVATAR_COLORS = [
-  '#E01E5A', // Slack Aubergine Red
+  '#E01E5A', // Slack Red
   '#2BAC76', // Green
-  '#1264A3', // Blue
+  '#1164A3', // Blue
   '#ECB22E', // Yellow
   '#4A154B', // Deep Aubergine
   '#007a5a', // Dark Green
@@ -93,7 +93,7 @@ export async function generateCryptoKeypairs(): Promise<{
   const encPubJWK = await crypto.subtle.exportKey('jwk', encKeypair.publicKey);
   const encPrivJWK = await crypto.subtle.exportKey('jwk', encKeypair.privateKey);
 
-  // Derive stable public fingerprint from Signing Public Key (x + y coordinates)
+  // Derive stable public fingerprint from Signing Public Key
   const pubRaw = `${signPubJWK.x || ''}${signPubJWK.y || ''}`;
   const pubkey = (await sha256(pubRaw)).substring(0, 32);
   const encPubRaw = `${encPubJWK.x || ''}${encPubJWK.y || ''}`;
@@ -134,8 +134,8 @@ export async function getOrCreateIdentity(): Promise<{
   identity: UserIdentity;
   keys: StoredPrivateKeyPair;
 }> {
-  const cachedIdentity = localStorage.getItem(STORAGE_KEYS.USER_IDENTITY);
-  const cachedKeys = localStorage.getItem(STORAGE_KEYS.CRYPTO_KEYS);
+  const cachedIdentity = typeof localStorage !== 'undefined' ? localStorage.getItem(STORAGE_KEYS.USER_IDENTITY) : null;
+  const cachedKeys = typeof localStorage !== 'undefined' ? localStorage.getItem(STORAGE_KEYS.CRYPTO_KEYS) : null;
 
   if (cachedIdentity && cachedKeys) {
     try {
@@ -143,7 +143,7 @@ export async function getOrCreateIdentity(): Promise<{
       const keys = JSON.parse(cachedKeys) as StoredPrivateKeyPair;
       return { identity, keys };
     } catch {
-      // fallback to generation if parsing fails
+      // fallback to generation
     }
   }
 
@@ -153,9 +153,11 @@ export async function getOrCreateIdentity(): Promise<{
 }
 
 export function saveIdentity(identity: UserIdentity, keys?: StoredPrivateKeyPair) {
-  localStorage.setItem(STORAGE_KEYS.USER_IDENTITY, JSON.stringify(identity));
-  if (keys) {
-    localStorage.setItem(STORAGE_KEYS.CRYPTO_KEYS, JSON.stringify(keys));
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem(STORAGE_KEYS.USER_IDENTITY, JSON.stringify(identity));
+    if (keys) {
+      localStorage.setItem(STORAGE_KEYS.CRYPTO_KEYS, JSON.stringify(keys));
+    }
   }
 }
 
@@ -225,7 +227,110 @@ export async function verifySignature(
 }
 
 /**
- * Generate a random 256-bit Workspace Symmetric Key
+ * Derive AES-GCM Symmetric Key from a passphrase using PBKDF2
+ */
+export async function deriveKeyFromPassphrase(passphrase: string, saltHex?: string): Promise<{ key: CryptoKey; salt: string }> {
+  const salt = saltHex ? hexToBuffer(saltHex) : crypto.getRandomValues(new Uint8Array(16));
+  const encoder = new TextEncoder();
+  const baseKey = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(passphrase),
+    'PBKDF2',
+    false,
+    ['deriveKey']
+  );
+
+  const key = await crypto.subtle.deriveKey(
+    {
+      name: 'PBKDF2',
+      salt: salt as BufferSource,
+      iterations: 100000,
+      hash: 'SHA-256',
+    },
+    baseKey,
+    { name: 'AES-GCM', length: 256 },
+    true,
+    ['encrypt', 'decrypt']
+  );
+
+  return { key, salt: bufferToHex(salt.buffer) };
+}
+
+/**
+ * Encrypt data using AES-GCM (256-bit)
+ */
+export async function encryptAESGCM(plainText: string, key: CryptoKey): Promise<{ cipherTextHex: string; ivHex: string }> {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const encoder = new TextEncoder();
+  const cipherBuffer = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv },
+    key,
+    encoder.encode(plainText)
+  );
+
+  return {
+    cipherTextHex: bufferToHex(cipherBuffer),
+    ivHex: bufferToHex(iv.buffer),
+  };
+}
+
+/**
+ * Decrypt data using AES-GCM (256-bit)
+ */
+export async function decryptAESGCM(cipherTextHex: string, ivHex: string, key: CryptoKey): Promise<string> {
+  const cipherBuffer = hexToBuffer(cipherTextHex);
+  const iv = hexToBuffer(ivHex);
+
+  const decryptedBuffer = await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv: iv as BufferSource },
+    key,
+    cipherBuffer as BufferSource
+  );
+
+  const decoder = new TextDecoder();
+  return decoder.decode(decryptedBuffer);
+}
+
+/**
+ * Derive ECDH Shared Secret Key between local private key and remote public key
+ */
+export async function deriveECDHSharedSecret(
+  localPrivateKeyJWKString: string,
+  remotePublicKeyJWKString: string
+): Promise<CryptoKey> {
+  const localPrivJWK = JSON.parse(localPrivateKeyJWKString);
+  const remotePubJWK = JSON.parse(remotePublicKeyJWKString);
+
+  const localPrivateKey = await crypto.subtle.importKey(
+    'jwk',
+    localPrivJWK,
+    { name: 'ECDH', namedCurve: 'P-256' },
+    false,
+    ['deriveKey', 'deriveBits']
+  );
+
+  const remotePublicKey = await crypto.subtle.importKey(
+    'jwk',
+    remotePubJWK,
+    { name: 'ECDH', namedCurve: 'P-256' },
+    false,
+    []
+  );
+
+  return await crypto.subtle.deriveKey(
+    {
+      name: 'ECDH',
+      public: remotePublicKey,
+    },
+    localPrivateKey,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+}
+
+/**
+ * Generate a random 256-bit Workspace Passphrase
  */
 export function generateWorkspacePassphrase(): string {
   const array = new Uint8Array(16);

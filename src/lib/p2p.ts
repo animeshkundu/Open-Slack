@@ -1,12 +1,42 @@
 import { joinRoom, Room } from 'trystero/nostr';
 import * as Y from 'yjs';
-import { HuddleParticipant, UserIdentity } from '../types';
+import { Attachment, HuddleParticipant, UserIdentity } from '../types';
+import {
+  FileChunkData,
+  FileChunkHeader,
+  fileChunkManager,
+  FileTransferProgress,
+} from './fileTransfer';
 
 export const DEFAULT_RELAYS = [
   'wss://relay.damus.io',
   'wss://nos.lol',
   'wss://relay.primal.net',
   'wss://nostr.mom',
+  'wss://relay.nostr.band',
+];
+
+export const DEFAULT_ICE_SERVERS: RTCIceServer[] = [
+  { urls: 'stun:stun.l.google.com:19302' },
+  { urls: 'stun:stun1.l.google.com:19302' },
+  { urls: 'stun:stun2.l.google.com:19302' },
+  { urls: 'stun:stun.cloudflare.com:3478' },
+  { urls: 'stun:openrelay.metered.ca:80' },
+  {
+    urls: 'turn:openrelay.metered.ca:80',
+    username: 'openrelayproject',
+    credential: 'openrelayproject',
+  },
+  {
+    urls: 'turn:openrelay.metered.ca:443',
+    username: 'openrelayproject',
+    credential: 'openrelayproject',
+  },
+  {
+    urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+    username: 'openrelayproject',
+    credential: 'openrelayproject',
+  },
 ];
 
 export interface P2PEvents {
@@ -16,6 +46,9 @@ export interface P2PEvents {
   onTypingUpdate?: (channelId: string, userPubkey: string, isTyping: boolean) => void;
   onHuddleStateUpdate?: (channelId: string, participants: HuddleParticipant[]) => void;
   onPeerStream?: (stream: MediaStream, peerId: string) => void;
+  onFileReceived?: (attachment: Attachment, senderPeerId: string) => void;
+  onFileProgress?: (progress: FileTransferProgress) => void;
+  onConnectionStatusChange?: (status: 'connecting' | 'connected' | 'reconnecting' | 'disconnected') => void;
 }
 
 export class P2PNetworkManager {
@@ -31,12 +64,18 @@ export class P2PNetworkManager {
   private sendDeltaUpdate: ((data: Uint8Array, options?: { target?: string }) => Promise<void>) | null = null;
   private sendPresence: ((user: any, options?: { target?: string }) => Promise<void>) | null = null;
   private sendTyping: ((payload: any, options?: { target?: string }) => Promise<void>) | null = null;
-  private sendHuddleSignal: ((payload: any, options?: { target?: string }) => Promise<void>) | null = null;
+  private sendFileHeader: ((header: FileChunkHeader, options?: { target?: string }) => Promise<void>) | null = null;
+  private sendFileChunk: ((chunk: FileChunkData, options?: { target?: string }) => Promise<void>) | null = null;
 
   private activeStream: MediaStream | null = null;
   private presenceInterval: number | null = null;
+  private antiEntropyInterval: number | null = null;
+  private reconnectTimeout: number | null = null;
+
   public connectedPeers: Set<string> = new Set();
-  public relayStatus: 'connecting' | 'connected' | 'disconnected' = 'connecting';
+  public relayStatus: 'connecting' | 'connected' | 'reconnecting' | 'disconnected' = 'connecting';
+  private currentWorkspaceId: string | null = null;
+  private currentRelays: string[] = DEFAULT_RELAYS;
 
   constructor() {
     this.initTabLeaderElection();
@@ -58,6 +97,8 @@ export class P2PNetworkManager {
             this.events.onPresenceUpdate(data.peerId, data.user);
           } else if (type === 'TYPING_SYNC' && this.events.onTypingUpdate) {
             this.events.onTypingUpdate(data.channelId, data.pubkey, data.isTyping);
+          } else if (type === 'FILE_SYNC' && this.events.onFileReceived) {
+            this.events.onFileReceived(data.attachment, data.senderPeerId);
           }
         };
       }
@@ -69,6 +110,7 @@ export class P2PNetworkManager {
           return new Promise<void>(() => {});
         }).catch((e) => {
           console.warn('[P2P] Web lock election note:', e);
+          this.isMasterTab = true;
         });
       } else {
         this.isMasterTab = true;
@@ -79,8 +121,12 @@ export class P2PNetworkManager {
     }
   }
 
+  public getIsMasterTab(): boolean {
+    return this.isMasterTab;
+  }
+
   /**
-   * Connect to workspace Nostr Room
+   * Connect to workspace Nostr Room with STUN/TURN fallback
    */
   public joinWorkspace(
     workspaceId: string,
@@ -93,36 +139,44 @@ export class P2PNetworkManager {
     this.ydoc = ydoc;
     this.localIdentity = identity;
     this.events = events;
+    this.currentWorkspaceId = workspaceId;
+    this.currentRelays = relays.length > 0 ? relays : DEFAULT_RELAYS;
 
     const roomId = `qs_${workspaceId.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 32)}`;
 
     try {
-      const activeRelays = relays.length > 0 ? relays : DEFAULT_RELAYS;
+      this.setStatus('connecting');
+
       this.room = joinRoom(
         {
           appId: 'quietslack-p2p-v1',
           relayConfig: {
-            urls: activeRelays,
+            urls: this.currentRelays,
+          },
+          rtcConfig: {
+            iceServers: DEFAULT_ICE_SERVERS,
           },
         },
         roomId
       );
 
-      this.relayStatus = 'connected';
-      console.log(`[P2P] Joined room ${roomId} via Nostr relays:`, activeRelays);
+      this.setStatus('connected');
+      console.log(`[P2P] Joined room ${roomId} with ${this.currentRelays.length} Nostr relays`);
 
-      // 1. Setup Trystero Actions using makeAction objects
+      // 1. Setup Trystero Actions
       const vectorAction = this.room.makeAction<Uint8Array>('sync_vec');
       const deltaAction = this.room.makeAction<Uint8Array>('sync_delta');
       const presAction = this.room.makeAction<any>('pres');
       const typeAction = this.room.makeAction<any>('type');
-      const huddleAction = this.room.makeAction<any>('huddle');
+      const fileHeaderAction = this.room.makeAction<any>('file_hdr');
+      const fileChunkAction = this.room.makeAction<any>('file_chk');
 
       this.sendSyncVector = (data, opts) => vectorAction.send(data, opts);
       this.sendDeltaUpdate = (data, opts) => deltaAction.send(data, opts);
       this.sendPresence = (data, opts) => presAction.send(data, opts);
       this.sendTyping = (data, opts) => typeAction.send(data, opts);
-      this.sendHuddleSignal = (data, opts) => huddleAction.send(data, opts);
+      this.sendFileHeader = (hdr, opts) => fileHeaderAction.send(hdr, opts);
+      this.sendFileChunk = (chk, opts) => fileChunkAction.send(chk, opts);
 
       // 2. State Vector Sync (Anti-Entropy)
       vectorAction.onMessage = (remoteVector, ctx) => {
@@ -157,8 +211,24 @@ export class P2PNetworkManager {
         });
       };
 
-      // 6. Huddle Signaling
-      huddleAction.onMessage = (_payload) => {};
+      // 6. Binary Chunked File Transfer Receivers
+      fileHeaderAction.onMessage = (header) => {
+        fileChunkManager.handleChunkHeader(header);
+      };
+
+      fileChunkAction.onMessage = async (chunk, ctx) => {
+        const assembledAttachment = await fileChunkManager.handleChunkData(chunk, (progress) => {
+          this.events.onFileProgress?.(progress);
+        });
+
+        if (assembledAttachment) {
+          this.events.onFileReceived?.(assembledAttachment, ctx.peerId);
+          this.tabBroadcastChannel?.postMessage({
+            type: 'FILE_SYNC',
+            data: { attachment: assembledAttachment, senderPeerId: ctx.peerId },
+          });
+        }
+      };
 
       // 7. Peer Lifecycle Callbacks
       this.room.onPeerJoin = (peerId: string) => {
@@ -166,7 +236,7 @@ export class P2PNetworkManager {
         this.connectedPeers.add(peerId);
         this.events.onPeerJoin?.(peerId);
 
-        // Send local state vector to the new peer
+        // Send local state vector to the new peer for anti-entropy sync
         if (this.ydoc && this.sendSyncVector) {
           const localVector = Y.encodeStateVector(this.ydoc);
           this.sendSyncVector(localVector, { target: peerId });
@@ -179,7 +249,11 @@ export class P2PNetworkManager {
 
         // If local huddle stream is active, attach stream
         if (this.activeStream && this.room) {
-          this.room.addStream(this.activeStream, { target: peerId });
+          try {
+            this.room.addStream(this.activeStream, { target: peerId });
+          } catch (e) {
+            console.warn('[P2P] Error adding stream to new peer:', e);
+          }
         }
       };
 
@@ -195,23 +269,45 @@ export class P2PNetworkManager {
         this.events.onPeerStream?.(stream, peerId);
       };
 
-      // 9. Start regular Presence Heartbeat
+      // 9. Start periodic Heartbeat & Anti-Entropy
       this.startPresenceHeartbeat();
+      this.startAntiEntropySync();
 
       // 10. Hook Y.Doc updates to broadcast deltas over P2P & Tab bus
       this.ydoc.on('update', this.handleYDocUpdate);
     } catch (err) {
-      console.warn('[P2P] Error joining Nostr room, running in resilient offline/tab mesh:', err);
-      this.relayStatus = 'disconnected';
+      console.warn('[P2P] Error joining Nostr room, operating in tab/local mode with retry:', err);
+      this.setStatus('disconnected');
+      this.scheduleReconnect();
     }
   }
 
+  private setStatus(status: 'connecting' | 'connected' | 'reconnecting' | 'disconnected') {
+    this.relayStatus = status;
+    this.events.onConnectionStatusChange?.(status);
+  }
+
+  private scheduleReconnect() {
+    if (this.reconnectTimeout) clearTimeout(this.reconnectTimeout);
+    this.reconnectTimeout = window.setTimeout(() => {
+      if (this.currentWorkspaceId && this.ydoc && this.localIdentity && this.relayStatus !== 'connected') {
+        console.log('[P2P] Attempting reconnection...');
+        this.setStatus('reconnecting');
+        this.joinWorkspace(
+          this.currentWorkspaceId,
+          this.ydoc,
+          this.localIdentity,
+          this.currentRelays,
+          this.events
+        );
+      }
+    }, 10000);
+  }
+
   private handleYDocUpdate = (update: Uint8Array, origin: unknown) => {
-    // Prevent echo loops from updates originating from p2p_network
     if (origin !== 'p2p_network' && this.sendDeltaUpdate) {
       this.sendDeltaUpdate(update);
     }
-    // Also broadcast to local tabs
     if (origin !== 'tab_bus' && this.tabBroadcastChannel) {
       this.tabBroadcastChannel.postMessage({
         type: 'YJS_UPDATE',
@@ -241,6 +337,26 @@ export class P2PNetworkManager {
     }
   }
 
+  /**
+   * Broadcast a file using 16 KB binary chunking with backpressure
+   */
+  public async broadcastFile(
+    file: File | { name: string; type: string; size: number; buffer: ArrayBuffer },
+    onProgress?: (progress: FileTransferProgress) => void
+  ): Promise<Attachment> {
+    return fileChunkManager.sendFileWithBackpressure(
+      file,
+      async (payload) => {
+        if (payload.type === 'CHUNK_HEADER' && this.sendFileHeader) {
+          await this.sendFileHeader(payload);
+        } else if (payload.type === 'CHUNK_DATA' && this.sendFileChunk) {
+          await this.sendFileChunk(payload);
+        }
+      },
+      onProgress
+    );
+  }
+
   private startPresenceHeartbeat() {
     if (this.presenceInterval) {
       clearInterval(this.presenceInterval);
@@ -257,8 +373,20 @@ export class P2PNetworkManager {
   }
 
   /**
-   * Huddle Media Stream controls
+   * Anti-entropy periodic sync: exchange state vectors to reconcile missing updates
    */
+  private startAntiEntropySync() {
+    if (this.antiEntropyInterval) {
+      clearInterval(this.antiEntropyInterval);
+    }
+    this.antiEntropyInterval = window.setInterval(() => {
+      if (this.ydoc && this.sendSyncVector && this.connectedPeers.size > 0) {
+        const localVector = Y.encodeStateVector(this.ydoc);
+        this.sendSyncVector(localVector);
+      }
+    }, 45000);
+  }
+
   public addMediaStream(stream: MediaStream) {
     this.activeStream = stream;
     if (this.room) {
@@ -282,9 +410,17 @@ export class P2PNetworkManager {
   }
 
   public leaveWorkspace() {
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
+      this.reconnectTimeout = null;
+    }
     if (this.presenceInterval) {
       clearInterval(this.presenceInterval);
       this.presenceInterval = null;
+    }
+    if (this.antiEntropyInterval) {
+      clearInterval(this.antiEntropyInterval);
+      this.antiEntropyInterval = null;
     }
     if (this.ydoc) {
       this.ydoc.off('update', this.handleYDocUpdate);
@@ -300,5 +436,4 @@ export class P2PNetworkManager {
   }
 }
 
-// Global Singleton Instance
 export const p2pNetwork = new P2PNetworkManager();
