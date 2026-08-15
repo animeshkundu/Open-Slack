@@ -2,7 +2,9 @@ import { defineConfig, devices } from '@playwright/test';
 
 const deployedBaseURL = process.env.PLAYWRIGHT_BASE_URL;
 const previewBuild = process.env.PLAYWRIGHT_PREVIEW === 'true';
-const localBaseURL = previewBuild ? 'http://localhost:4173' : 'http://localhost:3000';
+const localBaseURL = previewBuild
+  ? 'http://localhost:4173/Open-Slack/'
+  : 'http://localhost:3000';
 
 export default defineConfig({
   testDir: './tests/e2e',
