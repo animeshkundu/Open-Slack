@@ -62,7 +62,7 @@ describe('Sound cues', () => {
 
     expect(AudioContextMock).toHaveBeenCalled();
     expect(context.resume).toHaveBeenCalled();
-    expect(oscillators.length).toBe(10);
+    expect(oscillators.length).toBe(10); // sent, received, pop, join, and leave use 1, 2, 1, 3, and 3 oscillators.
     oscillators.forEach((oscillator) => {
       expect(oscillator.connect).toHaveBeenCalled();
       expect(oscillator.start).toHaveBeenCalled();

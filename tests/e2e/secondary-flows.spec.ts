@@ -24,7 +24,7 @@ test.describe('Secondary workspace flows', () => {
     await page.locator('#workspace-header-menu-btn').click();
     await page.locator('#ws-menu-invite-btn').click();
     await expect(page.locator('#invite-modal-card')).toBeVisible();
-    await expect(page.locator('#invite-link-input')).toHaveValue(/#invite=/);
+    await expect(page.locator('#invite-link-input')).toHaveValue(/\/#invite=.+$/);
     await page.locator('#close-invite-modal-btn').click();
 
     await page.locator('#workspace-header-menu-btn').click();
