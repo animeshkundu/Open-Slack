@@ -25,7 +25,7 @@ test.describe('Secondary workspace flows', () => {
     await page.locator('#workspace-header-menu-btn').click();
     await page.locator('#ws-menu-invite-btn').click();
     await expect(page.locator('#invite-modal-card')).toBeVisible();
-    await expect(page.locator('#invite-link-input')).toHaveValue(/\/#invite=.+$/);
+    await expect(page.locator('#invite-link-input')).toHaveValue(/#invite=.+$/);
     await page.locator('#close-invite-modal-btn').click();
 
     await page.locator('#workspace-header-menu-btn').click();
@@ -51,7 +51,9 @@ test.describe('Secondary workspace flows', () => {
     await page.locator('#workspace-header-menu-btn').click();
     await page.locator('#ws-menu-landing-page-btn').click();
     await expect(page.locator('#open-slack-landing-page')).toBeVisible();
-    await page.locator('#hero-launch-app-btn').click();
+    await page.locator('#hero-create-workspace-btn').click();
+    await expect(page.getByTestId('onboarding-modal-card')).toBeVisible();
+    await page.locator('#close-onboarding-modal').click();
     await expect(page.locator('#openslack-root-shell')).toBeVisible();
   });
 });

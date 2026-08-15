@@ -56,8 +56,8 @@ test.describe('Open Slack Comprehensive Self-Review & Autonomous E2E Matrix', ()
     // 2. Activity Tab — bottom nav must remain visible (Slack mobile parity)
     await page.locator('#mobile-nav-activity-btn').click();
     await expect(page.locator('#mobile-activity-screen')).toBeVisible();
-    await expect(page.locator('#activity-feed-drawer')).toBeVisible();
-    await expect(page.locator('#activity-feed-drawer')).toHaveAttribute('data-variant', 'page');
+    await expect(page.locator('#mobile-activity-feed-drawer')).toBeVisible();
+    await expect(page.locator('#mobile-activity-feed-drawer')).toHaveAttribute('data-variant', 'page');
     await expect(mobileNav).toBeVisible();
     await expect(mobileNav).toBeInViewport();
     // Drawer close chrome is hidden on the tab surface

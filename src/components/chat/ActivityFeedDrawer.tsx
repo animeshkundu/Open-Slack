@@ -47,8 +47,8 @@ export const ActivityFeedDrawer: React.FC<ActivityFeedDrawerProps> = ({
 
   return (
     <div
-      id="activity-feed-drawer"
-      data-testid="activity-feed-drawer"
+      id={isPage ? 'mobile-activity-feed-drawer' : 'activity-feed-drawer'}
+      data-testid={isPage ? 'mobile-activity-feed-drawer' : 'activity-feed-drawer'}
       data-variant={variant}
       className="h-full min-h-0 flex flex-col bg-white"
     >

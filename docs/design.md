@@ -14,6 +14,7 @@ Interactive controls should use real buttons or links, retain visible focus beha
   - **Activity** is a first-class bottom-tab page (`mobileView === 'activity'`, `ActivityFeedDrawer variant="page"`) — the tab bar stays visible and tappable, matching Slack mobile.
   - Right drawers on phone stop above the tab bar (`bottom-[calc(3.5rem+env(safe-area-inset-bottom))]`) so Threads / channel details never cover `MobileNavBar`.
   - Sidebar **Invite people** sits under Channels & DMs (Slack placement). DM compose searches workspace members; empty state CTAs route to workspace invite rather than treating invite as a peer directory.
+  - Activity surfaces use variant-specific DOM identifiers so the mobile bottom-tab page and desktop/tablet right drawer remain independently addressable and never duplicate element IDs.
 
 Viewport-locked app surfaces use `100dvh`, `min-h-0`, and explicit nested overflow. The landing page remains normal document flow with vertical page scrolling and horizontal overflow clipped. Modal cards cap their height against the dynamic viewport and scroll their own content.
 
