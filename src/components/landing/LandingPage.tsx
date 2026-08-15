@@ -44,7 +44,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
   const [activeDocTab, setActiveDocTab] = useState<'p2p' | 'crdt' | 'security' | 'responsive'>('p2p');
 
   return (
-    <div id="open-slack-landing-page" className="min-h-screen bg-white text-neutral-900 font-sans selection:bg-amber-100 selection:text-amber-900 flex flex-col">
+    <div id="open-slack-landing-page" className="min-h-screen w-full overflow-x-hidden bg-white text-neutral-900 font-sans selection:bg-amber-100 selection:text-amber-900 flex flex-col">
       {/* Top Navigation */}
       <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-neutral-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
@@ -125,17 +125,17 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
           <div className="relative mx-auto max-w-5xl rounded-2xl border border-neutral-300/80 bg-neutral-900 p-2 sm:p-3 shadow-2xl overflow-hidden">
             <div className="bg-[#1A1D21] rounded-xl overflow-hidden border border-neutral-800 flex flex-col text-left">
               {/* Window Bar */}
-              <div className="h-9 bg-[#121016] border-b border-neutral-800 flex items-center justify-between px-4">
+              <div className="h-9 bg-[#121016] border-b border-neutral-800 flex items-center justify-between px-3 sm:px-4">
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full bg-[#EC6A5E]" />
                   <div className="w-3 h-3 rounded-full bg-[#F5BF4F]" />
                   <div className="w-3 h-3 rounded-full bg-[#62C554]" />
                 </div>
-                <div className="flex items-center gap-2 px-6 py-0.5 bg-white/10 rounded-md text-[11px] text-neutral-300 font-mono">
+                <div className="hidden sm:flex items-center gap-2 px-6 py-0.5 bg-white/10 rounded-md text-[11px] text-neutral-300 font-mono truncate">
                   <Lock className="w-3 h-3 text-emerald-400" />
                   <span>openslack://workspace/general • E2E Encrypted P2P Mesh</span>
                 </div>
-                <div className="text-[11px] text-neutral-400 font-mono flex items-center gap-1">
+                <div className="hidden sm:flex text-[11px] text-neutral-400 font-mono items-center gap-1">
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                   <span>3 Peers Connected</span>
                 </div>
@@ -193,10 +193,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
                 <div className="flex-1 bg-white flex flex-col justify-between">
                   {/* Channel Header */}
                   <div className="h-12 border-b border-neutral-200 px-4 flex items-center justify-between bg-neutral-50/50">
-                    <div className="flex items-center gap-2">
+                    <div className="flex min-w-0 items-center gap-2">
                       <Hash className="w-4 h-4 text-neutral-600" />
                       <span className="text-sm font-extrabold text-neutral-900">general</span>
-                      <span className="text-xs text-neutral-400">| E2E encrypted team discussion</span>
+                      <span className="hidden sm:inline text-xs text-neutral-400 truncate">| E2E encrypted team discussion</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <button type="button" className="px-2.5 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-md text-xs font-bold flex items-center gap-1">
@@ -505,17 +505,17 @@ channel.onmessage = (e) => Y.applyUpdate(ydoc, new Uint8Array(e.data));`}</code>
                     Designed for high-productivity switching across devices:
                   </p>
                   <div className="space-y-2 text-xs">
-                    <div className="flex items-center justify-between p-2.5 bg-neutral-50 rounded-lg border border-neutral-200">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 p-2.5 bg-neutral-50 rounded-lg border border-neutral-200">
                       <span className="font-bold flex items-center gap-1.5"><Monitor className="w-4 h-4 text-blue-600" /> Desktop (&gt;1024px)</span>
-                      <span className="text-neutral-500 font-mono">Workspace Rail + Sidebar + Chat Canvas + Thread Drawer</span>
+                      <span className="text-neutral-500 font-mono break-words">Workspace Rail + Sidebar + Chat Canvas + Thread Drawer</span>
                     </div>
-                    <div className="flex items-center justify-between p-2.5 bg-neutral-50 rounded-lg border border-neutral-200">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 p-2.5 bg-neutral-50 rounded-lg border border-neutral-200">
                       <span className="font-bold flex items-center gap-1.5"><Tablet className="w-4 h-4 text-purple-600" /> Tablet (768px - 1024px)</span>
-                      <span className="text-neutral-500 font-mono">Collapsible Sidebar + Chat Canvas + Slide-Over Drawers</span>
+                      <span className="text-neutral-500 font-mono break-words">Collapsible Sidebar + Chat Canvas + Slide-Over Drawers</span>
                     </div>
-                    <div className="flex items-center justify-between p-2.5 bg-neutral-50 rounded-lg border border-neutral-200">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 p-2.5 bg-neutral-50 rounded-lg border border-neutral-200">
                       <span className="font-bold flex items-center gap-1.5"><Smartphone className="w-4 h-4 text-amber-600" /> Mobile (&lt;768px)</span>
-                      <span className="text-neutral-500 font-mono">Single Active View + Bottom Nav Bar (Home, DMs, Activity, More)</span>
+                      <span className="text-neutral-500 font-mono break-words">Single Active View + Bottom Nav Bar (Home, DMs, Activity, More)</span>
                     </div>
                   </div>
                 </div>

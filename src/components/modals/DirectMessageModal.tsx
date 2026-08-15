@@ -44,7 +44,7 @@ export const DirectMessageModal: React.FC<DirectMessageModalProps> = ({
     >
       <div
         id="dm-modal-card"
-        className="w-full max-w-md bg-white rounded-xl shadow-2xl border border-neutral-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+        className="w-full max-w-md max-h-[calc(100dvh-2rem)] bg-white rounded-xl shadow-2xl border border-neutral-200 overflow-y-auto animate-in fade-in zoom-in-95 duration-150"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="p-5 border-b border-neutral-100 flex items-center justify-between">
