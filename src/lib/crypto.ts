@@ -1,9 +1,28 @@
 import { StoredPrivateKeyPair, UserIdentity } from '../types';
+import { getUserIdentityFromIndexedDB, saveUserIdentityToIndexedDB } from './storage';
 
-const STORAGE_KEYS = {
+export const STORAGE_KEYS = {
   USER_IDENTITY: 'openslack_user_identity',
   CRYPTO_KEYS: 'openslack_crypto_keys',
 };
+
+/**
+ * Auto-derive a clean, collision-free handle from a user's display name and public key.
+ * User cannot supply their own alias manually.
+ */
+export function deriveUniqueHandle(fullName: string, pubkey?: string): string {
+  const trimmed = (fullName || '').trim().toLowerCase();
+  if (!trimmed) return '@user';
+  const parts = trimmed
+    .split(/\s+/)
+    .map((p) => p.replace(/[^a-z0-9]/g, ''))
+    .filter(Boolean);
+  if (parts.length === 0) return '@user';
+
+  const base = parts.length === 1 ? parts[0] : `${parts[0]}.${parts[parts.length - 1]}`;
+  const suffix = pubkey ? pubkey.slice(0, 4) : '';
+  return suffix ? `@${base}.${suffix}` : `@${base}`;
+}
 
 // Utility to convert ArrayBuffer or Uint8Array to hex
 export function bufferToHex(buffer: ArrayBuffer | ArrayBufferLike | Uint8Array): string {
@@ -135,6 +154,7 @@ export async function getOrCreateIdentity(): Promise<{
   identity: UserIdentity;
   keys: StoredPrivateKeyPair;
 }> {
+  // 1. Fast check from localStorage
   const cachedIdentity = typeof localStorage !== 'undefined' ? localStorage.getItem(STORAGE_KEYS.USER_IDENTITY) : null;
   const cachedKeys = typeof localStorage !== 'undefined' ? localStorage.getItem(STORAGE_KEYS.CRYPTO_KEYS) : null;
 
@@ -142,13 +162,35 @@ export async function getOrCreateIdentity(): Promise<{
     try {
       const identity = JSON.parse(cachedIdentity) as UserIdentity;
       const keys = JSON.parse(cachedKeys) as StoredPrivateKeyPair;
+      // Mirror to IndexedDB in background
+      saveUserIdentityToIndexedDB(identity, keys).catch(() => {});
       return { identity, keys };
     } catch {
-      // fallback to generation
+      // fallback to IndexedDB / generation
     }
   }
 
+  // 2. Check IndexedDB if localStorage was empty or cleared
+  try {
+    const idbResult = await getUserIdentityFromIndexedDB();
+    if (idbResult && idbResult.identity && idbResult.keys) {
+      // Restore to localStorage
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(STORAGE_KEYS.USER_IDENTITY, JSON.stringify(idbResult.identity));
+        localStorage.setItem(STORAGE_KEYS.CRYPTO_KEYS, JSON.stringify(idbResult.keys));
+      }
+      return {
+        identity: idbResult.identity,
+        keys: idbResult.keys,
+      };
+    }
+  } catch (err) {
+    console.warn('[Crypto] Error loading identity from IndexedDB:', err);
+  }
+
+  // 3. Generate initial keys & identity
   const generated = await generateCryptoKeypairs();
+  generated.identity.hasCustomName = false;
   saveIdentity(generated.identity, generated.keys);
   return generated;
 }
@@ -160,6 +202,10 @@ export function saveIdentity(identity: UserIdentity, keys?: StoredPrivateKeyPair
       localStorage.setItem(STORAGE_KEYS.CRYPTO_KEYS, JSON.stringify(keys));
     }
   }
+  // Also persist to IndexedDB asynchronously
+  saveUserIdentityToIndexedDB(identity, keys).catch((err) => {
+    console.warn('[Crypto] Could not persist identity to IndexedDB:', err);
+  });
 }
 
 /**

@@ -1,9 +1,10 @@
-import { Attachment } from '../types';
+import { Attachment, StoredPrivateKeyPair, UserIdentity } from '../types';
 import { sha256 } from './crypto';
 
 const DB_NAME = 'openslack_media_store';
 const STORE_NAME = 'media_files';
-const DB_VERSION = 2;
+const USER_STORE_NAME = 'user_identity';
+const DB_VERSION = 3;
 
 let dbPromise: Promise<IDBDatabase> | null = null;
 
@@ -65,12 +66,94 @@ export function getMediaDB(): Promise<IDBDatabase> {
         if (!db.objectStoreNames.contains(STORE_NAME)) {
           db.createObjectStore(STORE_NAME, { keyPath: 'id' });
         }
+        if (!db.objectStoreNames.contains(USER_STORE_NAME)) {
+          db.createObjectStore(USER_STORE_NAME, { keyPath: 'key' });
+        }
       };
       req.onsuccess = () => resolve(req.result);
       req.onerror = () => reject(req.error);
     });
   }
   return dbPromise;
+}
+
+/**
+ * Save user identity & crypto keys to persistent IndexedDB
+ */
+export async function saveUserIdentityToIndexedDB(
+  identity: UserIdentity,
+  keys?: StoredPrivateKeyPair | null
+): Promise<boolean> {
+  try {
+    const db = await getMediaDB();
+    const tx = db.transaction(USER_STORE_NAME, 'readwrite');
+    const store = tx.objectStore(USER_STORE_NAME);
+    
+    store.put({
+      key: 'current_user_profile',
+      identity,
+      keys: keys || null,
+      updatedAt: Date.now(),
+    });
+
+    return new Promise((resolve) => {
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => resolve(false);
+    });
+  } catch (err) {
+    console.warn('[Storage] Error saving identity to IndexedDB:', err);
+    return false;
+  }
+}
+
+/**
+ * Retrieve user identity & crypto keys from persistent IndexedDB
+ */
+export async function getUserIdentityFromIndexedDB(): Promise<{
+  identity: UserIdentity;
+  keys: StoredPrivateKeyPair | null;
+} | null> {
+  try {
+    const db = await getMediaDB();
+    const tx = db.transaction(USER_STORE_NAME, 'readonly');
+    const store = tx.objectStore(USER_STORE_NAME);
+
+    return new Promise((resolve) => {
+      const req = store.get('current_user_profile');
+      req.onsuccess = () => {
+        if (req.result && req.result.identity) {
+          resolve({
+            identity: req.result.identity,
+            keys: req.result.keys || null,
+          });
+        } else {
+          resolve(null);
+        }
+      };
+      req.onerror = () => resolve(null);
+    });
+  } catch (err) {
+    console.warn('[Storage] Error loading identity from IndexedDB:', err);
+    return null;
+  }
+}
+
+/**
+ * Delete user identity from IndexedDB (e.g. for testing or reset)
+ */
+export async function deleteUserIdentityFromIndexedDB(): Promise<boolean> {
+  try {
+    const db = await getMediaDB();
+    const tx = db.transaction(USER_STORE_NAME, 'readwrite');
+    const store = tx.objectStore(USER_STORE_NAME);
+    store.delete('current_user_profile');
+    return new Promise((resolve) => {
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => resolve(false);
+    });
+  } catch {
+    return false;
+  }
 }
 
 export interface StorageQuotaInfo {

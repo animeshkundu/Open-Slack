@@ -18,14 +18,14 @@ test.describe('Open Slack Comprehensive Self-Review & Autonomous E2E Matrix', ()
     await page.locator('#hero-create-workspace-btn').click();
     await expect(page.locator('#create-workspace-modal-card')).toBeVisible();
 
-    // Step 1: Identity capture (Real Name & Handle)
-    await page.locator('#landing-user-name-input').fill('Alice Reviewer');
-    await page.locator('#landing-user-handle-input').fill('@alice_rev');
+    // Step 1: Workspace details
+    await page.locator('#landing-ws-name-input').fill('Self Review Team');
     await page.locator('#step1-next-btn').click();
 
-    // Step 2: Workspace details
-    await expect(page.locator('#landing-ws-name-input')).toBeVisible();
-    await page.locator('#landing-ws-name-input').fill('Self Review Team');
+    // Step 2: Identity capture (Real Name & Handle)
+    await expect(page.locator('#landing-user-name-input')).toBeVisible();
+    await page.locator('#landing-user-name-input').fill('Alice Reviewer');
+    await page.locator('#landing-user-handle-input').fill('@alice_rev');
     await page.locator('#submit-create-workspace-btn').click();
 
     // Should transition directly to the workspace shell

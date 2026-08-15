@@ -2,6 +2,31 @@ import { Plus, Settings, ShieldCheck, Zap } from 'lucide-react';
 import React, { useState } from 'react';
 import { useWorkspace } from '../../context/WorkspaceContext';
 
+const WORKSPACE_PALETTE = [
+  '#4A154B', // Aubergine (Slack Classic)
+  '#007A5A', // Emerald Green
+  '#1264A3', // Royal Blue
+  '#E01E5A', // Slack Red
+  '#ECB22E', // Golden Amber
+  '#611F69', // Deep Violet
+  '#0B8296', // Ocean Teal
+  '#C74800', // Terracotta Orange
+  '#2C5282', // Midnight Navy
+  '#1D1C1D', // Charcoal Dark
+];
+
+export function getWorkspaceColor(ws?: { color?: string; id?: string; name?: string }): string {
+  if (ws?.color) return ws.color;
+  if (!ws?.id && !ws?.name) return '#4A154B';
+  const str = ws.id || ws.name || '';
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const idx = Math.abs(hash) % WORKSPACE_PALETTE.length;
+  return WORKSPACE_PALETTE[idx];
+}
+
 interface WorkspaceBarProps {
   onOpenAddWorkspace: () => void;
   onOpenSettings: () => void;
@@ -29,6 +54,7 @@ export const WorkspaceBar: React.FC<WorkspaceBarProps> = ({
       <div className="flex-1 w-full flex flex-col items-center space-y-4 overflow-y-auto overflow-x-hidden no-scrollbar">
         {workspaces.map((ws) => {
           const isActive = ws.id === activeWorkspace?.id;
+          const wsColor = getWorkspaceColor(ws);
           const initials = ws.name
             .split(/\s+/)
             .map((w) => w[0])
@@ -47,10 +73,13 @@ export const WorkspaceBar: React.FC<WorkspaceBarProps> = ({
                 id={`ws-switch-btn-${ws.id}`}
                 type="button"
                 onClick={() => switchWorkspace(ws.id)}
-                className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm transition-all relative ${
+                style={{
+                  backgroundColor: wsColor,
+                }}
+                className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm text-white transition-all relative ${
                   isActive
-                    ? 'bg-[#3F0E40] text-white border-2 border-white/40 shadow-lg scale-105'
-                    : 'bg-[#350d36] text-white/70 hover:bg-[#3F0E40] hover:text-white border border-white/10 hover:rounded-lg'
+                    ? 'border-2 border-white shadow-lg scale-105 opacity-100 ring-2 ring-white/20'
+                    : 'border border-white/15 opacity-75 hover:opacity-100 hover:rounded-lg hover:scale-102'
                 }`}
                 title={ws.name}
               >

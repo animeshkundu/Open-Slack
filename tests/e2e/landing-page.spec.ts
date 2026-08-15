@@ -16,7 +16,7 @@ test.describe('Landing Page & Responsiveness Suite', () => {
     await expect(landingContainer).toBeVisible();
 
     // Verify Hero Section
-    await expect(page.locator('[data-testid="hero-launch-app-btn"]')).toBeVisible();
+    await expect(page.locator('#hero-launch-app-btn')).toBeVisible();
     await expect(page.getByText('Explore Technical Docs')).toBeVisible();
 
     // Verify Interactive Showcase section exists
@@ -39,9 +39,9 @@ test.describe('Landing Page & Responsiveness Suite', () => {
     expect(landingScrollMetrics.scrollHeight).toBeGreaterThan(landingScrollMetrics.viewportHeight);
     expect(landingScrollMetrics.scrollWidth).toBeLessThanOrEqual(landingScrollMetrics.viewportWidth);
 
-    // Open the onboarding flow from the landing page
-    await page.locator('[data-testid="hero-launch-app-btn"]').click();
-    await expect(page.locator('#create-workspace-modal-card')).toBeVisible();
+    // Launch app from landing page
+    await page.locator('#hero-launch-app-btn').click();
+    await expect(page.locator('#openslack-root-shell')).toBeVisible();
   });
 
   test('responsive layout adapts smoothly to Mobile (375px), Tablet (768px), and Desktop (1440px)', async ({ page }) => {
@@ -64,7 +64,7 @@ test.describe('Landing Page & Responsiveness Suite', () => {
     // Mobile Viewport
     await page.setViewportSize({ width: 375, height: 667 });
     await expect(page.locator('#openslack-root-shell')).toBeVisible();
-    await expect(page.locator('#mobile-nav-bar')).toBeVisible();
+    await expect(page.locator('#mobile-bottom-nav-bar')).toBeVisible();
     await expect
       .poll(() =>
         page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
@@ -73,7 +73,7 @@ test.describe('Landing Page & Responsiveness Suite', () => {
 
     await page.locator('#mobile-nav-home-btn').click();
     await expect(page.locator('#primary-sidebar-container')).toBeVisible();
-    await page.locator('#mobile-nav-channels-btn').click();
+    await page.locator('#mobile-nav-chat-btn').click();
     await page.locator('#channel-details-btn').click();
     await expect(page.locator('#right-drawer-panel')).toBeVisible();
     await expect

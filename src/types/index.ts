@@ -33,6 +33,7 @@ export interface UserIdentity {
   enc_pubkey?: string;       // Hex public key for ECDH encryption
   displayName: string;
   handle: string;
+  hasCustomName?: boolean;   // True once the user has explicitly entered their name
   email?: string;
   avatarUrl: string;         // Data URL or generated avatar
   status: string;            // Legacy text status
@@ -62,6 +63,7 @@ export interface Workspace {
   id: string;                // e.g. "ws_general_..."
   name: string;
   slug?: string;
+  color?: string;            // Custom brand/accent color for workspace
   iconUrl?: string;
   ownerId?: string;
   ownerPubkey: string;
@@ -134,6 +136,23 @@ export interface AppNotification {
   contentSnippet?: string;
   isRead: boolean;
   createdAt: string;
+}
+
+export interface ToastNotification {
+  id: string;
+  title?: string;
+  authorName: string;
+  authorAvatar?: string;
+  authorPubkey?: string;
+  channelId?: string;
+  channelName?: string;
+  isPrivate?: boolean;
+  isDirectMessage?: boolean;
+  messageId?: string;
+  threadParentId?: string;
+  content: string;
+  type: 'message' | 'mention' | 'thread_reply' | 'reaction' | 'huddle' | 'system';
+  createdAt: number;
 }
 
 export interface JoinRequest {

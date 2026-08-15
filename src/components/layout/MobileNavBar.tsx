@@ -92,7 +92,7 @@ export const MobileNavBar: React.FC<MobileNavBarProps> = ({ onOpenSettings }) =>
         type="button"
         onClick={() => {
           setMobileView('activity');
-          setRightPanel('activity_feed');
+          setRightPanel('none');
         }}
         className={`relative flex flex-col items-center justify-center py-1 px-3 rounded-lg transition cursor-pointer ${
           mobileView === 'activity'

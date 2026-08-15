@@ -54,25 +54,39 @@ export const InviteModal: React.FC<InviteModalProps> = ({
       : `Join our decentralized, serverless workspace "${activeWorkspace.name}" on Open-Slack:\n${inviteUrl}`
     : '';
 
-  // Generate QR Code on mount / url change
+  // Generate QR Code on modal open, url change, or tab change
   useEffect(() => {
-    if (!isOpen || !activeWorkspace) return;
+    if (!isOpen || !activeWorkspace || !inviteUrl) return;
 
     QRCode.toDataURL(inviteUrl, {
       width: 280,
       margin: 1.5,
+      errorCorrectionLevel: 'M',
       color: {
         dark: '#111827',
         light: '#FFFFFF',
       },
     })
       .then((url) => setQrDataUrl(url))
-      .catch((err) => console.warn('QR Code Generation Error:', err));
-  }, [inviteUrl]);
+      .catch((err) => {
+        console.warn('QR Code Generation Error (Retrying with Low EC):', err);
+        QRCode.toDataURL(inviteUrl, {
+          width: 280,
+          margin: 1,
+          errorCorrectionLevel: 'L',
+          color: {
+            dark: '#111827',
+            light: '#FFFFFF',
+          },
+        })
+          .then((url) => setQrDataUrl(url))
+          .catch((retryErr) => console.error('QR Code Fallback Failed:', retryErr));
+      });
+  }, [isOpen, activeWorkspace, inviteUrl, activeTab]);
 
   // Render Privacy-Safe Preview Card on Canvas
   useEffect(() => {
-    if (activeTab === 'preview_card' && previewCanvasRef.current) {
+    if (activeTab === 'preview_card' && previewCanvasRef.current && activeWorkspace) {
       const canvas = previewCanvasRef.current;
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
@@ -266,6 +280,7 @@ export const InviteModal: React.FC<InviteModalProps> = ({
         {/* Tab Navigation Strip */}
         <div className="flex border-b border-neutral-200 px-4 sm:px-6 gap-2 overflow-x-auto no-scrollbar flex-shrink-0 bg-neutral-50/70">
           <button
+            id="invite-tab-link-btn"
             type="button"
             onClick={() => setActiveTab('link')}
             className={`py-2.5 px-3 text-xs font-bold border-b-2 flex items-center gap-1.5 transition whitespace-nowrap cursor-pointer ${
@@ -279,6 +294,7 @@ export const InviteModal: React.FC<InviteModalProps> = ({
           </button>
 
           <button
+            id="invite-tab-social-btn"
             type="button"
             onClick={() => setActiveTab('social')}
             className={`py-2.5 px-3 text-xs font-bold border-b-2 flex items-center gap-1.5 transition whitespace-nowrap cursor-pointer ${
@@ -292,6 +308,7 @@ export const InviteModal: React.FC<InviteModalProps> = ({
           </button>
 
           <button
+            id="invite-tab-qr-btn"
             type="button"
             onClick={() => setActiveTab('qr')}
             className={`py-2.5 px-3 text-xs font-bold border-b-2 flex items-center gap-1.5 transition whitespace-nowrap cursor-pointer ${
@@ -305,6 +322,7 @@ export const InviteModal: React.FC<InviteModalProps> = ({
           </button>
 
           <button
+            id="invite-tab-preview-card-btn"
             type="button"
             onClick={() => setActiveTab('preview_card')}
             className={`py-2.5 px-3 text-xs font-bold border-b-2 flex items-center gap-1.5 transition whitespace-nowrap cursor-pointer ${
@@ -318,6 +336,7 @@ export const InviteModal: React.FC<InviteModalProps> = ({
           </button>
 
           <button
+            id="invite-tab-specs-btn"
             type="button"
             onClick={() => setActiveTab('specs')}
             className={`py-2.5 px-3 text-xs font-bold border-b-2 flex items-center gap-1.5 transition whitespace-nowrap cursor-pointer ${
@@ -505,16 +524,17 @@ export const InviteModal: React.FC<InviteModalProps> = ({
 
           {/* TAB 3: QR CODE */}
           {activeTab === 'qr' && (
-            <div className="flex flex-col items-center justify-center space-y-4 py-2">
+            <div id="invite-qr-container" className="flex flex-col items-center justify-center space-y-4 py-2">
               <div className="p-3 bg-white border-2 border-neutral-900 rounded-2xl shadow-md">
                 {qrDataUrl ? (
                   <img
+                    id="invite-qr-image"
                     src={qrDataUrl}
                     alt="Workspace Invite QR Code"
                     className="w-56 h-56 rounded-lg"
                   />
                 ) : (
-                  <div className="w-56 h-56 flex items-center justify-center text-xs text-neutral-400">
+                  <div id="invite-qr-generating" className="w-56 h-56 flex items-center justify-center text-xs text-neutral-400">
                     Generating QR Code...
                   </div>
                 )}
@@ -531,6 +551,7 @@ export const InviteModal: React.FC<InviteModalProps> = ({
 
               <div className="flex items-center gap-2">
                 <button
+                  id="download-qr-btn"
                   type="button"
                   onClick={handleDownloadQR}
                   className="px-4 py-2 bg-neutral-900 hover:bg-neutral-800 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-xs"
@@ -552,7 +573,7 @@ export const InviteModal: React.FC<InviteModalProps> = ({
 
           {/* TAB 4: PRIVACY-SAFE PREVIEW CARD / SCREENSHOT */}
           {activeTab === 'preview_card' && (
-            <div className="space-y-4">
+            <div id="invite-preview-card-container" className="space-y-4">
               <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-900 leading-relaxed flex items-start gap-2.5">
                 <ShieldCheck className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
                 <div>
@@ -563,6 +584,7 @@ export const InviteModal: React.FC<InviteModalProps> = ({
 
               <div className="rounded-xl overflow-hidden border border-neutral-300 shadow-md bg-neutral-950 flex items-center justify-center p-2">
                 <canvas
+                  id="invite-preview-canvas"
                   ref={previewCanvasRef}
                   className="w-full max-w-[500px] h-auto rounded-lg shadow-inner"
                 />
@@ -574,6 +596,7 @@ export const InviteModal: React.FC<InviteModalProps> = ({
                   <span>Zero-PII Wireframe Format</span>
                 </div>
                 <button
+                  id="download-preview-card-btn"
                   type="button"
                   onClick={handleDownloadPreviewCard}
                   className="px-4 py-2 bg-[#007a5a] hover:bg-[#148567] text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-xs"

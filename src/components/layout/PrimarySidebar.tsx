@@ -1,8 +1,12 @@
 import {
+  AtSign,
   Bell,
   ChevronDown,
   Globe,
+  Hash,
   Headphones,
+  Lock,
+  MessageSquare,
   Mic,
   MicOff,
   PhoneOff,
@@ -13,6 +17,7 @@ import {
   UserCheck,
   UserPlus,
   Users,
+  X,
 } from 'lucide-react';
 import React, { useState } from 'react';
 import { useWorkspace } from '../../context/WorkspaceContext';
@@ -39,6 +44,7 @@ export const PrimarySidebar: React.FC<PrimarySidebarProps> = ({
     channels,
     activeChannel,
     selectChannel,
+    leaveChannel,
     peerUsers,
     identity,
     setIsSearchOpen,
@@ -46,7 +52,9 @@ export const PrimarySidebar: React.FC<PrimarySidebarProps> = ({
     leaveHuddle,
     toggleHuddleMute,
     joinRequests,
+    rightPanel,
     setRightPanel,
+    notifications,
     setShowLandingPage,
     setMobileView,
   } = useWorkspace();
@@ -55,10 +63,15 @@ export const PrimarySidebar: React.FC<PrimarySidebarProps> = ({
   const [channelsCollapsed, setChannelsCollapsed] = useState(false);
   const [dmsCollapsed, setDmsCollapsed] = useState(false);
 
-  const publicChannels = channels.filter((c) => !c.isDirectMessage);
-  const directChannels = channels.filter((c) => c.isDirectMessage);
+  const publicChannels = channels.filter(
+    (c) => !c.isDirectMessage && (!c.isPrivate || !c.members || !identity || c.members.includes(identity.pubkey))
+  );
+  const directChannels = channels.filter(
+    (c) => c.isDirectMessage && (!c.members || !identity || c.members.includes(identity.pubkey))
+  );
 
   const pendingApprovalsCount = joinRequests.filter((r) => r.status === 'PENDING').length;
+  const unreadNotifs = notifications.filter((n) => !n.isRead).length;
   const huddleChannel = channels.find((c) => c.id === huddleState.channelId);
 
   return (
@@ -184,26 +197,43 @@ export const PrimarySidebar: React.FC<PrimarySidebarProps> = ({
           </button>
         )}
 
-        {/* Quick Tools */}
-        <div className="space-y-0.5">
-          <button
-            id="quick-search-trigger-btn"
-            type="button"
-            onClick={() => setIsSearchOpen(true)}
-            className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-md text-xs hover:bg-black/15 hover:text-white transition cursor-pointer"
-          >
-            <Search className="w-3.5 h-3.5 opacity-70" />
-            <span>Search workspace</span>
-          </button>
-
+        {/* Slack-Style Primary Navigation Items */}
+        <div className="space-y-0.5 mb-3">
           <button
             id="quick-activity-btn"
             type="button"
-            onClick={() => setRightPanel('activity_feed')}
-            className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-md text-xs hover:bg-black/15 hover:text-white transition cursor-pointer"
+            onClick={() => setRightPanel(rightPanel === 'activity_feed' ? 'none' : 'activity_feed')}
+            className={`w-full flex items-center justify-between px-3 py-1.5 rounded-md text-xs transition cursor-pointer ${
+              rightPanel === 'activity_feed'
+                ? 'bg-black/30 text-white font-bold'
+                : 'hover:bg-black/15 hover:text-white'
+            }`}
           >
-            <Bell className="w-3.5 h-3.5 opacity-70" />
-            <span>Activity & Mentions</span>
+            <div className="flex items-center gap-2.5">
+              <AtSign className="w-3.5 h-3.5 opacity-85 text-amber-300" />
+              <span>Activity & Mentions</span>
+            </div>
+            {unreadNotifs > 0 && (
+              <span className="px-1.5 py-0.2 bg-[#E01E5A] text-white rounded-full text-[10px] font-bold shadow-xs">
+                {unreadNotifs}
+              </span>
+            )}
+          </button>
+
+          <button
+            id="quick-threads-btn"
+            type="button"
+            onClick={() => setRightPanel(rightPanel === 'thread' ? 'none' : 'thread')}
+            className={`w-full flex items-center justify-between px-3 py-1.5 rounded-md text-xs transition cursor-pointer ${
+              rightPanel === 'thread'
+                ? 'bg-black/30 text-white font-bold'
+                : 'hover:bg-black/15 hover:text-white'
+            }`}
+          >
+            <div className="flex items-center gap-2.5">
+              <MessageSquare className="w-3.5 h-3.5 opacity-85 text-blue-300" />
+              <span>Threads</span>
+            </div>
           </button>
         </div>
 
@@ -240,46 +270,67 @@ export const PrimarySidebar: React.FC<PrimarySidebarProps> = ({
               {publicChannels.map((channel) => {
                 const isActive = channel.id === activeChannel?.id;
                 const isChannelInHuddle = huddleState.isActive && huddleState.channelId === channel.id;
+                const canLeave = channel.id !== 'chan_general' && channel.isPrivate;
+
                 return (
-                  <button
+                  <div
                     key={channel.id}
-                    id={`sidebar-channel-${channel.name}`}
-                    type="button"
-                    onClick={() => {
-                      selectChannel(channel.id);
-                      setMobileView('chat');
-                    }}
-                    style={
-                      isActive
-                        ? {
-                            backgroundColor: 'var(--theme-active-item-bg, #1164A3)',
-                            color: 'var(--theme-sidebar-text-active, #FFFFFF)',
-                          }
-                        : undefined
-                    }
-                    className={`w-full flex items-center justify-between px-3 py-1 rounded-md text-xs sm:text-[13px] transition cursor-pointer ${
-                      isActive
-                        ? 'font-semibold shadow-xs'
-                        : 'hover:bg-black/15 hover:text-white'
-                    }`}
+                    className="relative group/chan flex items-center"
                   >
-                    <div className="flex items-center truncate">
-                      <span className="opacity-60 mr-2 text-[13px] font-mono">
-                        {channel.isPrivate ? '🔒' : '#'}
-                      </span>
-                      <span className="truncate">{channel.name}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      {isChannelInHuddle && (
-                        <span className="w-2 h-2 rounded-full bg-[#2BAC76] animate-pulse" title="Active huddle in progress" />
-                      )}
-                      {channel.unreadCount ? (
-                        <span className="bg-[#E01E5A] text-white text-[10px] font-bold px-1.5 rounded-full">
-                          {channel.unreadCount}
+                    <button
+                      id={`sidebar-channel-${channel.name}`}
+                      type="button"
+                      onClick={() => {
+                        selectChannel(channel.id);
+                        setMobileView('chat');
+                      }}
+                      style={
+                        isActive
+                          ? {
+                              backgroundColor: 'var(--theme-active-item-bg, #1164A3)',
+                              color: 'var(--theme-sidebar-text-active, #FFFFFF)',
+                            }
+                          : undefined
+                      }
+                      className={`w-full flex items-center justify-between px-3 py-1 rounded-md text-xs sm:text-[13px] transition cursor-pointer ${
+                        isActive
+                          ? 'font-semibold shadow-xs'
+                          : 'hover:bg-black/15 hover:text-white'
+                      }`}
+                    >
+                      <div className="flex items-center truncate pr-2">
+                        <span className="opacity-60 mr-2 text-[13px] font-mono">
+                          {channel.isPrivate ? '🔒' : '#'}
                         </span>
-                      ) : null}
-                    </div>
-                  </button>
+                        <span className="truncate">{channel.name}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        {isChannelInHuddle && (
+                          <span className="w-2 h-2 rounded-full bg-[#2BAC76] animate-pulse" title="Active huddle in progress" />
+                        )}
+                        {channel.unreadCount ? (
+                          <span className="bg-[#E01E5A] text-white text-[10px] font-bold px-1.5 rounded-full">
+                            {channel.unreadCount}
+                          </span>
+                        ) : null}
+                      </div>
+                    </button>
+
+                    {canLeave && (
+                      <button
+                        id={`leave-channel-btn-${channel.name}`}
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          leaveChannel(channel.id);
+                        }}
+                        className="absolute right-2 opacity-0 group-hover/chan:opacity-100 p-0.5 hover:bg-black/30 rounded text-white/70 hover:text-white transition"
+                        title="Leave private channel"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
                 );
               })}
 
@@ -296,7 +347,7 @@ export const PrimarySidebar: React.FC<PrimarySidebarProps> = ({
           )}
         </div>
 
-        {/* DIRECT MESSAGES SECTION */}
+        {/* DIRECT MESSAGES & GROUP CHATS SECTION */}
         <div>
           <div className="px-3 mb-2 flex items-center justify-between group">
             <button
@@ -318,7 +369,7 @@ export const PrimarySidebar: React.FC<PrimarySidebarProps> = ({
               type="button"
               onClick={onOpenDirectMessage}
               className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-black/20 rounded hover:text-white transition cursor-pointer"
-              title="New direct message"
+              title="New direct message or group chat"
             >
               <Plus className="w-3.5 h-3.5" />
             </button>
@@ -326,66 +377,102 @@ export const PrimarySidebar: React.FC<PrimarySidebarProps> = ({
 
           {!dmsCollapsed && (
             <div className="space-y-0.5 text-xs">
-              {/* Connected Teammates */}
-              {Array.from(peerUsers.values()).map((user) => {
-                const dmChannel = directChannels.find((c) =>
-                  c.members?.includes(user.pubkey)
-                );
-                const isActive = dmChannel && dmChannel.id === activeChannel?.id;
-                const isSelf = user.pubkey === identity?.pubkey;
+              {/* Render Existing DM Channels (1-on-1 and Group DMs) */}
+              {directChannels.map((dmChan) => {
+                const isActive = dmChan.id === activeChannel?.id;
+                const membersCount = dmChan.members?.length || 0;
+                const isGroupDm = membersCount > 2;
 
                 return (
-                  <button
-                    key={user.pubkey}
-                    id={`sidebar-dm-user-${user.pubkey}`}
-                    type="button"
-                    onClick={() => {
-                      if (dmChannel) {
-                        selectChannel(dmChannel.id);
-                        setMobileView('chat');
-                      } else {
-                        onOpenDirectMessage();
-                      }
-                    }}
-                    style={
-                      isActive
-                        ? {
-                            backgroundColor: 'var(--theme-active-item-bg, #1164A3)',
-                            color: 'var(--theme-sidebar-text-active, #FFFFFF)',
-                          }
-                        : undefined
-                    }
-                    className={`w-full flex items-center px-3 py-1 rounded-md text-xs sm:text-[13px] transition cursor-pointer ${
-                      isActive
-                        ? 'font-semibold shadow-xs'
-                        : 'hover:bg-black/15 hover:text-white'
-                    }`}
+                  <div
+                    key={dmChan.id}
+                    className="relative group/dm flex items-center"
                   >
-                    <div
-                      className={`w-2 h-2 rounded-full mr-2.5 flex-shrink-0 ${
-                        user.isOnline
-                          ? 'bg-[#2BAC76]'
-                          : 'border border-white/30 bg-transparent'
+                    <button
+                      id={`sidebar-dm-${dmChan.id}`}
+                      type="button"
+                      onClick={() => {
+                        selectChannel(dmChan.id);
+                        setMobileView('chat');
+                      }}
+                      style={
+                        isActive
+                          ? {
+                              backgroundColor: 'var(--theme-active-item-bg, #1164A3)',
+                              color: 'var(--theme-sidebar-text-active, #FFFFFF)',
+                            }
+                          : undefined
+                      }
+                      className={`w-full flex items-center justify-between px-3 py-1 rounded-md text-xs sm:text-[13px] transition cursor-pointer ${
+                        isActive
+                          ? 'font-semibold shadow-xs'
+                          : 'hover:bg-black/15 hover:text-white'
                       }`}
-                    />
-                    <span className="truncate">
-                      {user.displayName} {isSelf && '(you)'}
-                    </span>
-                  </button>
+                    >
+                      <div className="flex items-center truncate pr-4">
+                        {isGroupDm ? (
+                          <div className="w-4 h-4 rounded bg-white/20 flex items-center justify-center mr-2 flex-shrink-0">
+                            <Users className="w-2.5 h-2.5 text-white" />
+                          </div>
+                        ) : (
+                          <div className="w-2 h-2 rounded-full mr-2.5 flex-shrink-0 bg-[#2BAC76]" />
+                        )}
+                        <span className="truncate">{dmChan.name}</span>
+                      </div>
+
+                      {isGroupDm && (
+                        <span className="text-[10px] opacity-60 font-mono font-bold mr-1">
+                          {membersCount}
+                        </span>
+                      )}
+                    </button>
+
+                    <button
+                      id={`leave-dm-btn-${dmChan.id}`}
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        leaveChannel(dmChan.id);
+                      }}
+                      className="absolute right-2 opacity-0 group-hover/dm:opacity-100 p-0.5 hover:bg-black/30 rounded text-white/70 hover:text-white transition cursor-pointer"
+                      title={isGroupDm ? 'Leave group conversation' : 'Close direct message'}
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
                 );
               })}
 
+              {directChannels.length === 0 && (
+                <div className="px-3 py-1 text-[11px] opacity-60 italic">
+                  No active direct messages
+                </div>
+              )}
+
               <button
-                id="add-teammates-dm-btn"
+                id="add-dm-inline-btn"
                 type="button"
-                onClick={onOpenInvite}
+                onClick={onOpenDirectMessage}
                 className="w-full flex items-center gap-2 px-3 py-1 rounded-md text-xs opacity-80 hover:bg-black/15 hover:text-white transition cursor-pointer"
               >
                 <span className="opacity-60 text-base leading-none">+</span>
-                <span>Invite teammates</span>
+                <span>Add direct message</span>
               </button>
             </div>
           )}
+        </div>
+
+        {/* Slack-Style Invite Teammates Workspace Action */}
+        <div className="pt-2 border-t border-white/10">
+          <button
+            id="sidebar-invite-teammates-btn"
+            type="button"
+            onClick={onOpenInvite}
+            className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-md text-xs opacity-80 hover:opacity-100 hover:bg-black/15 hover:text-white transition cursor-pointer"
+          >
+            <UserPlus className="w-3.5 h-3.5 opacity-75" />
+            <span>Invite teammates</span>
+          </button>
         </div>
       </div>
 

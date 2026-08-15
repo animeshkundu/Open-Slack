@@ -1,6 +1,7 @@
 import { Hash, Lock, Users } from 'lucide-react';
 import React, { useEffect, useRef } from 'react';
 import { useWorkspace } from '../../context/WorkspaceContext';
+import { getUrlParams } from '../../lib/url';
 import { Message } from '../../types';
 import { MessageItem } from './MessageItem';
 
@@ -12,10 +13,27 @@ export const MessageList: React.FC<MessageListProps> = ({ messages }) => {
   const { activeChannel, peerUsers } = useWorkspace();
   const bottomRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const hasScrolledToTargetRef = useRef<string | null>(null);
 
-  // Auto scroll to bottom
+  // Auto scroll to target message from URL if present, otherwise bottom
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const { messageId } = getUrlParams();
+    if (messageId && messageId !== hasScrolledToTargetRef.current) {
+      const el = document.getElementById(`message-${messageId}`);
+      if (el) {
+        hasScrolledToTargetRef.current = messageId;
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.classList.add('ring-2', 'ring-[#1264A3]', 'bg-blue-50/70', 'transition-all', 'duration-500');
+        setTimeout(() => {
+          el.classList.remove('ring-2', 'ring-[#1264A3]', 'bg-blue-50/70');
+        }, 3000);
+        return;
+      }
+    }
+
+    if (!messageId) {
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [messages.length, messages[messages.length - 1]?.id]);
 
   // Group messages by Date (e.g. "Today", "Yesterday", "August 14, 2026")

@@ -4,6 +4,7 @@ import {
   Copy,
   Download,
   FileText,
+  Link2,
   MessageSquare,
   Pin,
   Smile,
@@ -15,6 +16,7 @@ import remarkGfm from 'remark-gfm';
 import { useWorkspace } from '../../context/WorkspaceContext';
 import { isUserMentioned } from '../../lib/mentions';
 import { formatBytes } from '../../lib/storage';
+import { getMessagePermalink } from '../../lib/url';
 import { Message } from '../../types';
 import { ReactionPicker } from './ReactionPicker';
 
@@ -32,6 +34,8 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   const {
     identity,
     peerUsers,
+    activeWorkspace,
+    activeChannel,
     toggleReaction,
     togglePinMessage,
     deleteMessage,
@@ -41,6 +45,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
 
   const [showPicker, setShowPicker] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
   const author = peerUsers.get(message.authorPubkey) || {
@@ -67,6 +72,15 @@ export const MessageItem: React.FC<MessageItemProps> = ({
     navigator.clipboard.writeText(message.content);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
+  };
+
+  const handleCopyLink = () => {
+    const wsName = activeWorkspace?.name || 'Decentralized HQ';
+    const chanId = message.channelId || activeChannel?.id || 'chan_general';
+    const permalink = getMessagePermalink(wsName, chanId, message.id);
+    navigator.clipboard.writeText(permalink);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 1500);
   };
 
   return (
@@ -335,6 +349,16 @@ export const MessageItem: React.FC<MessageItemProps> = ({
           title={message.pinned ? 'Unpin from channel' : 'Pin to channel'}
         >
           <Pin className="w-3.5 h-3.5" />
+        </button>
+
+        <button
+          id={`hover-copy-link-btn-${message.id}`}
+          type="button"
+          onClick={handleCopyLink}
+          className="p-1.5 hover:bg-neutral-100 rounded-md text-neutral-600 hover:text-[#1264A3] transition cursor-pointer"
+          title="Copy link to message"
+        >
+          {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Link2 className="w-3.5 h-3.5 text-neutral-600" />}
         </button>
 
         <button

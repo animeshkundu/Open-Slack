@@ -36,7 +36,7 @@ import {
 } from 'lucide-react';
 import React, { useState } from 'react';
 import { useWorkspace } from '../../context/WorkspaceContext';
-import { generateAvatarSvg } from '../../lib/crypto';
+import { deriveUniqueHandle, generateAvatarSvg } from '../../lib/crypto';
 import { generateHandleFromName } from '../../lib/mentions';
 
 interface LandingPageProps {
@@ -84,8 +84,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
 
   const handleFullNameChange = (name: string) => {
     setFullName(name);
-    // Auto-generate clean @firstname.lastname handle
-    const autoHandle = generateHandleFromName(name);
+    // Auto-generate clean collision-free handle
+    const autoHandle = deriveUniqueHandle(name, identity?.pubkey);
     setHandle(autoHandle);
   };
 
@@ -108,6 +108,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
       handle: cleanHandle.trim(),
       color: selectedColor,
       avatarUrl: newAvatar,
+      hasCustomName: true,
     });
 
     setOnboardingError('');
@@ -827,9 +828,14 @@ channel.onmessage = (e) => Y.applyUpdate(ydoc, new Uint8Array(e.data));`}</code>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-neutral-700 mb-1.5">
-                    Display Handle (@mention) <span className="text-red-500">*</span>
-                  </label>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-neutral-700">
+                      Auto-Derived Alias (@handle)
+                    </label>
+                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-purple-800 bg-purple-100 px-2 py-0.5 rounded-full">
+                      <Lock className="w-2.5 h-2.5" /> Collision-Free
+                    </span>
+                  </div>
                   <div className="relative flex items-center">
                     <span className="absolute left-3 text-neutral-400 font-bold">@</span>
                     <input
@@ -837,14 +843,15 @@ channel.onmessage = (e) => Y.applyUpdate(ydoc, new Uint8Array(e.data));`}</code>
                       data-testid="onboarding-handle-input"
                       type="text"
                       required
+                      readOnly
                       placeholder="animesh"
                       value={handle.replace(/^@/, '')}
                       onChange={(e) => setHandle(`@${e.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, '')}`)}
-                      className="w-full pl-8 pr-3.5 py-2.5 bg-neutral-50 border border-neutral-300 rounded-lg text-sm text-neutral-900 outline-none focus:border-blue-500 focus:bg-white font-mono font-medium transition"
+                      className="w-full pl-8 pr-3.5 py-2.5 bg-neutral-100 border border-neutral-200 rounded-lg text-sm text-neutral-700 outline-none font-mono font-bold transition select-all"
                     />
                   </div>
                   <p className="text-[11px] text-neutral-500 mt-1">
-                    Teammates will use this to notify and @mention you in channels.
+                    Your alias is auto-derived from your name to guarantee zero handle collisions across all workspaces.
                   </p>
                 </div>
 

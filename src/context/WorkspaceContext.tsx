@@ -27,6 +27,12 @@ import {
 } from '../lib/storage';
 import { applyThemeToDom, getThemeConfig } from '../lib/theme';
 import {
+  getUrlParams,
+  isAppRoute,
+  updateLandingUrl,
+  updateWorkspaceUrl,
+} from '../lib/url';
+import {
   AppNotification,
   Attachment,
   Channel,
@@ -36,6 +42,7 @@ import {
   Message,
   RightPanelView,
   StoredPrivateKeyPair,
+  ToastNotification,
   UserIdentity,
   UserPreferences,
   Workspace,
@@ -74,6 +81,7 @@ interface WorkspaceContextValue {
   selectChannel: (channelId: string) => void;
   createChannel: (name: string, topic?: string, isPrivate?: boolean) => Promise<Channel>;
   openDirectMessage: (peerPubkeys: string | string[]) => Promise<Channel>;
+  leaveChannel: (channelId: string) => void;
 
   // Messages & Reactions
   messages: Message[];
@@ -90,6 +98,9 @@ interface WorkspaceContextValue {
   markNotificationAsRead: (id: string) => void;
   markAllNotificationsAsRead: () => void;
   clearNotifications: () => void;
+  toasts: ToastNotification[];
+  dismissToast: (id: string) => void;
+  triggerToast: (toast: Omit<ToastNotification, 'id' | 'createdAt'>) => void;
 
   // Typing & Presence
   typingUsers: { channelId: string; pubkey: string; user: UserIdentity }[];
@@ -206,7 +217,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [peerUsers, setPeerUsers] = useState<Map<string, UserIdentity>>(new Map());
   const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([]);
 
-  // Notifications
+  // Notifications & In-App Toasts
   const [notifications, setNotifications] = useState<AppNotification[]>(() => {
     try {
       const stored = localStorage.getItem('openslack_notifications') || localStorage.getItem('quietslack_notifications');
@@ -215,6 +226,20 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       return [];
     }
   });
+  const [toasts, setToasts] = useState<ToastNotification[]>([]);
+
+  const dismissToast = (id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  };
+
+  const triggerToast = (toastData: Omit<ToastNotification, 'id' | 'createdAt'>) => {
+    const newToast: ToastNotification = {
+      ...toastData,
+      id: `toast_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      createdAt: Date.now(),
+    };
+    setToasts((prev) => [newToast, ...prev.slice(0, 4)]);
+  };
 
   // Right Panel & Sub-views
   const [rightPanel, setRightPanel] = useState<RightPanelView>('none');
@@ -222,7 +247,12 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [inspectUser, setInspectUser] = useState<UserIdentity | null>(null);
 
   // App Navigation & Responsive Views
-  const [showLandingPage, setShowLandingPage] = useState<boolean>(false);
+  const [showLandingPage, setShowLandingPage] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    const hash = window.location.hash;
+    const search = new URLSearchParams(window.location.search);
+    return hash === '#landing' || search.get('landing') === 'true';
+  });
   const [mobileView, setMobileView] = useState<MobileViewType>('chat');
 
   // Search
@@ -289,7 +319,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     applyThemeToDom(config);
   }, [preferences.themeName, preferences.customTheme]);
 
-  // Handle invite links in hash (e.g. #invite=...)
+  // Handle invite links in hash (e.g. #invite=...) and query parameters
   const handleInviteLinkFromUrl = (user: UserIdentity) => {
     try {
       const hash = window.location.hash;
@@ -306,6 +336,8 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       console.warn('Invalid invite payload:', e);
     }
 
+    const { workspace: queryWsParam, channel: queryChParam } = getUrlParams();
+
     // Default workspace initialization if no invite
     const storedWorkspaces = localStorage.getItem('openslack_workspaces') || localStorage.getItem('quietslack_workspaces');
     if (storedWorkspaces) {
@@ -313,8 +345,25 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         const parsed = JSON.parse(storedWorkspaces) as Workspace[];
         if (parsed.length > 0) {
           setWorkspaces(parsed);
-          const lastActive = localStorage.getItem('openslack_active_ws') || localStorage.getItem('quietslack_active_ws') || parsed[0].id;
-          setActiveWorkspaceId(lastActive);
+
+          let targetWsId = localStorage.getItem('openslack_active_ws') || localStorage.getItem('quietslack_active_ws') || parsed[0].id;
+          
+          if (queryWsParam) {
+            const matchedWs = parsed.find(
+              (w) => w.name.toLowerCase() === queryWsParam.toLowerCase() || w.id === queryWsParam || w.slug === queryWsParam
+            );
+            if (matchedWs) {
+              targetWsId = matchedWs.id;
+            }
+          }
+
+          setActiveWorkspaceId(targetWsId);
+          const lastSavedChan = localStorage.getItem(`openslack_active_channel_${targetWsId}`);
+          if (queryChParam) {
+            setActiveChannelId(queryChParam);
+          } else if (lastSavedChan) {
+            setActiveChannelId(lastSavedChan);
+          }
           return;
         }
       } catch {}
@@ -374,6 +423,39 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       updatePreferences({ dndUntil: dndDate.toISOString() });
     }
   };
+
+  // Synchronize URL on popstate (browser back/forward navigation)
+  useEffect(() => {
+    const onPopState = () => {
+      const isApp = isAppRoute();
+      setShowLandingPage(!isApp);
+      if (isApp) {
+        const { workspace: wsParam, channel: chParam } = getUrlParams();
+        if (wsParam && workspaces.length > 0) {
+          const match = workspaces.find(
+            (w) => w.name.toLowerCase() === wsParam.toLowerCase() || w.id === wsParam || w.slug === wsParam
+          );
+          if (match) {
+            setActiveWorkspaceId(match.id);
+          }
+        }
+        if (chParam) {
+          setActiveChannelId(chParam);
+        }
+      }
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, [workspaces]);
+
+  // Synchronize browser URL when activeWorkspace or showLandingPage changes
+  useEffect(() => {
+    if (showLandingPage) {
+      updateLandingUrl(true);
+    } else if (activeWorkspace) {
+      updateWorkspaceUrl(activeWorkspace.name, true);
+    }
+  }, [showLandingPage, activeWorkspace?.name]);
 
   // 2. Initialize Y.Doc & IndexedDB persistence when Active Workspace changes
   useEffect(() => {
@@ -472,9 +554,70 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     // Observer on YDoc mutations
     const observer = (event: any, transaction: any) => {
       updateStateFromYDoc();
-      if (transaction?.origin === 'p2p_network') {
-        if (preferences.soundEnabled && !isDNDActive(preferences)) {
-          playSound.received();
+      if (transaction?.origin === 'p2p_network' || transaction?.origin === 'remote_peer') {
+        if (event?.changes?.added) {
+          event.changes.added.forEach((item: any) => {
+            const msgs: Message[] = item.content?.getContent?.() || [];
+            msgs.forEach((msg) => {
+              if (msg && msg.authorPubkey && msg.authorPubkey !== identity.pubkey) {
+                const author = yUsers.get(msg.authorPubkey) || peerUsers.get(msg.authorPubkey);
+                const authorName = author?.displayName || `Peer (${msg.authorPubkey.slice(0, 5)})`;
+                const channel = yChannels.get(msg.channelId || '');
+                const channelName = channel ? channel.name : 'channel';
+                const isMention = isUserMentioned(msg, identity.pubkey, identity.handle);
+                const isReply = Boolean(msg.threadParentId);
+
+                if (shouldNotify(msg, identity.pubkey, identity.handle, preferences)) {
+                  // In-App Toast
+                  triggerToast({
+                    authorName,
+                    authorAvatar: author?.avatarUrl,
+                    authorPubkey: msg.authorPubkey,
+                    channelId: msg.channelId,
+                    channelName,
+                    isPrivate: channel?.isPrivate,
+                    isDirectMessage: channel?.isDirectMessage,
+                    content: msg.content,
+                    type: isMention ? 'mention' : isReply ? 'thread_reply' : 'message',
+                    messageId: msg.id,
+                    threadParentId: msg.threadParentId,
+                  });
+
+                  // Notification record for Activity Feed
+                  if (isMention || isReply) {
+                    const notif: AppNotification = {
+                      id: `notif_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+                      workspaceId: activeWorkspace.id,
+                      recipientId: identity.pubkey,
+                      actorId: msg.authorPubkey,
+                      type: isMention ? 'mention' : 'thread_reply',
+                      channelId: msg.channelId,
+                      messageId: msg.id,
+                      contentSnippet: msg.content.slice(0, 80),
+                      isRead: false,
+                      createdAt: new Date().toISOString(),
+                    };
+                    setNotifications((prev) => [notif, ...prev.slice(0, 99)]);
+                  }
+
+                  // Native OS / Browser Web Notification
+                  showBrowserNotification(`${isMention ? '💬 Mention from ' : ''}${authorName} in #${channelName}`, {
+                    body: msg.content,
+                    tag: `msg-${msg.id}`,
+                    onClick: () => {
+                      if (msg.channelId) selectChannel(msg.channelId);
+                    },
+                  });
+
+                  // Notification audio chime
+                  if (preferences.soundEnabled && !isDNDActive(preferences)) {
+                    if (isMention) playSound.mention();
+                    else playSound.received();
+                  }
+                }
+              }
+            });
+          });
         }
       }
     };
@@ -711,25 +854,61 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     };
 
     saveAndJoinWorkspace(newWs, identity);
+    setShowLandingPage(false);
+    updateWorkspaceUrl(newWs.name);
     return newWs;
   };
 
   const joinWorkspace = (ws: Workspace) => {
     if (!identity) return;
     saveAndJoinWorkspace(ws, identity);
+    setShowLandingPage(false);
+    updateWorkspaceUrl(ws.name);
   };
 
   const switchWorkspace = (workspaceId: string) => {
     setActiveWorkspaceId(workspaceId);
     localStorage.setItem('openslack_active_ws', workspaceId);
+    const target = workspaces.find((w) => w.id === workspaceId);
+    if (target) {
+      updateWorkspaceUrl(target.name);
+      const savedChan = localStorage.getItem(`openslack_active_channel_${workspaceId}`);
+      if (savedChan) {
+        setActiveChannelId(savedChan);
+      } else {
+        setActiveChannelId('chan_general');
+      }
+    }
   };
 
   const leaveWorkspace = (workspaceId: string) => {
     setWorkspaces((prev) => {
       const filtered = prev.filter((w) => w.id !== workspaceId);
       localStorage.setItem('openslack_workspaces', JSON.stringify(filtered));
-      if (activeWorkspaceId === workspaceId && filtered.length > 0) {
-        setActiveWorkspaceId(filtered[0].id);
+      localStorage.removeItem(`openslack_active_channel_${workspaceId}`);
+      
+      if (filtered.length > 0) {
+        const nextWs = filtered[0];
+        setActiveWorkspaceId(nextWs.id);
+        localStorage.setItem('openslack_active_ws', nextWs.id);
+        updateWorkspaceUrl(nextWs.name);
+        const nextSavedChan = localStorage.getItem(`openslack_active_channel_${nextWs.id}`);
+        setActiveChannelId(nextSavedChan || 'chan_general');
+      } else if (identity) {
+        // If user left all workspaces, recreate a clean default workspace
+        const defaultWs: Workspace = {
+          id: 'ws_decentralized_hq',
+          name: 'Decentralized HQ',
+          passphrase: generateWorkspacePassphrase(),
+          created: Date.now(),
+          createdAt: new Date().toISOString(),
+          ownerPubkey: identity.pubkey,
+          ownerId: identity.pubkey,
+          settings: DEFAULT_WORKSPACE_SETTINGS,
+          relays: DEFAULT_RELAYS,
+        };
+        saveAndJoinWorkspace(defaultWs, identity);
+        setActiveChannelId('chan_general');
       }
       return filtered;
     });
@@ -844,7 +1023,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     });
 
     const dmTitle = peerNames.join(', ');
-    const id = `dm_${[...allMembers].sort().join('_').slice(0, 32)}`;
+    const id = `dm_${[...allMembers].sort().join('_')}`;
     const newDm: Channel = {
       id,
       workspaceId: activeWorkspace?.id,
@@ -863,15 +1042,66 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     });
 
     setActiveChannelId(id);
+    if (activeWorkspace) {
+      localStorage.setItem(`openslack_active_channel_${activeWorkspace.id}`, id);
+    }
     setMobileView('chat');
     return newDm;
   };
 
   const selectChannel = (channelId: string) => {
     setActiveChannelId(channelId);
+    if (activeWorkspace) {
+      localStorage.setItem(`openslack_active_channel_${activeWorkspace.id}`, channelId);
+    }
     setMobileView('chat');
     if (rightPanel === 'thread') {
       setRightPanel('none');
+    }
+  };
+
+  const leaveChannel = (channelId: string) => {
+    if (!identity || !ydocRef.current) return;
+    const yChannels = ydocRef.current.getMap<Channel>('channels');
+    const chan = yChannels.get(channelId);
+    if (!chan) return;
+
+    if (chan.members && chan.members.length > 0) {
+      const updatedMembers = chan.members.filter((m) => m !== identity.pubkey);
+      if (updatedMembers.length <= 1 && chan.isDirectMessage) {
+        ydocRef.current.transact(() => {
+          yChannels.delete(channelId);
+        });
+      } else {
+        const remainingPeerNames = updatedMembers
+          .filter((pk) => pk !== identity.pubkey)
+          .map((pk) => {
+            const p = peerUsers.get(pk);
+            return p?.displayName || `User ${pk.slice(0, 6)}`;
+          });
+        const updatedName =
+          chan.isDirectMessage && remainingPeerNames.length > 0
+            ? remainingPeerNames.join(', ')
+            : chan.name;
+
+        const updatedChan: Channel = {
+          ...chan,
+          members: updatedMembers,
+          name: updatedName,
+        };
+        ydocRef.current.transact(() => {
+          yChannels.set(channelId, updatedChan);
+        });
+      }
+    } else if (chan.isPrivate) {
+      ydocRef.current.transact(() => {
+        yChannels.delete(channelId);
+      });
+    }
+
+    setActiveChannelId('chan_general');
+    if (activeWorkspace) {
+      localStorage.setItem(`openslack_active_channel_${activeWorkspace.id}`, 'chan_general');
     }
   };
 
@@ -1273,6 +1503,19 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setNotifications((prev) => [newNotif, ...prev]);
 
       if (shouldNotify(newMsg, identity.pubkey, identity.handle, preferences)) {
+        triggerToast({
+          authorName: dummy.name,
+          authorAvatar: dummyUser.avatarUrl,
+          authorPubkey: dummyPubkey,
+          channelId: activeChannel.id,
+          channelName: activeChannel.name,
+          isPrivate: activeChannel.isPrivate,
+          isDirectMessage: activeChannel.isDirectMessage,
+          content: newMsg.content,
+          type: isUserMentioned(newMsg, identity.pubkey, identity.handle) ? 'mention' : 'message',
+          messageId: newMsg.id,
+        });
+
         showBrowserNotification(`Mention from ${dummy.name}`, {
           body: newMsg.content,
           onClick: () => {
@@ -1280,6 +1523,19 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           },
         });
       }
+    } else if (shouldNotify(newMsg, identity?.pubkey || '', identity?.handle, preferences)) {
+      triggerToast({
+        authorName: dummy.name,
+        authorAvatar: dummyUser.avatarUrl,
+        authorPubkey: dummyPubkey,
+        channelId: activeChannel.id,
+        channelName: activeChannel.name,
+        isPrivate: activeChannel.isPrivate,
+        isDirectMessage: activeChannel.isDirectMessage,
+        content: newMsg.content,
+        type: 'message',
+        messageId: newMsg.id,
+      });
     }
 
     if (preferences.soundEnabled && !isDNDActive(preferences)) {
@@ -1310,6 +1566,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     selectChannel,
     createChannel,
     openDirectMessage,
+    leaveChannel,
     messages,
     activeThreadParent,
     threadReplies,
@@ -1322,6 +1579,9 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     markNotificationAsRead,
     markAllNotificationsAsRead,
     clearNotifications,
+    toasts,
+    dismissToast,
+    triggerToast,
     typingUsers,
     setTyping,
     peerUsers,

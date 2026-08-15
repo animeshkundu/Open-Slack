@@ -12,6 +12,7 @@ import {
   Mic,
   MicOff,
   Monitor,
+  MoreHorizontal,
   PhoneOff,
   Pin,
   Search,
@@ -23,7 +24,7 @@ import {
   VideoOff,
   WifiOff,
 } from 'lucide-react';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useWorkspace } from '../../context/WorkspaceContext';
 import { usePWAInstall } from '../../lib/usePWAInstall';
 
@@ -35,6 +36,7 @@ export const MainHeader: React.FC<MainHeaderProps> = ({ onOpenInvite }) => {
   const {
     activeChannel,
     activeWorkspace,
+    identity,
     setIsSearchOpen,
     rightPanel,
     setRightPanel,
@@ -52,8 +54,34 @@ export const MainHeader: React.FC<MainHeaderProps> = ({ onOpenInvite }) => {
   const { isInstallable, installApp, isOffline } = usePWAInstall();
   const [isStarred, setIsStarred] = useState(false);
   const [showHuddleMenu, setShowHuddleMenu] = useState(false);
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [copiedChannelLink, setCopiedChannelLink] = useState(false);
   const huddleMenuRef = useRef<HTMLDivElement | null>(null);
+  const moreMenuRef = useRef<HTMLDivElement | null>(null);
+
+  // Compute accurate members for the active channel (DM, Group DM, or Public)
+  const channelMembers = useMemo(() => {
+    if (!activeChannel) return [];
+    if (activeChannel.members && activeChannel.members.length > 0) {
+      return activeChannel.members.map((pubkey) => {
+        const existing = peerUsers.get(pubkey);
+        if (existing) return existing;
+        if (pubkey === identity?.pubkey && identity) return identity;
+        return {
+          pubkey,
+          displayName: pubkey === identity?.pubkey ? identity?.displayName || 'You' : `User (${pubkey.slice(0, 6)})`,
+          handle: `@user_${pubkey.slice(0, 6)}`,
+          avatarUrl: '',
+          status: '',
+          lastSeen: Date.now(),
+          color: '#1164A3',
+          isOnline: pubkey === identity?.pubkey,
+        };
+      });
+    }
+    return Array.from(peerUsers.values());
+  }, [activeChannel, peerUsers, identity]);
 
   const isInActiveHuddle =
     huddleState.isActive && huddleState.channelId === activeChannel?.id;
@@ -62,18 +90,21 @@ export const MainHeader: React.FC<MainHeaderProps> = ({ onOpenInvite }) => {
     ? huddleState.participants.size
     : 0;
 
-  // Close dropdown on outside click
+  // Close dropdowns on outside click
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (huddleMenuRef.current && !huddleMenuRef.current.contains(e.target as Node)) {
         setShowHuddleMenu(false);
       }
+      if (moreMenuRef.current && !moreMenuRef.current.contains(e.target as Node)) {
+        setShowMoreMenu(false);
+      }
     };
-    if (showHuddleMenu) {
+    if (showHuddleMenu || showMoreMenu) {
       document.addEventListener('mousedown', handleClickOutside);
     }
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showHuddleMenu]);
+  }, [showHuddleMenu, showMoreMenu]);
 
   const handleStartScreenShare = async () => {
     setShowHuddleMenu(false);
@@ -93,6 +124,18 @@ export const MainHeader: React.FC<MainHeaderProps> = ({ onOpenInvite }) => {
     setTimeout(() => {
       setCopiedLink(false);
       setShowHuddleMenu(false);
+    }, 1500);
+  };
+
+  const handleCopyChannelLink = () => {
+    if (!activeWorkspace || !activeChannel) return;
+    const payloadStr = btoa(JSON.stringify(activeWorkspace));
+    const chanUrl = `${window.location.origin}${window.location.pathname}#invite=${payloadStr}&channel=${encodeURIComponent(activeChannel.name)}`;
+    navigator.clipboard.writeText(chanUrl);
+    setCopiedChannelLink(true);
+    setTimeout(() => {
+      setCopiedChannelLink(false);
+      setShowMoreMenu(false);
     }, 1500);
   };
 
@@ -119,127 +162,101 @@ export const MainHeader: React.FC<MainHeaderProps> = ({ onOpenInvite }) => {
         </div>
       )}
 
-      {/* Main Header Row */}
+      {/* Main Channel Header Bar */}
       <div
         id="main-channel-header"
-        className="h-14 border-b border-neutral-200 bg-white flex items-center justify-between px-3 sm:px-4 gap-2"
+        className="h-14 border-b border-neutral-200 bg-white flex items-center justify-between px-3 sm:px-4 gap-2 min-w-0"
       >
-        {/* Left Channel Details & Mobile Back Button */}
-        <div className="flex items-center gap-2 min-w-0">
+        {/* Left: Channel Information & Metadata */}
+        <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-shrink">
           {/* Mobile Back / Menu button */}
           <button
             id="mobile-back-to-sidebar-btn"
             type="button"
             onClick={() => setMobileView('sidebar')}
-            className="md:hidden p-1.5 hover:bg-neutral-100 rounded-lg text-neutral-600 focus:outline-none cursor-pointer"
+            className="md:hidden p-1.5 -ml-1 hover:bg-neutral-100 rounded-lg text-neutral-600 focus:outline-none cursor-pointer flex-shrink-0"
             title="Back to channels"
           >
             <ChevronLeft className="w-5 h-5" />
           </button>
 
-          <div className="flex flex-col min-w-0">
-            <div className="flex items-center space-x-1.5 min-w-0">
-              <span className="text-neutral-500 font-bold text-base sm:text-lg flex-shrink-0">
-                {activeChannel?.isPrivate ? (
-                  <Lock className="w-4 h-4 text-neutral-600" />
-                ) : activeChannel?.isDirectMessage ? (
-                  <Users className="w-4 h-4 text-neutral-600" />
-                ) : (
-                  <Hash className="w-4 h-4 text-neutral-600" />
-                )}
-              </span>
-              <span className="font-black text-sm sm:text-base text-neutral-900 truncate">
-                {activeChannel?.name || 'general'}
-              </span>
-              <button
-                id="star-channel-btn"
-                type="button"
-                onClick={() => setIsStarred(!isStarred)}
-                className={`p-1 hover:bg-neutral-100 rounded transition cursor-pointer flex-shrink-0 ${
-                  isStarred ? 'text-amber-500' : 'text-neutral-300 hover:text-neutral-600'
-                }`}
-                title={isStarred ? 'Unstar channel' : 'Star channel'}
-              >
-                <Star className={`w-3.5 h-3.5 ${isStarred ? 'fill-current' : ''}`} />
-              </button>
-            </div>
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="text-neutral-500 font-bold text-base flex-shrink-0">
+              {activeChannel?.isPrivate ? (
+                <Lock className="w-4 h-4 text-neutral-600" />
+              ) : activeChannel?.isDirectMessage ? (
+                <Users className="w-4 h-4 text-neutral-600" />
+              ) : (
+                <Hash className="w-4 h-4 text-neutral-600" />
+              )}
+            </span>
 
-            <div className="text-[11px] text-neutral-500 truncate hidden sm:flex items-center space-x-1.5">
-              <span>{peerUsers.size} {peerUsers.size === 1 ? 'member' : 'members'}</span>
-              <span>•</span>
-              <span className="truncate">
-                {activeChannel?.topic || 'Decentralized P2P Workspace'}
-              </span>
-            </div>
+            <h1
+              className="font-bold text-sm sm:text-base text-neutral-900 truncate min-w-0"
+              title={activeChannel?.name || 'general'}
+            >
+              {activeChannel?.name || 'general'}
+            </h1>
+
+            <button
+              id="star-channel-btn"
+              type="button"
+              onClick={() => setIsStarred(!isStarred)}
+              className={`p-1 hover:bg-neutral-100 rounded transition cursor-pointer flex-shrink-0 ${
+                isStarred ? 'text-amber-500' : 'text-neutral-300 hover:text-neutral-600'
+              }`}
+              title={isStarred ? 'Unstar channel' : 'Star channel'}
+            >
+              <Star className={`w-3.5 h-3.5 ${isStarred ? 'fill-current' : ''}`} />
+            </button>
+          </div>
+
+          {/* Topic & Member details: hidden on constrained screens to prevent any overlap */}
+          <div className="text-[11px] text-neutral-500 truncate hidden 2xl:flex items-center space-x-1.5 ml-2 border-l border-neutral-200 pl-2">
+            <span>{channelMembers.length} {channelMembers.length === 1 ? 'member' : 'members'}</span>
+            {activeChannel?.topic && (
+              <>
+                <span>•</span>
+                <span className="truncate max-w-[200px]">{activeChannel.topic}</span>
+              </>
+            )}
           </div>
         </div>
 
-        {/* Center Search Bar Trigger */}
-        <div className="flex-1 max-w-sm sm:max-w-md mx-auto hidden md:block">
+        {/* Center: Global Search Bar Trigger (Visible on wide screens, collapses gracefully) */}
+        <div className="flex-1 max-w-xs xl:max-w-md mx-2 lg:mx-4 hidden lg:block min-w-0">
           <button
             id="header-search-bar-trigger"
             type="button"
             onClick={() => setIsSearchOpen(true)}
-            className="w-full flex items-center justify-between px-3 py-1.5 bg-neutral-100/70 hover:bg-neutral-200/60 border border-neutral-200/80 rounded-lg text-xs text-neutral-500 transition group cursor-pointer"
+            className="w-full flex items-center justify-between px-3 py-1.5 bg-neutral-100/80 hover:bg-neutral-200/70 border border-neutral-200/80 rounded-lg text-xs text-neutral-500 transition group cursor-pointer"
           >
-            <div className="flex items-center gap-2 truncate">
+            <div className="flex items-center gap-2 truncate min-w-0">
               <Search className="w-3.5 h-3.5 text-neutral-400 group-hover:text-neutral-600 flex-shrink-0" />
               <span className="truncate">Search {activeWorkspace?.name || 'workspace'}</span>
             </div>
-            <kbd className="text-[10px] font-mono bg-white border border-neutral-200 px-1.5 py-0.5 rounded text-neutral-400 flex-shrink-0 ml-2 shadow-2xs">
+            <kbd className="text-[10px] font-mono bg-white border border-neutral-200 px-1.5 py-0.5 rounded text-neutral-400 flex-shrink-0 ml-1.5 shadow-2xs">
               Ctrl+K
             </kbd>
           </button>
         </div>
 
-        {/* Right Action Icons & Huddle Pill */}
-        <div className="flex items-center space-x-1 sm:space-x-1.5 flex-shrink-0">
-          {/* Mobile Search Button (< md) */}
+        {/* Right: Actions, Huddle Pill, and Slack-Style Overflow Menu */}
+        <div className="flex items-center gap-1 sm:gap-1.5 flex-shrink-0 ml-auto">
+          {/* Compact Search Trigger for screens < lg */}
           <button
             id="mobile-header-search-btn"
             type="button"
             onClick={() => setIsSearchOpen(true)}
-            className="md:hidden p-2 rounded-lg hover:bg-neutral-100 text-neutral-600 hover:text-neutral-900 transition cursor-pointer"
-            title="Search workspace"
+            className="lg:hidden p-2 rounded-lg hover:bg-neutral-100 text-neutral-600 hover:text-neutral-900 transition cursor-pointer flex-shrink-0"
+            title="Search workspace (Ctrl+K)"
           >
             <Search className="w-4 h-4" />
           </button>
 
-          {/* PWA Install Button (if available) */}
-          {isInstallable && (
-            <button
-              id="header-pwa-install-btn"
-              type="button"
-              onClick={installApp}
-              className="px-2.5 py-1 bg-[#4A154B] hover:bg-[#611f69] text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs"
-              title="Install Desktop/Mobile Open-Slack App"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span className="hidden lg:inline">Install</span>
-            </button>
-          )}
-
-          {/* Activity & Mentions trigger button */}
-          <button
-            id="header-activity-btn"
-            type="button"
-            onClick={() => togglePanel('activity_feed')}
-            className={`relative p-2 rounded-lg transition cursor-pointer ${
-              rightPanel === 'activity_feed'
-                ? 'bg-neutral-100 text-neutral-900'
-                : 'hover:bg-neutral-100 text-neutral-600 hover:text-neutral-900'
-            }`}
-            title="Activity & Mentions feed"
-          >
-            <Bell className="w-4 h-4" />
-            {unreadNotifs > 0 && (
-              <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-amber-500 ring-2 ring-white" />
-            )}
-          </button>
-
           {/* Canonical Slack-Style Huddle Button Pill with Dropdown */}
           {activeChannel && (
-            <div ref={huddleMenuRef} className="relative">
+            <div ref={huddleMenuRef} className="relative flex-shrink-0">
               <div
                 className={`inline-flex items-center rounded-lg border transition shadow-2xs overflow-hidden ${
                   isInActiveHuddle
@@ -260,7 +277,7 @@ export const MainHeader: React.FC<MainHeaderProps> = ({ onOpenInvite }) => {
                   title={isInActiveHuddle ? 'Huddle active in this channel' : 'Start or join audio huddle'}
                 >
                   <Headphones className={`w-3.5 h-3.5 ${isInActiveHuddle ? 'text-white animate-pulse' : 'text-[#007a5a]'}`} />
-                  <span>{isInActiveHuddle ? 'In Huddle' : 'Huddle'}</span>
+                  <span className="hidden sm:inline">{isInActiveHuddle ? 'In Huddle' : 'Huddle'}</span>
                   {huddleParticipantsCount > 0 && (
                     <span
                       className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
@@ -362,18 +379,6 @@ export const MainHeader: React.FC<MainHeaderProps> = ({ onOpenInvite }) => {
                         type="button"
                         onClick={() => {
                           setShowHuddleMenu(false);
-                          toggleHuddleScreenShare();
-                        }}
-                        className="w-full px-3.5 py-2 hover:bg-neutral-100 flex items-center gap-2.5 text-neutral-800 cursor-pointer"
-                      >
-                        <Monitor className="w-4 h-4 text-emerald-600" />
-                        <span>{huddleState.isScreenSharing ? 'Stop Screen Sharing' : 'Share Your Screen'}</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowHuddleMenu(false);
                           toggleHuddleMute();
                         }}
                         className="w-full px-3.5 py-2 hover:bg-neutral-100 flex items-center gap-2.5 text-neutral-800 cursor-pointer"
@@ -458,15 +463,15 @@ export const MainHeader: React.FC<MainHeaderProps> = ({ onOpenInvite }) => {
             </div>
           )}
 
-          {/* Member Avatars Stack */}
+          {/* Member Avatars Stack (Visible on wide desktop) */}
           <button
             id="channel-members-stack-btn"
             type="button"
             onClick={() => togglePanel('channel_details')}
-            className="hidden sm:flex -space-x-1 items-center hover:opacity-80 transition cursor-pointer px-1 py-1"
+            className="hidden xl:flex -space-x-1 items-center hover:opacity-80 transition cursor-pointer px-1 py-1 flex-shrink-0"
             title="View channel members"
           >
-            {Array.from(peerUsers.values())
+            {channelMembers
               .slice(0, 2)
               .map((u) => (
                 <div
@@ -490,19 +495,19 @@ export const MainHeader: React.FC<MainHeaderProps> = ({ onOpenInvite }) => {
                   )}
                 </div>
               ))}
-            {peerUsers.size > 2 && (
+            {channelMembers.length > 2 && (
               <div className="w-6 h-6 rounded-full bg-neutral-200 border-2 border-white flex items-center justify-center text-[9px] font-bold text-neutral-700 shadow-2xs">
-                +{peerUsers.size - 2}
+                +{channelMembers.length - 2}
               </div>
             )}
           </button>
 
-          {/* Pinned Messages Button */}
+          {/* Pinned Messages Button (Visible on medium+ desktops) */}
           <button
             id="channel-pinned-btn"
             type="button"
             onClick={() => togglePanel('pinned')}
-            className={`h-8 w-8 rounded-lg flex items-center justify-center transition cursor-pointer ${
+            className={`hidden lg:flex h-8 w-8 rounded-lg items-center justify-center transition cursor-pointer flex-shrink-0 ${
               rightPanel === 'pinned'
                 ? 'bg-neutral-100 text-neutral-900'
                 : 'hover:bg-neutral-100 text-neutral-500 hover:text-neutral-900'
@@ -517,7 +522,7 @@ export const MainHeader: React.FC<MainHeaderProps> = ({ onOpenInvite }) => {
             id="channel-details-btn"
             type="button"
             onClick={() => togglePanel('channel_details')}
-            className={`h-8 w-8 rounded-lg flex items-center justify-center transition cursor-pointer ${
+            className={`hidden sm:flex h-8 w-8 rounded-lg items-center justify-center transition cursor-pointer flex-shrink-0 ${
               rightPanel === 'channel_details'
                 ? 'bg-neutral-100 text-neutral-900'
                 : 'hover:bg-neutral-100 text-neutral-500 hover:text-neutral-900'
@@ -526,9 +531,128 @@ export const MainHeader: React.FC<MainHeaderProps> = ({ onOpenInvite }) => {
           >
             <Info className="w-4 h-4" />
           </button>
+
+          {/* Activity Feed Button (Visible on medium+ screens) */}
+          <button
+            id="header-activity-btn"
+            type="button"
+            onClick={() => togglePanel('activity_feed')}
+            className={`hidden md:flex relative h-8 w-8 rounded-lg items-center justify-center transition cursor-pointer flex-shrink-0 ${
+              rightPanel === 'activity_feed'
+                ? 'bg-neutral-100 text-neutral-900'
+                : 'hover:bg-neutral-100 text-neutral-500 hover:text-neutral-900'
+            }`}
+            title="Activity & Mentions feed"
+          >
+            <Bell className="w-4 h-4" />
+            {unreadNotifs > 0 && (
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#E01E5A] ring-2 ring-white" />
+            )}
+          </button>
+
+          {/* Slack-Style More Actions Triple-Dot Menu (...) */}
+          <div ref={moreMenuRef} className="relative flex-shrink-0">
+            <button
+              id="header-more-actions-btn"
+              type="button"
+              onClick={() => setShowMoreMenu(!showMoreMenu)}
+              className={`h-8 w-8 rounded-lg flex items-center justify-center transition cursor-pointer ${
+                showMoreMenu ? 'bg-neutral-100 text-neutral-900' : 'hover:bg-neutral-100 text-neutral-500 hover:text-neutral-900'
+              }`}
+              title="More channel options"
+            >
+              <MoreHorizontal className="w-4 h-4" />
+            </button>
+
+            {showMoreMenu && (
+              <div
+                id="header-more-actions-dropdown"
+                className="absolute right-0 top-full mt-1.5 w-56 bg-white rounded-xl shadow-2xl border border-neutral-200 py-1.5 z-50 text-xs font-medium text-neutral-800 animate-in fade-in zoom-in-95 duration-100"
+              >
+                <div className="px-3.5 py-2 border-b border-neutral-100 bg-neutral-50/70 text-neutral-500 text-[11px] font-bold uppercase tracking-wider">
+                  Channel Options
+                </div>
+
+                <button
+                  id="more-menu-details-btn"
+                  type="button"
+                  onClick={() => {
+                    setShowMoreMenu(false);
+                    togglePanel('channel_details');
+                  }}
+                  className="w-full px-3.5 py-2 hover:bg-neutral-100 flex items-center gap-2.5 text-neutral-700 cursor-pointer"
+                >
+                  <Info className="w-4 h-4 text-neutral-500" />
+                  <span>Channel details & members</span>
+                </button>
+
+                <button
+                  id="more-menu-pinned-btn"
+                  type="button"
+                  onClick={() => {
+                    setShowMoreMenu(false);
+                    togglePanel('pinned');
+                  }}
+                  className="w-full px-3.5 py-2 hover:bg-neutral-100 flex items-center gap-2.5 text-neutral-700 cursor-pointer"
+                >
+                  <Pin className="w-4 h-4 text-neutral-500" />
+                  <span>Pinned messages</span>
+                </button>
+
+                <button
+                  id="more-menu-activity-btn"
+                  type="button"
+                  onClick={() => {
+                    setShowMoreMenu(false);
+                    togglePanel('activity_feed');
+                  }}
+                  className="w-full px-3.5 py-2 hover:bg-neutral-100 flex items-center justify-between text-neutral-700 cursor-pointer"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <Bell className="w-4 h-4 text-amber-500" />
+                    <span>Activity & Mentions</span>
+                  </div>
+                  {unreadNotifs > 0 && (
+                    <span className="px-1.5 py-0.2 bg-[#E01E5A] text-white rounded-full text-[10px] font-bold">
+                      {unreadNotifs}
+                    </span>
+                  )}
+                </button>
+
+                <div className="border-t border-neutral-100 my-1" />
+
+                <button
+                  id="more-menu-copy-link-btn"
+                  type="button"
+                  onClick={handleCopyChannelLink}
+                  className="w-full px-3.5 py-2 hover:bg-neutral-100 flex items-center justify-between text-neutral-700 cursor-pointer"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <Copy className="w-4 h-4 text-neutral-500" />
+                    <span>Copy channel link</span>
+                  </div>
+                  {copiedChannelLink && <Check className="w-3.5 h-3.5 text-emerald-600" />}
+                </button>
+
+                {isInstallable && (
+                  <button
+                    id="more-menu-install-pwa-btn"
+                    type="button"
+                    onClick={() => {
+                      setShowMoreMenu(false);
+                      installApp();
+                    }}
+                    className="w-full px-3.5 py-2 hover:bg-neutral-100 flex items-center gap-2.5 text-neutral-700 cursor-pointer font-bold text-[#4A154B]"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>Install desktop app</span>
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
   );
 };
-

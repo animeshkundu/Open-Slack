@@ -8,6 +8,7 @@ import { HuddleOverlay } from '../huddle/HuddleOverlay';
 import { LandingPage } from '../landing/LandingPage';
 import { CreateChannelModal } from '../modals/CreateChannelModal';
 import { DirectMessageModal } from '../modals/DirectMessageModal';
+import { FirstTimeOnboardingModal } from '../modals/FirstTimeOnboardingModal';
 import { InviteModal } from '../modals/InviteModal';
 import { JoinWorkspaceModal } from '../modals/JoinWorkspaceModal';
 import { PendingApprovalsModal } from '../modals/PendingApprovalsModal';
@@ -18,9 +19,12 @@ import { MobileNavBar } from './MobileNavBar';
 import { PrimarySidebar } from './PrimarySidebar';
 import { RightDrawer } from './RightDrawer';
 import { WorkspaceBar } from './WorkspaceBar';
+import { ActivityFeedDrawer } from '../chat/ActivityFeedDrawer';
+import { SlackToastContainer } from '../notifications/SlackToastContainer';
 
 export const AppLayout: React.FC = () => {
   const {
+    identity,
     messages,
     setIsSearchOpen,
     mediaPermissionError,
@@ -30,7 +34,13 @@ export const AppLayout: React.FC = () => {
     setShowLandingPage,
     mobileView,
     rightPanel,
+    toasts,
+    dismissToast,
+    selectChannel,
+    setMobileView,
   } = useWorkspace();
+
+  const isFirstTimeUser = Boolean(identity && !identity.hasCustomName);
 
   // Modals state
   const [isAddWorkspaceOpen, setIsAddWorkspaceOpen] = useState(false);
@@ -88,6 +98,18 @@ export const AppLayout: React.FC = () => {
             onOpenPendingApprovals={() => setIsPendingApprovalsOpen(true)}
             onOpenWorkspaceSettings={() => setIsWorkspaceSettingsOpen(true)}
           />
+        </div>
+
+        {/* 2b. Mobile Activity Feed Screen (< 768px) */}
+        <div
+          id="mobile-activity-screen"
+          className={`${
+            mobileView === 'activity' && rightPanel === 'none'
+              ? 'flex flex-1 w-full bg-white h-full md:hidden flex-col overflow-hidden min-h-0'
+              : 'hidden'
+          }`}
+        >
+          <ActivityFeedDrawer onClose={() => setMobileView('sidebar')} />
         </div>
 
         {/* 3. Main Center Canvas: Header + Message Stream + Rich Composer */}
@@ -196,6 +218,22 @@ export const AppLayout: React.FC = () => {
       <WorkspaceSettingsModal
         isOpen={isWorkspaceSettingsOpen}
         onClose={() => setIsWorkspaceSettingsOpen(false)}
+      />
+
+      {/* 8. Mandatory First-Time Visitor Profile Onboarding */}
+      {isFirstTimeUser && <FirstTimeOnboardingModal />}
+
+      {/* 9. Structured Slack In-App & OS Notification Toast Container */}
+      <SlackToastContainer
+        toasts={toasts}
+        onDismiss={dismissToast}
+        onToastClick={(toast) => {
+          dismissToast(toast.id);
+          if (toast.channelId) {
+            selectChannel(toast.channelId);
+          }
+          setMobileView('chat');
+        }}
       />
     </div>
   );
