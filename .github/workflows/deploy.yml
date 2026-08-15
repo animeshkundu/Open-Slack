@@ -41,12 +41,6 @@ jobs:
       - name: Run Tests
         run: npm test
 
-      - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium
-
-      - name: Run E2E tests
-        run: npm run test:e2e
-
       - name: Build project
         env:
           GITHUB_PAGES: 'true'
@@ -59,6 +53,12 @@ jobs:
         run: |
           test -s dist/index.html
           test -s dist/404.html
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run E2E tests
+        run: npm run test:e2e
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

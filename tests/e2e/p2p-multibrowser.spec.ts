@@ -15,7 +15,7 @@ test.describe('Multi-Browser P2P Interaction & CRDT Synchronization', () => {
     await pageA.locator('#ws-menu-invite-btn').click();
     await expect(pageA.locator('#invite-modal-card')).toBeVisible();
 
-    const inviteLinkInput = pageA.locator('#invite-modal-card input[readonly]');
+    const inviteLinkInput = pageA.locator('#invite-link-input');
     const inviteUrl = await inviteLinkInput.inputValue();
     expect(inviteUrl).toContain('#invite=');
 
