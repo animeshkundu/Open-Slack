@@ -6,9 +6,11 @@ import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig(() => {
   const isGhPages = process.env.GITHUB_PAGES === 'true';
+  const repositoryName = process.env.GITHUB_REPOSITORY?.split('/')[1] ?? 'Open-Slack';
+  const pagesBasePath = `/${repositoryName}/`;
 
   return {
-    base: isGhPages ? '/Open-Slack/' : './',
+    base: isGhPages ? pagesBasePath : './',
     plugins: [
       react(),
       tailwindcss(),
@@ -22,7 +24,7 @@ export default defineConfig(() => {
           theme_color: '#4A154B',
           background_color: '#1A1D21',
           display: 'standalone',
-          start_url: isGhPages ? '/Open-Slack/' : './',
+          start_url: isGhPages ? pagesBasePath : './',
           icons: [
             {
               src: 'pwa-192x192.png',
@@ -43,6 +45,10 @@ export default defineConfig(() => {
         },
       }),
     ],
+    build: {
+      minify: 'esbuild' as const,
+      cssMinify: 'esbuild' as const,
+    },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),
