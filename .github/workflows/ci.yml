@@ -42,8 +42,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run Vitest with >90% coverage
-        run: npm run test:unit -- --run --coverage
+      - name: Run Vitest with coverage thresholds
+        run: npm run test:coverage
 
   build-verification:
     name: Build Verification
