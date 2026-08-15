@@ -44,3 +44,7 @@ User identities use ECDSA P-256 for message signing and ECDH P-256 for end-to-en
 - State transitions and cross-surface actions belong in `WorkspaceContext`.
 - Storage, cryptography, signaling, and file-transfer changes belong in `src/lib/` and must preserve the client-side trust model.
 - Add or update unit and Playwright coverage when a boundary or user-visible flow changes.
+
+## Delivery validation
+
+Pushes to `main` run typechecking, coverage-gated unit tests, a minified Vite production build, and Playwright coverage before the Pages artifact is deployed. The deployment workflow then runs smoke tests against the published Pages URL and uploads the visual review screenshots and reports as build artifacts.

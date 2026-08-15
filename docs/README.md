@@ -9,6 +9,8 @@ These documents are maintained alongside the code and are required reading for a
 | [ADRs](adrs/) | Durable records of significant technical decisions | A decision is introduced, changed, or rejected |
 | [History](history.md) | Dated record of meaningful repository evolution | A feature, fix, migration, or decision lands |
 
+Current ADRs include [local-first peer-to-peer workspace](adrs/0001-local-first-peer-to-peer.md) and [Pages delivery validation](adrs/0002-pages-delivery-validation.md).
+
 ## Maintenance rules
 
 1. Update documentation in the same change as the implementation.

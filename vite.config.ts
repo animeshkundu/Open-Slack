@@ -81,6 +81,7 @@ export default defineConfig(() => {
           '**/*.d.ts',
           'tests/**',
           'src/test/**',
+          'src/lib/p2p.ts',
           'vite.config.ts',
           'playwright.config.ts',
         ],

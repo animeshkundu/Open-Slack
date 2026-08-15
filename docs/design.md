@@ -25,3 +25,4 @@ Viewport-locked app surfaces use `100dvh`, `min-h-0`, and explicit nested overfl
 - Main channel header uses a unified Slack-authentic segmented pill button for Huddle (`[ 🎧 Huddle | ▾ ]`). Clicking the dropdown reveals quick actions for Audio Huddle, Screen Share, Copy Huddle Link, and Invite Teammates.
 - Primary sidebar removes idle duplicate Huddle buttons and displays a live, ambient Active Huddle Mini-Widget with speaking audio wave indicators and quick mute/leave controls only while participating in an active call.
 - The `InviteModal` provides dedicated sub-views for direct link copying, instant QR code presentation, social deep links, and a canvas-rendered Privacy Preview Card.
+- The Playwright visual review suite captures the landing page, responsive workspace shell, drawers, huddle dock, and modal surfaces; CI and Pages deployment retain the resulting screenshots as artifacts for desktop (1440px), tablet (1024px), and mobile (390px) review.

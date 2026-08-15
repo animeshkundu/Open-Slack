@@ -3,6 +3,12 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 test.describe('Pixel-Perfect Visual Screenshots Suite', () => {
+  const responsiveViewports = [
+    { name: 'desktop', width: 1440, height: 900 },
+    { name: 'tablet', width: 1024, height: 768 },
+    { name: 'mobile', width: 390, height: 844 },
+  ] as const;
+
   test.beforeAll(() => {
     if (!fs.existsSync('screenshots')) {
       fs.mkdirSync('screenshots', { recursive: true });
@@ -26,6 +32,26 @@ test.describe('Pixel-Perfect Visual Screenshots Suite', () => {
     // 2. Landing Page Mobile
     await page.setViewportSize({ width: 390, height: 844 });
     await page.screenshot({ path: 'screenshots/02-landing-page-mobile.png', fullPage: true });
+  });
+
+  test('captures the responsive workspace shell in desktop, tablet, and mobile modes', async ({ page }) => {
+    for (const viewport of responsiveViewports) {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      await page.goto('./');
+      await expect(page.locator('#openslack-root-shell')).toBeVisible();
+      await page.screenshot({
+        path: `screenshots/responsive-${viewport.name}-workspace.png`,
+        fullPage: false,
+      });
+
+      if (viewport.name === 'mobile') {
+        await page.locator('#mobile-nav-home-btn').click();
+        await expect(page.locator('#primary-sidebar-container')).toBeVisible();
+        await page.screenshot({ path: 'screenshots/responsive-mobile-sidebar.png' });
+        await page.locator('#mobile-nav-channels-btn').click();
+        await expect(page.locator('#message-stream-container')).toBeVisible();
+      }
+    }
   });
 
   test('captures main workspace, composer, and all dialogs/modals', async ({ page }) => {
