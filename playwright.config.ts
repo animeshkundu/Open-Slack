@@ -7,7 +7,13 @@ const deployedBaseURL = configuredBaseURL
     : `${configuredBaseURL}/`
   : undefined;
 const previewBuild = process.env.PLAYWRIGHT_PREVIEW === 'true';
-const localBaseURL = previewBuild ? 'http://localhost:4173/' : 'http://localhost:3000/';
+const isCI = process.env.CI === 'true';
+const repositoryName = process.env.GITHUB_REPOSITORY?.split('/')[1] ?? 'Open-Slack';
+const localBaseURL = previewBuild
+  ? isCI
+    ? `http://localhost:4173/${repositoryName}/`
+    : 'http://localhost:4173/'
+  : 'http://localhost:3000/';
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -42,7 +48,9 @@ export default defineConfig({
     ? undefined
     : {
         command: previewBuild
-          ? 'npm run preview -- --host 0.0.0.0 --port 4173'
+          ? isCI
+            ? `npm run preview -- --host 0.0.0.0 --port 4173 --base /${repositoryName}/`
+            : 'npm run preview -- --host 0.0.0.0 --port 4173'
           : 'npm run dev',
         url: localBaseURL,
         reuseExistingServer: !process.env.CI,

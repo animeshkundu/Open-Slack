@@ -61,17 +61,11 @@ export const AppLayout: React.FC = () => {
   return (
     <div
       id="openslack-root-shell"
-      className="flex flex-col h-screen w-screen bg-[#1A1D21] overflow-hidden text-neutral-900 antialiased font-sans select-none"
+      className="flex flex-col h-dvh min-h-0 w-full bg-[#1A1D21] overflow-hidden text-neutral-900 antialiased font-sans select-none"
     >
-      <div className="flex-1 flex overflow-hidden relative">
+      <div className="flex-1 min-h-0 flex overflow-hidden relative">
         {/* 1. Leftmost Rail: Workspace Icons */}
-        <div
-          className={`${
-            mobileView === 'chat' || rightPanel !== 'none'
-              ? 'hidden md:flex'
-              : 'flex'
-          }`}
-        >
+        <div className="hidden md:flex">
           <WorkspaceBar
             onOpenAddWorkspace={() => setIsAddWorkspaceOpen(true)}
             onOpenSettings={() => setIsSettingsOpen(true)}
@@ -99,7 +93,7 @@ export const AppLayout: React.FC = () => {
         {/* 3. Main Center Canvas: Header + Message Stream + Rich Composer */}
         <div
           id="main-chat-viewport"
-          className={`flex-1 flex-col min-w-0 bg-white h-full relative ${
+          className={`flex-1 min-h-0 flex-col min-w-0 bg-white h-full relative ${
             mobileView === 'sidebar' && rightPanel === 'none'
               ? 'hidden md:flex'
               : 'flex'

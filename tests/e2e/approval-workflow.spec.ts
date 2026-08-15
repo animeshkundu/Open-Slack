@@ -19,7 +19,7 @@ test.describe('Workspace Invites & Admin Approval Workflow Suite', () => {
 
     // 2. Open Pending Approvals Modal
     await page.locator('#workspace-header-menu-btn').click();
-    const approvalsMenuBtn = page.locator('#ws-menu-approvals-btn');
+    const approvalsMenuBtn = page.locator('#ws-menu-pending-approvals-btn');
     if (await approvalsMenuBtn.isVisible()) {
       await approvalsMenuBtn.click();
       await expect(page.locator('#pending-approvals-modal-card')).toBeVisible();

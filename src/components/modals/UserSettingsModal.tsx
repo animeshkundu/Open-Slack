@@ -193,7 +193,7 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
     >
       <div
         id="user-settings-modal-card"
-        className="w-full max-w-2xl bg-white rounded-xl shadow-2xl border border-neutral-200 overflow-hidden flex flex-col max-h-[88vh] animate-in fade-in zoom-in-95 duration-150"
+        className="w-full max-w-2xl bg-white rounded-xl shadow-2xl border border-neutral-200 overflow-hidden flex flex-col max-h-[calc(100dvh-2rem)] animate-in fade-in zoom-in-95 duration-150"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -209,14 +209,14 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
           </button>
         </div>
 
-        <div className="flex flex-1 overflow-hidden">
+        <div className="flex flex-1 min-h-0 flex-col sm:flex-row overflow-hidden">
           {/* Tabs Sidebar */}
-          <div className="w-48 bg-neutral-50/80 border-r border-neutral-200 p-3 space-y-1">
+          <div className="w-full sm:w-48 flex sm:block gap-1 overflow-x-auto bg-neutral-50/80 border-b sm:border-b-0 sm:border-r border-neutral-200 p-2 sm:p-3">
             <button
               id="tab-profile-btn"
               type="button"
               onClick={() => setActiveTab('profile')}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition text-left cursor-pointer ${
+              className={`w-auto sm:w-full flex-shrink-0 flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition text-left cursor-pointer whitespace-nowrap ${
                 activeTab === 'profile'
                   ? 'bg-neutral-900 text-white'
                   : 'text-neutral-600 hover:bg-neutral-200/60'
@@ -230,7 +230,7 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
               id="tab-themes-btn"
               type="button"
               onClick={() => setActiveTab('themes')}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition text-left cursor-pointer ${
+              className={`w-auto sm:w-full flex-shrink-0 flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition text-left cursor-pointer whitespace-nowrap ${
                 activeTab === 'themes'
                   ? 'bg-neutral-900 text-white'
                   : 'text-neutral-600 hover:bg-neutral-200/60'
@@ -244,7 +244,7 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
               id="tab-notifications-btn"
               type="button"
               onClick={() => setActiveTab('notifications')}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition text-left cursor-pointer ${
+              className={`w-auto sm:w-full flex-shrink-0 flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition text-left cursor-pointer whitespace-nowrap ${
                 activeTab === 'notifications'
                   ? 'bg-neutral-900 text-white'
                   : 'text-neutral-600 hover:bg-neutral-200/60'
@@ -258,7 +258,7 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
               id="tab-crypto-btn"
               type="button"
               onClick={() => setActiveTab('crypto')}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition text-left cursor-pointer ${
+              className={`w-auto sm:w-full flex-shrink-0 flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition text-left cursor-pointer whitespace-nowrap ${
                 activeTab === 'crypto'
                   ? 'bg-neutral-900 text-white'
                   : 'text-neutral-600 hover:bg-neutral-200/60'
@@ -272,7 +272,7 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
               id="tab-network-btn"
               type="button"
               onClick={() => setActiveTab('network')}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition text-left cursor-pointer ${
+              className={`w-auto sm:w-full flex-shrink-0 flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition text-left cursor-pointer whitespace-nowrap ${
                 activeTab === 'network'
                   ? 'bg-neutral-900 text-white'
                   : 'text-neutral-600 hover:bg-neutral-200/60'
@@ -286,7 +286,7 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
               id="tab-storage-btn"
               type="button"
               onClick={() => setActiveTab('storage')}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition text-left cursor-pointer ${
+              className={`w-auto sm:w-full flex-shrink-0 flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition text-left cursor-pointer whitespace-nowrap ${
                 activeTab === 'storage'
                   ? 'bg-neutral-900 text-white'
                   : 'text-neutral-600 hover:bg-neutral-200/60'

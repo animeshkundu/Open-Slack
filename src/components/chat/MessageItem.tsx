@@ -200,7 +200,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
                       </div>
                     </div>
                   ) : (
-                    <div className="mt-2 p-3 bg-white border border-neutral-200 rounded-xl flex items-center space-x-3 w-[300px] sm:w-[340px] shadow-xs">
+                    <div className="mt-2 p-3 bg-white border border-neutral-200 rounded-xl flex items-center space-x-3 w-full max-w-[340px] shadow-xs">
                       <div className="w-10 h-11 bg-blue-50 rounded-lg flex items-center justify-center border border-blue-100 flex-shrink-0 text-[#1264A3]">
                         <FileText className="w-5 h-5" />
                       </div>

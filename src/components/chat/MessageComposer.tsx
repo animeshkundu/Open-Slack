@@ -340,7 +340,7 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
       {mentionQuery !== null && suggestions.length > 0 && (
         <div
           id="mention-autocomplete-menu"
-          className="absolute bottom-full left-4 mb-2 w-72 bg-white rounded-xl shadow-2xl border border-neutral-200 overflow-hidden z-40 max-h-60 overflow-y-auto animate-in fade-in zoom-in-95 duration-100"
+          className="absolute bottom-full left-2 right-2 sm:left-4 sm:right-auto mb-2 w-auto sm:w-72 max-w-72 bg-white rounded-xl shadow-2xl border border-neutral-200 overflow-hidden z-40 max-h-60 overflow-y-auto animate-in fade-in zoom-in-95 duration-100"
         >
           <div className="p-2 border-b border-neutral-100 bg-neutral-50/80 flex items-center justify-between text-[11px] font-bold text-neutral-600">
             <span className="flex items-center gap-1">
