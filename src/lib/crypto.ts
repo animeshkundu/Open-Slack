@@ -190,7 +190,7 @@ export async function getOrCreateIdentity(): Promise<{
 
   // 3. Generate initial keys & identity
   const generated = await generateCryptoKeypairs();
-  generated.identity.hasCustomName = false;
+  generated.identity.hasCustomName = true;
   saveIdentity(generated.identity, generated.keys);
   return generated;
 }

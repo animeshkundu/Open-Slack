@@ -2,19 +2,23 @@ import {
   Activity,
   Bell,
   Check,
+  CheckCircle2,
   Clock,
   Copy,
   Database,
   Download,
   FileArchive,
   HardDrive,
+  Lock,
   Network,
   Palette,
   Play,
+  QrCode,
   Radio,
   RefreshCw,
   Save,
   Shield,
+  Smartphone,
   Smile,
   Sparkles,
   Trash2,
@@ -25,10 +29,12 @@ import {
   X,
   Zap,
 } from 'lucide-react';
+import QRCode from 'qrcode';
 import React, { useEffect, useState } from 'react';
 import { useWorkspace } from '../../context/WorkspaceContext';
 import { generateAvatarSvg } from '../../lib/crypto';
 import { generateHandleFromName } from '../../lib/mentions';
+import { encodeDeviceSyncPayload, getOrCreateDeviceId } from '../../lib/multiDevice';
 import { isDNDActive, requestNotificationPermission } from '../../lib/notifications';
 import {
   ALL_RECOMMENDED_RELAYS,
@@ -57,7 +63,7 @@ interface UserSettingsModalProps {
   onClose: () => void;
 }
 
-type TabType = 'profile' | 'themes' | 'notifications' | 'crypto' | 'network' | 'storage';
+type TabType = 'profile' | 'themes' | 'notifications' | 'linked_devices' | 'privacy' | 'crypto' | 'network' | 'storage';
 
 export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
   isOpen,
@@ -66,6 +72,7 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
   const {
     identity,
     keys,
+    activeWorkspace,
     preferences,
     updateProfile,
     updatePreferences,
@@ -117,6 +124,25 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
   const [compressionBenchmark, setCompressionBenchmark] = useState<{ rawBytes: number; compressedBytes: number; savings: string } | null>(null);
   const [isCompressing, setIsCompressing] = useState(false);
   const [clearedStorageSuccess, setClearedStorageSuccess] = useState(false);
+
+  // Device Sync & QR state
+  const [deviceQrDataUrl, setDeviceQrDataUrl] = useState<string>('');
+  const [deviceSyncUrl, setDeviceSyncUrl] = useState<string>('');
+
+  useEffect(() => {
+    if (activeTab === 'linked_devices' && identity && keys) {
+      try {
+        const payloadStr = encodeDeviceSyncPayload(identity, keys, activeWorkspace ? [activeWorkspace] : []);
+        const fullUrl = `${window.location.origin}${window.location.pathname}#device-sync=${payloadStr}`;
+        setDeviceSyncUrl(fullUrl);
+        QRCode.toDataURL(fullUrl, { width: 220, margin: 1 })
+          .then(setDeviceQrDataUrl)
+          .catch((err) => console.warn('QR render error:', err));
+      } catch (err) {
+        console.warn('Device payload build error:', err);
+      }
+    }
+  }, [activeTab, identity, keys, activeWorkspace]);
 
   useEffect(() => {
     if (activeTab === 'storage') {
@@ -348,6 +374,34 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
             >
               <Bell className="w-4 h-4" />
               <span>Notifications & DND</span>
+            </button>
+
+            <button
+              id="tab-linked-devices-btn"
+              type="button"
+              onClick={() => setActiveTab('linked_devices')}
+              className={`w-auto sm:w-full flex-shrink-0 flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition text-left cursor-pointer whitespace-nowrap ${
+                activeTab === 'linked_devices'
+                  ? 'bg-neutral-900 text-white shadow-xs'
+                  : 'text-neutral-600 hover:bg-neutral-200/60'
+              }`}
+            >
+              <Smartphone className="w-4 h-4" />
+              <span>Linked Devices</span>
+            </button>
+
+            <button
+              id="tab-privacy-btn"
+              type="button"
+              onClick={() => setActiveTab('privacy')}
+              className={`w-auto sm:w-full flex-shrink-0 flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition text-left cursor-pointer whitespace-nowrap ${
+                activeTab === 'privacy'
+                  ? 'bg-neutral-900 text-white shadow-xs'
+                  : 'text-neutral-600 hover:bg-neutral-200/60'
+              }`}
+            >
+              <Lock className="w-4 h-4" />
+              <span>Privacy & Security</span>
             </button>
 
             <button
@@ -943,6 +997,133 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
                         </div>
                       </label>
                     ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* LINKED DEVICES TAB */}
+            {activeTab === 'linked_devices' && (
+              <div className="space-y-5">
+                <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-950 leading-relaxed font-medium">
+                  <span className="font-bold">Sync Your Personal Devices:</span> Sync your account, history, and notifications to your personal phone or laptop. Do not share this QR code with coworkers.
+                </div>
+
+                <div>
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-700 mb-2 flex items-center gap-1.5">
+                    <QrCode className="w-4 h-4 text-[#1264A3]" /> Pair Mobile Phone or Secondary Laptop
+                  </h4>
+                  <div className="flex flex-col sm:flex-row items-center gap-4 p-4 bg-neutral-50 border border-neutral-200 rounded-xl">
+                    {deviceQrDataUrl ? (
+                      <img
+                        id="linked-device-qr-img"
+                        src={deviceQrDataUrl}
+                        alt="Linked Device Pairing QR Code"
+                        className="w-44 h-44 rounded-lg border border-neutral-300 shadow-xs"
+                      />
+                    ) : (
+                      <div className="w-44 h-44 flex items-center justify-center bg-white border border-neutral-200 rounded-lg text-xs text-neutral-400">
+                        Generating Pairing QR...
+                      </div>
+                    )}
+                    <div className="flex-1 space-y-2 text-xs">
+                      <div className="font-bold text-neutral-900">Scan QR Code or Copy Direct Link</div>
+                      <p className="text-neutral-600 leading-relaxed">
+                        Open Open-Slack on your phone or secondary browser and scan this QR code or open the link below to sync your profile, workspace keys, and chat history instantly.
+                      </p>
+                      <div className="pt-1 flex items-center gap-2">
+                        <input
+                          type="text"
+                          readOnly
+                          value={deviceSyncUrl}
+                          id="linked-device-url-input"
+                          className="flex-1 px-3 py-1.5 bg-white border border-neutral-300 rounded text-[11px] font-mono select-all outline-none"
+                        />
+                        <button
+                          type="button"
+                          id="copy-linked-device-url-btn"
+                          onClick={() => copyToClipboard(deviceSyncUrl, 'linked_device_url')}
+                          className="px-3 py-1.5 bg-[#007a5a] text-white font-bold rounded text-xs flex items-center gap-1 cursor-pointer hover:bg-[#148567]"
+                        >
+                          {copiedKey === 'linked_device_url' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                          <span>{copiedKey === 'linked_device_url' ? 'Copied' : 'Copy'}</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-700 mb-2">
+                    Active Registered Devices
+                  </h4>
+                  <div className="space-y-2">
+                    <div className="p-3 bg-white border border-neutral-200 rounded-xl flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold">
+                          <Smartphone className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="text-xs font-bold text-neutral-900 flex items-center gap-2">
+                            <span>{getOrCreateDeviceId().deviceName}</span>
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">This Device</span>
+                          </div>
+                          <div className="text-[11px] text-neutral-500 font-mono">
+                            ID: {getOrCreateDeviceId().deviceId}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-[11px] text-emerald-600 font-bold flex items-center gap-1">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                        <span>Active Now</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* PRIVACY & SECURITY TAB */}
+            {activeTab === 'privacy' && (
+              <div className="space-y-5">
+                <div id="privacy-statement-banner" className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-950 leading-relaxed font-medium space-y-2">
+                  <div className="font-extrabold text-sm text-emerald-900 flex items-center gap-2">
+                    <Lock className="w-4 h-4" /> Zero Central Storage Architecture
+                  </div>
+                  <p>
+                    Communications are exchanged directly between active member devices and stored locally in your browser. There is no central server, cloud database, or third-party storage.
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-700">
+                    Workspace Access & Gatekeeping
+                  </h4>
+                  <div className="p-3.5 bg-neutral-50 border border-neutral-200 rounded-xl space-y-1 text-xs">
+                    <div className="font-bold text-neutral-900">Private & Invitation-Only Workspaces</div>
+                    <p className="text-neutral-600 leading-relaxed">
+                      Workspaces are private and invitation-only. Every new member must be approved by an administrator before gaining access.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-700">
+                    Channel & Direct Message Security Models
+                  </h4>
+                  <div className="grid grid-cols-1 gap-2.5 text-xs">
+                    <div className="p-3 bg-white border border-neutral-200 rounded-xl">
+                      <div className="font-bold text-neutral-900">Public Channels</div>
+                      <div className="text-neutral-600 mt-0.5">Public to workspace: Visible to all approved members of this workspace.</div>
+                    </div>
+                    <div className="p-3 bg-white border border-neutral-200 rounded-xl">
+                      <div className="font-bold text-neutral-900">Private Channels</div>
+                      <div className="text-neutral-600 mt-0.5">Private channel: Accessible strictly by invitation from existing channel members.</div>
+                    </div>
+                    <div className="p-3 bg-white border border-neutral-200 rounded-xl">
+                      <div className="font-bold text-neutral-900">Direct Messages</div>
+                      <div className="text-neutral-600 mt-0.5">Private conversation: Messages exist only on the devices of participants in this conversation.</div>
+                    </div>
                   </div>
                 </div>
               </div>

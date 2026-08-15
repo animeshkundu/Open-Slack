@@ -42,7 +42,7 @@ test.describe('Landing Page & Responsiveness Suite', () => {
     expect(landingScrollMetrics.scrollWidth).toBeLessThanOrEqual(landingScrollMetrics.viewportWidth);
 
     // Open and dismiss the workspace setup flow from the landing page
-    await page.locator('#hero-create-workspace-btn').click();
+    await page.locator('#open-modal-custom-setup').click();
     await expect(page.getByTestId('onboarding-modal-card')).toBeVisible();
     await page.locator('#close-onboarding-modal').click();
     await expect(page.getByTestId('onboarding-modal-card')).not.toBeVisible();

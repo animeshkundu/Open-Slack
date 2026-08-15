@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useWorkspace } from '../../context/WorkspaceContext';
+import { playSound } from '../../lib/sound';
 import { usePWAInstall } from '../../lib/usePWAInstall';
 
 interface MainHeaderProps {
@@ -139,6 +140,15 @@ export const MainHeader: React.FC<MainHeaderProps> = ({ onOpenInvite }) => {
     }, 1500);
   };
 
+  const handleCopyInviteLink = () => {
+    playSound.pop();
+    const inviteLink = activeWorkspace
+      ? `${window.location.origin}${window.location.pathname}#invite=${btoa(JSON.stringify(activeWorkspace))}`
+      : window.location.href;
+    navigator.clipboard.writeText(inviteLink);
+    onOpenInvite();
+  };
+
   const unreadNotifs = notifications.filter((n) => !n.isRead).length;
 
   const togglePanel = (panel: 'channel_details' | 'pinned' | 'activity_feed') => {
@@ -208,6 +218,21 @@ export const MainHeader: React.FC<MainHeaderProps> = ({ onOpenInvite }) => {
               {activeChannel?.name || 'general'}
             </h1>
 
+            {/* Header Privacy Badges */}
+            {activeChannel?.isDirectMessage ? (
+              <span id="header-privacy-badge-dm" className="px-2 py-0.5 rounded text-[11px] font-medium bg-blue-50 text-blue-700 border border-blue-200 ml-1.5 flex-shrink-0">
+                Private Conversation
+              </span>
+            ) : activeChannel?.isPrivate ? (
+              <span id="header-privacy-badge-private" className="px-2 py-0.5 rounded text-[11px] font-medium bg-purple-50 text-purple-700 border border-purple-200 ml-1.5 flex-shrink-0">
+                Private Channel ({activeChannel?.members?.length || 1} Members)
+              </span>
+            ) : (
+              <span id="header-privacy-badge-public" className="px-2 py-0.5 rounded text-[11px] font-medium bg-neutral-100 text-neutral-600 border border-neutral-200 ml-1.5 flex-shrink-0">
+                Public to Workspace
+              </span>
+            )}
+
             <button
               id="star-channel-btn"
               type="button"
@@ -221,13 +246,36 @@ export const MainHeader: React.FC<MainHeaderProps> = ({ onOpenInvite }) => {
             </button>
           </div>
 
-          {/* Topic & Member details: hidden on constrained screens to prevent any overlap */}
-          <div className="text-[11px] text-neutral-500 truncate hidden 2xl:flex items-center space-x-1.5 ml-2 border-l border-neutral-200 pl-2">
-            <span>{channelMembers.length} {channelMembers.length === 1 ? 'member' : 'members'}</span>
+          {/* Topic & Member details + Peer Status Badge */}
+          <div className="text-[11px] text-neutral-500 truncate hidden lg:flex items-center space-x-2 ml-2 border-l border-neutral-200 pl-2">
+            {peerUsers.size > 0 ? (
+              <span id="header-peer-pill-connected" className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 font-bold border border-emerald-200 text-xs shadow-2xs">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span>{peerUsers.size} {peerUsers.size === 1 ? 'Peer Connected' : 'Peers Connected'}</span>
+              </span>
+            ) : (
+              <button
+                type="button"
+                id="header-peer-pill-waiting"
+                onClick={handleCopyInviteLink}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold border border-amber-200 text-xs transition cursor-pointer shadow-2xs"
+                title="Click to copy invite link to clipboard"
+              >
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
+                </span>
+                <span>Waiting for teammates...</span>
+                <span className="px-1.5 py-0.5 rounded bg-amber-200/80 text-[10px] font-bold text-amber-950 flex items-center gap-1">
+                  <Copy className="w-3 h-3" />
+                  <span>{copiedLink ? 'Copied!' : 'Copy Link'}</span>
+                </span>
+              </button>
+            )}
             {activeChannel?.topic && (
               <>
                 <span>•</span>
-                <span className="truncate max-w-[200px]">{activeChannel.topic}</span>
+                <span className="truncate max-w-[180px]">{activeChannel.topic}</span>
               </>
             )}
           </div>

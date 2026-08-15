@@ -51,9 +51,9 @@ test.describe('Secondary workspace flows', () => {
     await page.locator('#workspace-header-menu-btn').click();
     await page.locator('#ws-menu-landing-page-btn').click();
     await expect(page.locator('#open-slack-landing-page')).toBeVisible();
-    await page.locator('#hero-create-workspace-btn').click();
+    await page.locator('#open-modal-custom-setup').click();
     await expect(page.getByTestId('onboarding-modal-card')).toBeVisible();
-    await page.locator('#landing-user-name-input').fill('Landing Flow Tester');
+    await page.getByTestId('modal-fullname-input').fill('Landing Flow Tester');
     await page.locator('#step1-next-btn').click();
     await page.locator('#submit-create-workspace-btn').click();
     await expect(page.locator('#openslack-root-shell')).toBeVisible();

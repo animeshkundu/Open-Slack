@@ -12,13 +12,14 @@ test.describe('Open Slack Comprehensive Self-Review & Autonomous E2E Matrix', ()
 
     await expect(page.locator('#open-slack-landing-page')).toBeVisible();
 
-    // Click "Create New Mesh Workspace"
-    await page.locator('#hero-create-workspace-btn').click();
-    await expect(page.locator('#create-workspace-modal-card')).toBeVisible();
+    // Click "Advanced Workspace Setup" modal trigger
+    await page.locator('#open-modal-custom-setup').click();
+    await expect(page.getByTestId('onboarding-modal-card')).toBeVisible();
 
     // Step 1: Identity capture (real name → auto handle)
-    await expect(page.locator('#landing-user-name-input')).toBeVisible();
-    await page.locator('#landing-user-name-input').fill('Alice Reviewer');
+    const modalInput = page.getByTestId('modal-fullname-input');
+    await expect(modalInput).toBeVisible();
+    await modalInput.fill('Alice Reviewer');
     await page.locator('#step1-next-btn').click();
 
     // Step 2: Workspace details

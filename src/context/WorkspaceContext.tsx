@@ -195,6 +195,18 @@ const DEFAULT_CHANNELS: Omit<Channel, 'creatorPubkey' | 'created'>[] = [
   },
 ];
 
+export const OPENBOT_USER: UserIdentity = {
+  pubkey: 'pubkey_openbot',
+  displayName: 'OpenBot',
+  handle: '@openbot',
+  avatarUrl: 'https://api.dicebear.com/7.x/bottts/svg?seed=OpenBot',
+  color: '#4A154B',
+  status: '🤖 Workspace Assistant',
+  lastSeen: Date.now(),
+  isOnline: true,
+  hasCustomName: true,
+};
+
 export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [identity, setIdentity] = useState<UserIdentity | null>(null);
   const [keys, setKeys] = useState<StoredPrivateKeyPair | null>(null);
@@ -330,8 +342,9 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const handleInviteLinkFromUrl = (user: UserIdentity) => {
     try {
       const hash = window.location.hash;
-      if (hash.startsWith('#invite=')) {
-        const payloadStr = decodeURIComponent(hash.replace('#invite=', ''));
+      if (hash.startsWith('#invite=') || hash.startsWith('#/join/')) {
+        setShowLandingPage(false);
+        const payloadStr = decodeURIComponent(hash.replace('#invite=', '').replace('#/join/', ''));
         const inviteData = JSON.parse(atob(payloadStr)) as Workspace;
         if (inviteData.id && inviteData.name) {
           saveAndJoinWorkspace(inviteData, user);
@@ -507,6 +520,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
       // Users
       const userMap = new Map<string, UserIdentity>();
+      userMap.set('pubkey_openbot', OPENBOT_USER);
       yUsers.forEach((u, k) => {
         userMap.set(k, u);
       });
@@ -534,17 +548,17 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             });
           });
 
-          // Welcome message
+          // Welcome message from OpenBot
           yMessages.push([
             {
               id: 'msg_welcome_seed',
               channelId: 'chan_general',
-              authorPubkey: identity.pubkey,
-              content: `👋 **Welcome to Open-Slack**!\n\nThis workspace is **100% serverless, private, and peer-to-peer**.\n- 🔒 State is persisted locally via **IndexedDB** & synchronized with **Yjs CRDTs**.\n- 🌐 Peer discovery is performed over public **Nostr signaling relays** with WebRTC data channels.\n- 💬 Rich @mentions, threaded discussions, and unread notification alerts.\n- 🎙️ Launch an instant **Audio/Video Huddle** anytime via the call button in the header!\n- 🔗 Invite teammates by clicking **Invite Teammates** in the sidebar.`,
+              authorPubkey: 'pubkey_openbot',
+              content: `👋 **Welcome to #general!**\n\nI'm **OpenBot**, your local workspace assistant. Open-Slack is a **free, instant team chat** with zero setup or central servers.\n\nEverything you send is saved locally in your browser and synced directly to teammates using WebRTC.\n\nInvite your team to start chatting in real-time!`,
               timestamp: Date.now(),
               createdAt: new Date().toISOString(),
               mentions: ['@channel'],
-              reactions: { '🎉': [identity.pubkey], '🚀': [identity.pubkey] },
+              reactions: { '🎉': [identity.pubkey], '👋': [identity.pubkey] },
             },
           ]);
         });
@@ -1220,6 +1234,24 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       playSound.sent();
     }
     p2pNetwork.broadcastTyping(targetChannel, false);
+
+    // First-message micro-toast guidance
+    try {
+      const hasSentFirst = localStorage.getItem('openslack_has_sent_first_message') === 'true';
+      if (!hasSentFirst) {
+        localStorage.setItem('openslack_has_sent_first_message', 'true');
+        setTimeout(() => {
+          triggerToast({
+            authorName: 'Pro Tip',
+            content: 'Tip: Hover over any message to add reactions or start a thread.',
+            type: 'system',
+            channelName: 'Getting Started',
+          });
+        }, 500);
+      }
+    } catch {
+      // Ignore storage block
+    }
 
     return message;
   };

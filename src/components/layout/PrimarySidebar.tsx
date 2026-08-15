@@ -488,13 +488,21 @@ export const PrimarySidebar: React.FC<PrimarySidebarProps> = ({
             id="sidebar-invite-teammates-btn"
             type="button"
             onClick={onOpenInvite}
-            className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-md text-xs font-semibold opacity-90 hover:opacity-100 hover:bg-black/15 hover:text-white transition cursor-pointer"
+            className="w-full flex items-center justify-between px-3 py-1.5 rounded-md text-xs font-semibold opacity-90 hover:opacity-100 hover:bg-black/15 hover:text-white transition cursor-pointer"
             title="Invite people to this workspace"
           >
-            <span className="w-5 h-5 rounded-md bg-white/10 flex items-center justify-center flex-shrink-0">
-              <UserPlus className="w-3.5 h-3.5 opacity-90" />
-            </span>
-            <span>Invite people</span>
+            <div className="flex items-center gap-2.5">
+              <span className="w-5 h-5 rounded-md bg-white/10 flex items-center justify-center flex-shrink-0">
+                <UserPlus className="w-3.5 h-3.5 opacity-90" />
+              </span>
+              <span>Invite people</span>
+            </div>
+            {peerUsers.size === 0 && (
+              <span className="relative flex h-2 w-2 mr-1" title="Waiting for teammates">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-400" />
+              </span>
+            )}
           </button>
         </div>
       </div>

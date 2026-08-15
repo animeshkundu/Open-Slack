@@ -259,11 +259,11 @@ export const InviteModal: React.FC<InviteModalProps> = ({
               <Users className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-base sm:text-lg font-black text-neutral-900 leading-tight">
-                Invite Teammates & Start Huddles
+              <h3 id="invite-modal-title" className="text-base sm:text-lg font-black text-neutral-900 leading-tight">
+                Invite Teammates
               </h3>
               <p className="text-xs text-neutral-500">
-                Workspace: <span className="font-bold text-neutral-700">{activeWorkspace.name}</span> • P2P Mesh
+                Workspace: <span className="font-bold text-neutral-700">{activeWorkspace.name}</span> • Private Access
               </p>
             </div>
           </div>
@@ -355,6 +355,10 @@ export const InviteModal: React.FC<InviteModalProps> = ({
           {/* TAB 1: 1-CLICK LINK */}
           {activeTab === 'link' && (
             <div className="space-y-4">
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-900 leading-relaxed font-medium">
+                <span className="font-bold">Teammate Invitation Notice:</span> Anyone with this link can request access to join the workspace under their own name. (To sync your own personal phone or laptop instead, go to Preferences &gt; Linked Devices).
+              </div>
+
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-neutral-700 mb-1.5">
                   Recipient Teammate Name (Optional)

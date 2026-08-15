@@ -28,8 +28,20 @@ export interface UserStatus {
   expiresAt?: string; // ISO string for auto-expiry
 }
 
+export interface DeviceSubIdentity {
+  deviceId: string;
+  deviceName: string;
+  deviceType: 'desktop' | 'mobile' | 'browser';
+  pubkey: string;
+  linkedAt: number;
+  lastActive: number;
+}
+
 export interface UserIdentity {
   pubkey: string;            // Hex/base64 public key identifier
+  masterPubkey?: string;     // Primary account master key if device is linked
+  deviceId?: string;         // Device sub-identity identifier
+  deviceName?: string;       // Human-readable device label
   enc_pubkey?: string;       // Hex public key for ECDH encryption
   displayName: string;
   handle: string;
@@ -43,6 +55,55 @@ export interface UserIdentity {
   lastSeen: number;          // Unix timestamp ms
   color: string;             // Distinct user color for badges/avatars
   isOnline?: boolean;
+  linkedDevices?: DeviceSubIdentity[];
+}
+
+export interface DeviceSyncPayload {
+  version: number;
+  masterPubkey: string;
+  deviceId: string;
+  deviceName: string;
+  identity: UserIdentity;
+  keys: StoredPrivateKeyPair;
+  workspace?: Workspace;
+  workspaces?: Workspace[];
+  timestamp: number;
+}
+
+export interface CallOfferPayload {
+  callId: string;
+  channelId: string;
+  channelName: string;
+  callerPubkey: string;
+  callerName: string;
+  targetPubkey?: string;
+  timestamp: number;
+}
+
+export interface CallResolvedPayload {
+  callId: string;
+  channelId: string;
+  answeredByDeviceId: string;
+  answeredDeviceName: string;
+  status: 'ANSWERED_ELSEWHERE' | 'COMPLETED' | 'DECLINED';
+  timestamp: number;
+}
+
+export interface CallTransferPayload {
+  callId: string;
+  channelId: string;
+  fromDeviceId: string;
+  toDeviceId: string;
+  timestamp: number;
+}
+
+export interface ActiveCallState {
+  isRinging: boolean;
+  incomingCall: CallOfferPayload | null;
+  answeredElsewhere: boolean;
+  answeredDeviceName?: string;
+  activeCallId?: string;
+  channelId?: string;
 }
 
 export interface StoredPrivateKeyPair {

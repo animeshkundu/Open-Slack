@@ -1,7 +1,9 @@
 import {
   AtSign,
   Bold,
+  Check,
   Code,
+  Copy,
   FileCode,
   Italic,
   Link as LinkIcon,
@@ -12,6 +14,7 @@ import {
   Quote,
   Send,
   Smile,
+  Sparkles,
   Square,
   Strikethrough,
   Users,
@@ -37,7 +40,10 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
 }) => {
   const {
     activeChannel,
+    activeWorkspace,
+    messages,
     sendMessage,
+    toggleReaction,
     setTyping,
     uploadAttachment,
     typingUsers,
@@ -50,6 +56,7 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
   const [isUploading, setIsUploading] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [copiedInvite, setCopiedInvite] = useState(false);
 
   // Mention Autocomplete state
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
@@ -75,6 +82,11 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
       : activeChannel
       ? `Message #${activeChannel.name}`
       : 'Type a message...');
+
+  // Auto-focus composer input on mount
+  useEffect(() => {
+    textareaRef.current?.focus();
+  }, []);
 
   // Auto-resize textarea height
   useEffect(() => {
@@ -407,6 +419,74 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
               </button>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* 1-Click Quick Action Chips Bar (when channel messages <= 3) */}
+      {messages.length <= 3 && !threadParentId && (
+        <div className="mb-2 flex flex-wrap items-center gap-1.5 text-xs">
+          <span className="text-[11px] font-bold text-neutral-500 mr-0.5 hidden sm:inline">Quick actions:</span>
+          <button
+            type="button"
+            id="composer-chip-say-hello"
+            onClick={async () => {
+              try {
+                const msg = await sendMessage('Say hello to the team!', [], threadParentId);
+                if (msg && msg.id) {
+                  setTimeout(() => toggleReaction(msg.id, '🎉'), 100);
+                }
+              } catch (e) {
+                console.error(e);
+              }
+            }}
+            className="px-2.5 py-1 bg-purple-50 hover:bg-purple-100 text-[#4A154B] border border-purple-200 rounded-full text-xs font-bold transition flex items-center gap-1 cursor-pointer active:scale-95 shadow-2xs"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+            <span>Say hello to team</span>
+          </button>
+
+          <button
+            type="button"
+            id="composer-chip-testing"
+            onClick={async () => {
+              try {
+                const msg = await sendMessage('Testing Open-Slack!', [], threadParentId);
+                if (msg && msg.id) {
+                  setTimeout(() => toggleReaction(msg.id, '🎉'), 100);
+                }
+              } catch (e) {
+                console.error(e);
+              }
+            }}
+            className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-[#007a5a] border border-emerald-200 rounded-full text-xs font-bold transition flex items-center gap-1 cursor-pointer active:scale-95 shadow-2xs"
+          >
+            <Check className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Testing Open-Slack</span>
+          </button>
+
+          <button
+            type="button"
+            id="composer-chip-invite"
+            onClick={() => {
+              const inviteLink = activeWorkspace
+                ? `${window.location.origin}${window.location.pathname}#invite=${btoa(JSON.stringify(activeWorkspace))}`
+                : window.location.href;
+              navigator.clipboard.writeText(inviteLink);
+              setCopiedInvite(true);
+              setTimeout(() => setCopiedInvite(false), 2000);
+            }}
+            className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-[#1164A3] border border-blue-200 rounded-full text-xs font-bold transition flex items-center gap-1 cursor-pointer active:scale-95 shadow-2xs"
+          >
+            {copiedInvite ? (
+              <span className="text-emerald-700 font-bold flex items-center gap-1">
+                <Check className="w-3.5 h-3.5" /> Link Copied!
+              </span>
+            ) : (
+              <span className="flex items-center gap-1">
+                <Copy className="w-3.5 h-3.5 text-blue-600" /> Copy Invite Link
+              </span>
+            )}
+          </button>
         </div>
       )}
 

@@ -1,6 +1,7 @@
-import { Hash, Lock, Users } from 'lucide-react';
-import React, { useEffect, useRef } from 'react';
+import { Check, Copy, Hash, Lock, Sparkles, Users } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useWorkspace } from '../../context/WorkspaceContext';
+import { playSound } from '../../lib/sound';
 import { getUrlParams } from '../../lib/url';
 import { Message } from '../../types';
 import { MessageItem } from './MessageItem';
@@ -10,10 +11,36 @@ interface MessageListProps {
 }
 
 export const MessageList: React.FC<MessageListProps> = ({ messages }) => {
-  const { activeChannel, peerUsers } = useWorkspace();
+  const { activeChannel, activeWorkspace, sendMessage, toggleReaction } = useWorkspace();
+  const [copiedInvite, setCopiedInvite] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const hasScrolledToTargetRef = useRef<string | null>(null);
+
+  const handleSendChip = async (text: string) => {
+    playSound.sent();
+    playSound.pop();
+    try {
+      const msg = await sendMessage(text, [], undefined);
+      if (msg && msg.id) {
+        setTimeout(() => {
+          toggleReaction(msg.id, '🎉');
+        }, 100);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleCopyInviteLink = () => {
+    playSound.pop();
+    const inviteLink = activeWorkspace
+      ? `${window.location.origin}${window.location.pathname}#invite=${btoa(JSON.stringify(activeWorkspace))}`
+      : window.location.href;
+    navigator.clipboard.writeText(inviteLink);
+    setCopiedInvite(true);
+    setTimeout(() => setCopiedInvite(false), 2000);
+  };
 
   // Auto scroll to target message from URL if present, otherwise bottom
   useEffect(() => {
@@ -103,17 +130,55 @@ export const MessageList: React.FC<MessageListProps> = ({ messages }) => {
                   : `Welcome to #${activeChannel?.name || 'general'}!`}
               </div>
               <div className="text-gray-500 text-sm mt-0.5">
-                {activeChannel?.isDirectMessage
-                  ? 'This is the start of your 1-on-1 direct message history with end-to-end encryption.'
-                  : (
+                {activeChannel?.isDirectMessage ? (
+                  <span id="privacy-subtext-dm">Private conversation: Messages exist only on the devices of participants in this conversation.</span>
+                ) : activeChannel?.isPrivate ? (
+                  <span id="privacy-subtext-private">Private channel: Accessible strictly by invitation from existing channel members.</span>
+                ) : (
+                  <span id="privacy-subtext-public">Public to workspace: Visible to all approved members of this workspace.</span>
+                )}
+              </div>
+
+              {/* 1-Click Interactive Quick-Action Chips */}
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  id="welcome-chip-say-hello"
+                  onClick={() => handleSendChip('Say hello to the team!')}
+                  className="px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-[#4A154B] border border-purple-200 rounded-full text-xs font-bold transition flex items-center gap-1.5 shadow-2xs cursor-pointer active:scale-95"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+                  <span>Say hello to team</span>
+                </button>
+
+                <button
+                  type="button"
+                  id="welcome-chip-testing"
+                  onClick={() => handleSendChip('Testing out Open-Slack!')}
+                  className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-[#007a5a] border border-emerald-200 rounded-full text-xs font-bold transition flex items-center gap-1.5 shadow-2xs cursor-pointer active:scale-95"
+                >
+                  <Check className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Testing Open-Slack</span>
+                </button>
+
+                <button
+                  type="button"
+                  id="welcome-chip-invite"
+                  onClick={handleCopyInviteLink}
+                  className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-[#1164A3] border border-blue-200 rounded-full text-xs font-bold transition flex items-center gap-1.5 shadow-2xs cursor-pointer active:scale-95"
+                >
+                  {copiedInvite ? (
                     <>
-                      This is the start of the{' '}
-                      <span className="font-bold text-[#1164A3]">
-                        #{activeChannel?.name || 'general'}
-                      </span>{' '}
-                      channel. This workspace is running purely serverless via P2P mesh networking.
+                      <Check className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Link Copied!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3.5 h-3.5" />
+                      <span>Copy Invite Link</span>
                     </>
                   )}
+                </button>
               </div>
             </div>
           </div>

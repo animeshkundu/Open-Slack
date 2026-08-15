@@ -49,7 +49,7 @@ const SlackToastItem: React.FC<SlackToastItemProps> = ({ toast, onDismiss, onCli
     if (isHovered) return;
     const timer = setTimeout(() => {
       onDismiss();
-    }, 6000);
+    }, 4000);
     return () => clearTimeout(timer);
   }, [isHovered, onDismiss]);
 

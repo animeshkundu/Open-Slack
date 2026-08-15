@@ -39,6 +39,8 @@ import { useWorkspace } from '../../context/WorkspaceContext';
 import { deriveUniqueHandle, generateAvatarSvg } from '../../lib/crypto';
 import { generateHandleFromName } from '../../lib/mentions';
 
+import { decodeDeviceSyncPayload } from '../../lib/multiDevice';
+
 interface LandingPageProps {
   onEnterApp: () => void;
 }
@@ -133,13 +135,21 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
       } else {
         const input = joinLinkInput.trim();
         let wsData: any;
-        if (input.includes('#invite=')) {
+        if (input.includes('#device-sync=')) {
+          const payloadStr = decodeURIComponent(input.split('#device-sync=')[1]);
+          const parsed = decodeDeviceSyncPayload(payloadStr);
+          if (parsed && parsed.workspaces && parsed.workspaces.length > 0) {
+            wsData = parsed.workspaces[0];
+          } else {
+            throw new Error('Invalid device sync payload');
+          }
+        } else if (input.includes('#invite=')) {
           const payloadStr = decodeURIComponent(input.split('#invite=')[1]);
           wsData = JSON.parse(atob(payloadStr));
         } else if (input.startsWith('{')) {
           wsData = JSON.parse(input);
         } else {
-          throw new Error('Invalid invite link or JSON config');
+          throw new Error('Invalid invite link or device sync payload');
         }
         joinWorkspace(wsData);
       }
@@ -197,39 +207,88 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
           {/* Badge */}
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold mb-6 animate-in fade-in slide-in-from-top-4 duration-300">
             <ShieldCheck className="w-4 h-4 text-emerald-600" />
-            <span>Zero-Cloud, Serverless P2P Team Messenger</span>
+            <span>Free, Instant Team Chat • Zero Setup or Central Servers</span>
           </div>
 
           {/* Heading */}
           <h1 className="text-4xl sm:text-6xl font-black tracking-tight text-neutral-950 max-w-4xl mx-auto leading-[1.1] mb-6">
-            The decentralized Slack alternative for privacy-first teams.
+            Instant team chat with zero setup or servers.
           </h1>
 
           {/* Subtitle */}
           <p className="text-lg sm:text-xl text-neutral-600 max-w-2xl mx-auto leading-relaxed mb-8">
-            Experience complete Slack UI feature parity powered by Nostr ephemeral signaling, WebRTC encrypted peer meshes, Yjs CRDTs, and local-first browser storage.
+            Everything you love about Slack — channels, direct messages, file sharing, and voice huddles — running 100% private in your browser.
           </p>
 
-          {/* CTA Buttons */}
-          <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4 mb-14">
+          {/* Quick Launch Hero Input */}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              const cleanName = fullName.trim() || 'Alex Rivera';
+              const autoHandle = deriveUniqueHandle(cleanName, identity?.pubkey);
+              const newAvatar = generateAvatarSvg(cleanName, selectedColor);
+
+              updateProfile({
+                displayName: cleanName,
+                handle: autoHandle,
+                color: selectedColor,
+                avatarUrl: newAvatar,
+                hasCustomName: true,
+              });
+
+              if (!activeWorkspace) {
+                createWorkspace('My Workspace', undefined, {
+                  requireApprovalForInvites: false,
+                  defaultChannels: ['chan_general', 'chan_random'],
+                  allowGuestInvites: true,
+                });
+              }
+
+              onEnterApp();
+            }}
+            className="max-w-lg mx-auto mb-6 p-2 sm:p-2.5 bg-white border border-neutral-200 rounded-2xl shadow-xl flex flex-col sm:flex-row items-center gap-2"
+          >
+            <input
+              id="landing-user-name-input"
+              data-testid="hero-fullname-input"
+              type="text"
+              placeholder="Your Display Name (e.g. Alex)"
+              value={fullName}
+              onChange={(e) => handleFullNameChange(e.target.value)}
+              className="w-full flex-1 px-4 py-2.5 bg-neutral-50 border border-neutral-200 rounded-xl text-sm font-medium text-neutral-900 outline-none focus:border-purple-600 focus:bg-white transition"
+            />
             <button
               id="hero-create-workspace-btn"
               data-testid="hero-launch-app-btn"
-              type="button"
-              onClick={handleOpenOnboarding}
-              className="px-6 py-3.5 bg-[#4A154B] hover:bg-[#611f69] text-white rounded-xl text-sm sm:text-base font-bold transition flex items-center gap-2 shadow-md cursor-pointer"
+              type="submit"
+              className="w-full sm:w-auto px-6 py-2.5 bg-[#4A154B] hover:bg-[#611f69] text-white rounded-xl text-sm font-bold transition flex items-center justify-center gap-2 shadow-sm cursor-pointer whitespace-nowrap"
             >
-              <span>Open Your Workspace</span>
+              <span>Start Chatting</span>
               <ArrowRight className="w-4 h-4" />
             </button>
+          </form>
 
+          {/* Docs & Onboarding Modal Secondary Link */}
+          <div className="flex items-center justify-center gap-4 text-xs font-semibold text-neutral-500 mb-10">
             <a
               href="#interactive-docs"
-              className="px-6 py-3.5 bg-white hover:bg-neutral-100 text-neutral-800 border border-neutral-300 rounded-xl text-sm sm:text-base font-bold transition flex items-center gap-2 shadow-2xs"
+              className="hover:text-neutral-900 transition flex items-center gap-1"
             >
-              <BookOpen className="w-4 h-4 text-neutral-500" />
+              <BookOpen className="w-3.5 h-3.5" />
               <span>Explore Technical Docs</span>
             </a>
+            <span>•</span>
+            <button
+              type="button"
+              id="open-modal-custom-setup"
+              onClick={() => {
+                setOnboardingStep(1);
+                setIsOnboardingOpen(true);
+              }}
+              className="hover:text-[#4A154B] transition cursor-pointer"
+            >
+              Advanced Workspace Setup...
+            </button>
           </div>
 
           {/* App Preview Mockup */}
@@ -815,8 +874,8 @@ channel.onmessage = (e) => Y.applyUpdate(ydoc, new Uint8Array(e.data));`}</code>
                     Full Name <span className="text-red-500">*</span>
                   </label>
                   <input
-                    id="landing-user-name-input"
-                    data-testid="onboarding-fullname-input"
+                    id="modal-user-name-input"
+                    data-testid="modal-fullname-input"
                     type="text"
                     required
                     placeholder="e.g. Animesh Kundu"
@@ -989,7 +1048,7 @@ channel.onmessage = (e) => Y.applyUpdate(ydoc, new Uint8Array(e.data));`}</code>
                     disabled={isSubmitting || (onboardingMode === 'create' ? !wsName.trim() : !joinLinkInput.trim())}
                     className="flex-1 py-3 bg-[#007a5a] hover:bg-[#148567] text-white rounded-xl text-sm font-bold transition flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 cursor-pointer"
                   >
-                    <span>{isSubmitting ? 'Initializing...' : 'Launch Open-Slack 🚀'}</span>
+                    <span>{isSubmitting ? 'Initializing...' : 'Launch Open-Slack'}</span>
                   </button>
                 </div>
               </form>

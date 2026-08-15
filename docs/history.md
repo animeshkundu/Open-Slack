@@ -4,6 +4,29 @@ This is a concise, human-readable record of meaningful repository evolution. Det
 
 ## 2026-08-15
 
+- Implemented Multi-Device Pairing, Call Signaling, and Privacy Gatekeeping Architecture:
+  - Built `DeviceSubIdentity` schema and `encodeDeviceSyncPayload` / `decodeDeviceSyncPayload` multi-device sync logic, enabling zero-prompt device pairing via QR code or direct link in User Settings > Linked Devices.
+  - Implemented `MultiDeviceCallManager` managing call offer forking across registered device sub-identities, simultaneous ringing, first-answerer resolution (`CALL_RESOLVED`), and call handoff (`CALL_TRANSFER`).
+  - Standardized UX separation between workspace invitations ("Invite Teammates") and personal device synchronization ("Linked Devices").
+  - Added explicit, transparent privacy model subtext across public channels, private channels, and direct messages, along with dynamic Privacy Badges in `MainHeader` and a Zero Central Storage architecture statement in `UserSettingsModal` > Privacy & Security.
+  - Cleaned up UI elements and buttons to strictly use SVG Lucide icons instead of decorative emojis.
+  - Added comprehensive unit test coverage (`src/test/call-signaling.test.ts`) and verified 100% clean builds, lint checks (`tsc --noEmit`), and Vitest test suite runs across 78 tests.
+
+- Implemented lightweight, non-blocking onboarding experience guiding users from landing page to `#general` in under 20 seconds:
+  - Landing page hero simplified to a single input (`[ Your Display Name ]` + `[ Start Chatting 🚀 ]`) with benefit-focused copy ("Instant, private team chat with zero setup").
+  - Automated identity generation in `crypto.ts` defaults `hasCustomName = true` to skip modal overlays and land directly in `#general` with auto-focused composer input.
+  - In-feed Welcome Card and composer quick-action chips (`👋 Say hello`, `🚀 Testing Open-Slack`, `📋 Copy Invite Link`) with 1-click message dispatch, audio chime, and automatic `🎉` reaction.
+  - Live Peer Connection Pill in `MainHeader` (`🟡 Waiting for teammates... [Copy Link 📋]` / `🟢 X Peers Connected`) and subtle pulsating dot on sidebar Invite CTA when 0 peers are connected.
+  - First-message 4-second dismissible guidance toast ("Tip: Hover over any message to add reactions or start a thread.").
+  - Verified full test suite passes cleanly across all 59 unit tests and Playwright E2E suites.
+
+- Redesigned and implemented the first-time onboarding flow: streamlined landing page messaging to focus on clear, benefit-driven value ("Free, instant team chat with zero setup or servers") with a 1-click Quick Launch input on the hero.
+- Simplified `FirstTimeOnboardingModal.tsx` to a frictionless 2-input flow (Display Name + Avatar/Color selector) with automated background identity generation and 1-click workspace launch.
+- Bypassed landing page automatically on shared invite links (`#invite=` / `#/join/`) to land directly into the target workspace.
+- Added interactive Welcome Card in `#general` with 1-click action chips (`👋 Say hello`, `🚀 Testing out Open-Slack`, `📋 Copy Invite Link`) with celebratory sound effects and instant message sending.
+- Added `@OpenBot` initial welcome message seeding and persistent peer status badge in `MainHeader` (`🟢 X teammates connected` / `Waiting for teammates... 📋 Invite`).
+- Updated Playwright test helper `ensureOnboardingCompleted` in `tests/e2e/helpers.ts` to support both landing page quick launch and modal workflows, keeping all Playwright and Vitest test suites passing cleanly.
+- Synchronized local repository with the latest changes from `https://github.com/animeshkundu/Open-Slack` (`main` branch commit `2406e01`). Verified full build, linting (`tsc --noEmit`), and Vitest unit/integration test suites pass cleanly.
 - Restored green CI coverage by adding unit coverage for identity handles, notification permissions, compressed storage and IndexedDB identity persistence, plus P2P relay and Yjs broadcast paths; all configured Vitest thresholds now pass.
 - Hardened legacy Playwright app-entry suites to complete first-time identity onboarding before interacting with the workspace shell, preventing the modal from intercepting test actions.
 - Refreshed stale responsive and landing-page E2E selectors for the current onboarding, mobile navigation, invite URL, and Activity surface contracts; Activity page and drawer identifiers are now unique.
@@ -46,3 +69,6 @@ This is a concise, human-readable record of meaningful repository evolution. Det
 - Improved phone and tablet behavior for the app shell, message attachments, mention suggestions, modal cards, settings tabs, and mobile navigation safe areas.
 - Made production preview validation use the same GitHub Pages base path as the deployed artifact while keeping local preview tests root-relative.
 - Added the agent contribution contract and living architecture, design, ADR, and history documentation.
+- Resolved onboarding modal test selector collisions between landing page hero quick-launch (`hero-fullname-input`) and modal dialog (`modal-fullname-input`).
+- Updated `open-modal-custom-setup` button to explicitly reset `onboardingStep` to step 1 upon opening.
+- Updated Playwright E2E test suites (`landing-page.spec.ts`, `secondary-flows.spec.ts`, `self-review.spec.ts`) and verified 100% test matrix execution across unit, integration, and E2E suites.

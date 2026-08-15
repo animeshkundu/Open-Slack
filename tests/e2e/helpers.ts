@@ -14,8 +14,10 @@ export async function ensureOnboardingCompleted(
 ): Promise<void> {
   await page.locator('#openslack-root-shell').waitFor({ state: 'visible', timeout: 20000 });
 
+  const landingPage = page.locator('#open-slack-landing-page');
   const overlay = page.locator('#first-time-onboarding-overlay');
   const nameInput = page.locator('#first-time-name-input');
+  const landingNameInput = page.locator('#landing-user-name-input');
   const deadline = Date.now() + 15000;
 
   while (Date.now() < deadline) {
@@ -26,6 +28,17 @@ export async function ensureOnboardingCompleted(
       await page.locator('#first-time-submit-btn').click();
       await expect(overlay).toBeHidden({ timeout: 10000 });
       break;
+    }
+
+    if (await landingPage.isVisible().catch(() => false)) {
+      if (await landingNameInput.isVisible().catch(() => false)) {
+        await landingNameInput.fill(displayName);
+        await page.locator('#hero-create-workspace-btn').click();
+      } else {
+        await page.locator('#hero-create-workspace-btn').click();
+      }
+      await page.waitForTimeout(500);
+      continue;
     }
 
     // Shell chrome is up — wait briefly for a late onboarding mount after identity load

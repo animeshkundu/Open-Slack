@@ -130,6 +130,11 @@ export const MessageItem: React.FC<MessageItemProps> = ({
           >
             {author.displayName}
           </button>
+          {message.authorPubkey === 'pubkey_openbot' && (
+            <span className="px-1.5 py-0.2 bg-[#4A154B] text-white rounded text-[10px] font-bold tracking-wider">
+              APP
+            </span>
+          )}
           <span className="text-[11px] text-neutral-400" title={fullDateString}>
             {timeString}
           </span>

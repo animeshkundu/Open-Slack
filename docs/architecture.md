@@ -42,9 +42,16 @@ Invitations support multi-channel distribution via `InviteModal.tsx` and in-hudd
 
 WebRTC data channels carry synchronized workspace state and direct payloads. Multi-protocol signaling uses both high-availability Nostr relays (NIP-01 ephemeral events) and WebTorrent / BitTorrent tracker swarms (BEP-03) for peer discovery without central servers. Relays are purely an ephemeral rendezvous layer; they are never the source of truth for messages. File transfers use chunked peer channels with SHA-256 integrity verification, and huddles use mesh peer media streams.
 
-## Identity & Mentions
+## Identity & Multi-Device Architecture
 
-User identities use ECDSA P-256 for message signing and ECDH P-256 for end-to-end encryption. Display handles adhere to the `@firstname.lastname` canonical format. The `generateHandleFromName` system enforces automated collision resolution by progressively truncating first name initials, 3-character prefixes, last name initials, or numeric suffixes against active workspace members.
+User master identities use ECDSA P-256 for message signing and ECDH P-256 for end-to-end encryption. Each master account can sign and authorize hierarchical Device Sub-Identities (`deviceId`, local device keypair, `masterPubkey`). Display handles adhere to the `@firstname.lastname` canonical format. The `generateHandleFromName` system enforces automated collision resolution by progressively truncating first name initials, 3-character prefixes, last name initials, or numeric suffixes against active workspace members.
+
+### Multi-Device Call Signaling & Handoff
+
+The `MultiDeviceCallManager` system manages simultaneous ringing across all registered sub-identities of a user:
+- **Simultaneous Ringing**: When an incoming call arrives (`CALL_OFFER`), call offers are broadcast to all linked device IDs.
+- **First-Answerer Resolution**: When any device accepts the call, a `CALL_RESOLVED` event (`answered`) is dispatched across the peer mesh, immediately stopping the ringing tone on all sibling devices.
+- **Call Handoff**: Active calls can be transferred seamlessly between linked devices (`CALL_TRANSFER`) with clean session handoff.
 
 ## Change boundaries
 
