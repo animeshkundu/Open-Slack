@@ -141,11 +141,18 @@ describe('Notifications & DND Logic', () => {
   });
 
   it('handles notification API failures safely', async () => {
+    class ThrowingNotification {
+      static permission = 'granted';
+      static requestPermission = vi.fn().mockRejectedValue(new Error('denied'));
+
+      constructor() {
+        throw new Error('unsupported');
+      }
+    }
+
     Object.defineProperty(window, 'Notification', {
       configurable: true,
-      value: Object.assign(vi.fn(() => {
-        throw new Error('unsupported');
-      }), { permission: 'granted', requestPermission: vi.fn().mockRejectedValue(new Error('denied')) }),
+      value: ThrowingNotification,
     });
 
     await expect(requestNotificationPermission()).resolves.toBe('denied');

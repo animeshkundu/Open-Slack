@@ -106,7 +106,7 @@ describe('Storage Module & Storage Quotas', () => {
     const result = await compressBuffer(input);
     expect(result.isCompressed).toBe(true);
     const restored = await decompressBuffer(result.compressed);
-    expect(new Uint8Array(restored)).toEqual(input);
+    expect(Array.from(new Uint8Array(restored))).toEqual(Array.from(input));
 
     const tiny = await compressBuffer(new Uint8Array([1, 2, 3]));
     expect(tiny.isCompressed).toBe(false);

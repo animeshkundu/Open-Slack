@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import * as Y from 'yjs';
-import { P2PNetworkManager } from '../lib/p2p';
+import { P2PNetworkManager, pingRelay } from '../lib/p2p';
 import { UserIdentity } from '../types';
 
 describe('P2P Network & CRDT Synchronization', () => {
@@ -101,5 +101,70 @@ describe('P2P Network & CRDT Synchronization', () => {
 
     manager.leaveWorkspace();
     expect(manager.relayStatus).toBe('disconnected');
+  });
+
+  it('reports relay open, error, and timeout outcomes', async () => {
+    class OpenSocket {
+      onopen: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      close = vi.fn();
+
+      constructor() {
+        queueMicrotask(() => this.onopen?.());
+      }
+    }
+
+    vi.stubGlobal('WebSocket', OpenSocket);
+    const openResult = await pingRelay('wss://open.test', 100);
+    expect(openResult.ok).toBe(true);
+    expect(openResult.url).toBe('wss://open.test');
+
+    class ErrorSocket {
+      onopen: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      close = vi.fn();
+
+      constructor() {
+        queueMicrotask(() => this.onerror?.());
+      }
+    }
+
+    vi.stubGlobal('WebSocket', ErrorSocket);
+    const errorResult = await pingRelay('wss://error.test', 100);
+    expect(errorResult.ok).toBe(false);
+
+    class TimeoutSocket {
+      onopen: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      close = vi.fn();
+    }
+
+    vi.stubGlobal('WebSocket', TimeoutSocket);
+    vi.useFakeTimers();
+    const timeoutPromise = pingRelay('wss://timeout.test', 25);
+    await vi.advanceTimersByTimeAsync(25);
+    await expect(timeoutPromise).resolves.toMatchObject({
+      url: 'wss://timeout.test',
+      latency: 25,
+      ok: false,
+    });
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it('broadcasts local Yjs updates to network and sibling tabs', () => {
+    const manager = new P2PNetworkManager();
+    const sendDeltaUpdate = vi.fn();
+    const postMessage = vi.fn();
+    (manager as any).sendDeltaUpdate = sendDeltaUpdate;
+    (manager as any).tabBroadcastChannel = { postMessage };
+
+    (manager as any).handleYDocUpdate(new Uint8Array([1, 2]), 'local');
+
+    expect(sendDeltaUpdate).toHaveBeenCalledOnce();
+    expect(postMessage).toHaveBeenCalledWith({
+      type: 'YJS_UPDATE',
+      data: [1, 2],
+    });
   });
 });
