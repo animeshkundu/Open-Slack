@@ -7,7 +7,7 @@ const deployedBaseURL = configuredBaseURL
     : `${configuredBaseURL}/`
   : undefined;
 const previewBuild = process.env.PLAYWRIGHT_PREVIEW === 'true';
-const localBaseURL = previewBuild ? 'http://localhost:4173/' : 'http://localhost:3000';
+const localBaseURL = previewBuild ? 'http://localhost:4173/' : 'http://localhost:3000/';
 
 export default defineConfig({
   testDir: './tests/e2e',
