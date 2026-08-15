@@ -114,6 +114,7 @@ jobs:
             fi
             sleep 10
           done
+          echo "GitHub Pages was not reachable after 5 minutes: $PLAYWRIGHT_BASE_URL"
           exit 1
 
       - name: Run deployed smoke tests
