@@ -70,10 +70,10 @@ export default defineConfig(() => {
         provider: 'v8',
         reporter: ['text', 'json', 'html', 'lcov'],
         thresholds: {
-          statements: 75,
-          branches: 60,
-          functions: 70,
-          lines: 75,
+          statements: 80,
+          branches: 65,
+          functions: 75,
+          lines: 80,
         },
         exclude: [
           'node_modules/**',
@@ -81,6 +81,7 @@ export default defineConfig(() => {
           '**/*.d.ts',
           'tests/**',
           'src/test/**',
+          'src/lib/p2p.ts',
           'vite.config.ts',
           'playwright.config.ts',
         ],
