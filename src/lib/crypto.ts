@@ -5,9 +5,10 @@ const STORAGE_KEYS = {
   CRYPTO_KEYS: 'quietslack_crypto_keys',
 };
 
-// Utility to convert ArrayBuffer to hex
-export function bufferToHex(buffer: ArrayBuffer): string {
-  return Array.from(new Uint8Array(buffer))
+// Utility to convert ArrayBuffer or Uint8Array to hex
+export function bufferToHex(buffer: ArrayBuffer | ArrayBufferLike | Uint8Array): string {
+  const uint8 = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+  return Array.from(uint8)
     .map((b) => b.toString(16).padStart(2, '0'))
     .join('');
 }
@@ -22,9 +23,9 @@ export function hexToBuffer(hex: string): Uint8Array {
 }
 
 // SHA-256 hashing
-export async function sha256(data: string | ArrayBuffer): Promise<string> {
+export async function sha256(data: string | BufferSource | ArrayBufferLike): Promise<string> {
   const encoder = new TextEncoder();
-  const buffer = typeof data === 'string' ? encoder.encode(data) : data;
+  const buffer: BufferSource = typeof data === 'string' ? encoder.encode(data) : (data as BufferSource);
   const hash = await crypto.subtle.digest('SHA-256', buffer);
   return bufferToHex(hash);
 }

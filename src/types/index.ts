@@ -1,15 +1,30 @@
+export interface ThemeDefinition {
+  sidebarBg: string;
+  sidebarText: string;
+  activeItemBg: string;
+  accentColor: string;
+  sidebarHover?: string;
+  railBg?: string;
+  canvasBg?: string;
+  canvasText?: string;
+}
+
 export interface UserPreferences {
   soundEnabled: boolean;
   desktopNotifications: 'all' | 'mentions_only' | 'none';
   dndUntil?: string | null; // ISO string for Do Not Disturb timer
   mutedChannelIds: string[];
   channelNotificationOverrides: Record<string, 'all' | 'mentions' | 'mute'>;
+  themeName?: 'aubergine' | 'nocturne' | 'ocin' | 'banana' | 'custom';
+  customTheme?: ThemeDefinition;
 }
 
 export interface UserStatus {
   state: 'active' | 'away' | 'offline';
-  customMessage?: string;
+  customText?: string;
   customEmoji?: string;
+  customMessage?: string; // Legacy fallback
+  expiresAt?: string; // ISO string for auto-expiry
 }
 
 export interface UserIdentity {
@@ -38,7 +53,8 @@ export interface StoredPrivateKeyPair {
 export interface WorkspaceSettings {
   requireApprovalForInvites: boolean;
   defaultChannels: string[];
-  allowGuestInvites: boolean;
+  allowGuestInvites?: boolean;
+  theme?: ThemeDefinition;
 }
 
 export interface Workspace {
@@ -85,7 +101,7 @@ export interface Attachment {
 
 export interface Message {
   id: string;
-  channelId: string;
+  channelId?: string;
   recipientId?: string;      // For direct messages
   senderId?: string;         // Alias for authorPubkey
   authorPubkey: string;

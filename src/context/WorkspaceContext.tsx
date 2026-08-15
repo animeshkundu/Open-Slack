@@ -25,6 +25,7 @@ import {
   StorageQuotaInfo,
   storeLocalFile,
 } from '../lib/storage';
+import { applyThemeToDom, getThemeConfig } from '../lib/theme';
 import {
   AppNotification,
   Attachment,
@@ -281,6 +282,12 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   useEffect(() => {
     localStorage.setItem('quietslack_notifications', JSON.stringify(notifications.slice(0, 100)));
   }, [notifications]);
+
+  // Apply visual theme to DOM
+  useEffect(() => {
+    const config = getThemeConfig(preferences.themeName || 'aubergine', preferences.customTheme);
+    applyThemeToDom(config);
+  }, [preferences.themeName, preferences.customTheme]);
 
   // Handle invite links in hash (e.g. #invite=...)
   const handleInviteLinkFromUrl = (user: UserIdentity) => {

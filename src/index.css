@@ -2,19 +2,30 @@
 
 @layer base {
   :root {
-    /* Professional Polish Theme Tokens */
-    --slack-rail-bg: #19171D;
+    /* Dynamic Theme Variables (Defaults to Aubergine) */
+    --theme-sidebar-bg: #3F0E40;
+    --theme-sidebar-text: #BCABB6;
+    --theme-sidebar-text-active: #FFFFFF;
+    --theme-sidebar-hover: #350d36;
+    --theme-active-item-bg: #1164A3;
+    --theme-accent-color: #007A5A;
+    --theme-rail-bg: #19171D;
+    --theme-canvas-bg: #FFFFFF;
+    --theme-canvas-text: #1D1C1D;
+
+    /* Legacy Tokens */
+    --slack-rail-bg: var(--theme-rail-bg, #19171D);
     --slack-aubergine-dark: #350d36;
-    --slack-aubergine: #3F0E40;
+    --slack-aubergine: var(--theme-sidebar-bg, #3F0E40);
     --slack-aubergine-border: #522653;
-    --slack-aubergine-hover: #350d36;
-    --slack-aubergine-active: #1164A3;
-    --slack-sidebar-text: #9E9EA6;
-    --slack-sidebar-text-bright: #FFFFFF;
+    --slack-aubergine-hover: var(--theme-sidebar-hover, #350d36);
+    --slack-aubergine-active: var(--theme-active-item-bg, #1164A3);
+    --slack-sidebar-text: var(--theme-sidebar-text, #9E9EA6);
+    --slack-sidebar-text-bright: var(--theme-sidebar-text-active, #FFFFFF);
     
     /* Main Canvas Colors */
-    --slack-canvas-bg: #FFFFFF;
-    --slack-canvas-text: #1D1C1D;
+    --slack-canvas-bg: var(--theme-canvas-bg, #FFFFFF);
+    --slack-canvas-text: var(--theme-canvas-text, #1D1C1D);
     --slack-canvas-subtle: #616061;
     --slack-canvas-border: #E8E8E8;
     --slack-canvas-hover: #F8F8F8;
@@ -23,18 +34,24 @@
     --slack-green: #2BAC76;
     --slack-green-hover: #249666;
     --slack-red: #E01E5A;
-    --slack-blue: #1164A3;
+    --slack-blue: var(--theme-active-item-bg, #1164A3);
     --slack-blue-hover: #0c4d7d;
     --slack-yellow: #ECB22E;
   }
 
   body {
-    background-color: #19171D;
+    background-color: var(--theme-rail-bg, #19171D);
     color: #1D1C1D;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
     user-select: none;
     overflow: hidden;
+    height: 100dvh;
   }
+}
+
+/* Dynamic Viewport Height Utility */
+.h-dvh {
+  height: 100dvh;
 }
 
 /* Custom Slack Scrollbar */
@@ -65,5 +82,3 @@
   background: rgba(17, 100, 163, 0.25);
   color: inherit;
 }
-
-

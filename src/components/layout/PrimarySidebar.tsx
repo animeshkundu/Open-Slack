@@ -1,20 +1,14 @@
 import {
   Bell,
-  Bookmark,
   ChevronDown,
   Globe,
-  Hash,
-  Lock,
-  MessageSquare,
   Plus,
   Radio,
   Search,
   Settings,
   ShieldAlert,
-  Sparkles,
   UserCheck,
   UserPlus,
-  Users,
   Zap,
 } from 'lucide-react';
 import React, { useState } from 'react';
@@ -46,7 +40,6 @@ export const PrimarySidebar: React.FC<PrimarySidebarProps> = ({
     identity,
     setIsSearchOpen,
     simulatePeerMessage,
-    openUserProfile,
     startOrJoinHuddle,
     huddleState,
     joinRequests,
@@ -63,12 +56,15 @@ export const PrimarySidebar: React.FC<PrimarySidebarProps> = ({
   const directChannels = channels.filter((c) => c.isDirectMessage);
 
   const pendingApprovalsCount = joinRequests.filter((r) => r.status === 'PENDING').length;
-  const isOwner = identity?.pubkey === (activeWorkspace?.ownerId || activeWorkspace?.ownerPubkey);
 
   return (
     <div
       id="primary-sidebar-container"
-      className="w-[260px] h-full bg-[#3F0E40] text-[#9E9EA6] flex flex-col flex-shrink-0 select-none border-r border-[#522653] relative"
+      className="w-[260px] h-full flex flex-col flex-shrink-0 select-none border-r border-white/10 relative transition-colors"
+      style={{
+        backgroundColor: 'var(--theme-sidebar-bg, #3F0E40)',
+        color: 'var(--theme-sidebar-text, #BCABB6)',
+      }}
     >
       {/* Workspace Header Dropdown */}
       <div className="relative">
@@ -76,13 +72,13 @@ export const PrimarySidebar: React.FC<PrimarySidebarProps> = ({
           id="workspace-header-menu-btn"
           type="button"
           onClick={() => setShowWorkspaceMenu(!showWorkspaceMenu)}
-          className="w-full h-14 p-4 flex items-center justify-between border-b border-[#522653] text-white hover:bg-[#350d36] transition"
+          className="w-full h-14 p-4 flex items-center justify-between border-b border-black/20 text-white hover:bg-black/15 transition cursor-pointer"
         >
           <div className="flex items-center gap-2 min-w-0">
-            <span className="font-black text-base tracking-tight truncate">
-              {activeWorkspace?.name || 'Quiet Workspace'}
+            <span className="font-black text-base tracking-tight truncate text-white">
+              {activeWorkspace?.name || 'Open Workspace'}
             </span>
-            <ChevronDown className="w-4 h-4 text-[#9E9EA6] flex-shrink-0" />
+            <ChevronDown className="w-4 h-4 opacity-75 flex-shrink-0" />
           </div>
         </button>
 
@@ -107,7 +103,7 @@ export const PrimarySidebar: React.FC<PrimarySidebarProps> = ({
                 setShowWorkspaceMenu(false);
                 onOpenInvite();
               }}
-              className="w-full px-3.5 py-2 hover:bg-neutral-100 text-xs font-semibold flex items-center gap-2.5 text-neutral-700"
+              className="w-full px-3.5 py-2 hover:bg-neutral-100 text-xs font-semibold flex items-center gap-2.5 text-neutral-700 cursor-pointer"
             >
               <UserPlus className="w-4 h-4 text-emerald-600" />
               <span>Invite teammates</span>
@@ -120,7 +116,7 @@ export const PrimarySidebar: React.FC<PrimarySidebarProps> = ({
                 setShowWorkspaceMenu(false);
                 onOpenPendingApprovals();
               }}
-              className="w-full px-3.5 py-2 hover:bg-neutral-100 text-xs font-semibold flex items-center justify-between text-neutral-700"
+              className="w-full px-3.5 py-2 hover:bg-neutral-100 text-xs font-semibold flex items-center justify-between text-neutral-700 cursor-pointer"
             >
               <div className="flex items-center gap-2.5">
                 <UserCheck className="w-4 h-4 text-blue-600" />
@@ -140,7 +136,7 @@ export const PrimarySidebar: React.FC<PrimarySidebarProps> = ({
                 setShowWorkspaceMenu(false);
                 onOpenWorkspaceSettings();
               }}
-              className="w-full px-3.5 py-2 hover:bg-neutral-100 text-xs font-semibold flex items-center gap-2.5 text-neutral-700"
+              className="w-full px-3.5 py-2 hover:bg-neutral-100 text-xs font-semibold flex items-center gap-2.5 text-neutral-700 cursor-pointer"
             >
               <Settings className="w-4 h-4 text-neutral-500" />
               <span>Workspace Administration</span>
@@ -155,7 +151,7 @@ export const PrimarySidebar: React.FC<PrimarySidebarProps> = ({
                 setShowWorkspaceMenu(false);
                 setShowLandingPage(true);
               }}
-              className="w-full px-3.5 py-2 hover:bg-neutral-100 text-xs font-semibold flex items-center gap-2.5 text-neutral-700"
+              className="w-full px-3.5 py-2 hover:bg-neutral-100 text-xs font-semibold flex items-center gap-2.5 text-neutral-700 cursor-pointer"
             >
               <Globe className="w-4 h-4 text-purple-600" />
               <span>Landing Page & Docs</span>
@@ -172,7 +168,7 @@ export const PrimarySidebar: React.FC<PrimarySidebarProps> = ({
             id="sidebar-pending-approvals-alert"
             type="button"
             onClick={onOpenPendingApprovals}
-            className="w-full px-3 py-2 bg-amber-500/20 border border-amber-400/40 rounded-lg text-xs font-bold text-amber-200 flex items-center justify-between hover:bg-amber-500/30 transition"
+            className="w-full px-3 py-2 bg-amber-500/20 border border-amber-400/40 rounded-lg text-xs font-bold text-amber-200 flex items-center justify-between hover:bg-amber-500/30 transition cursor-pointer"
           >
             <span className="flex items-center gap-1.5">
               <ShieldAlert className="w-4 h-4 text-amber-400" />
@@ -190,7 +186,7 @@ export const PrimarySidebar: React.FC<PrimarySidebarProps> = ({
             id="quick-search-trigger-btn"
             type="button"
             onClick={() => setIsSearchOpen(true)}
-            className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-md text-xs text-[#9E9EA6] hover:bg-[#350d36] hover:text-white transition"
+            className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-md text-xs hover:bg-black/15 hover:text-white transition cursor-pointer"
           >
             <Search className="w-3.5 h-3.5 opacity-70" />
             <span>Search workspace</span>
@@ -200,7 +196,7 @@ export const PrimarySidebar: React.FC<PrimarySidebarProps> = ({
             id="quick-activity-btn"
             type="button"
             onClick={() => setRightPanel('activity_feed')}
-            className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-md text-xs text-[#9E9EA6] hover:bg-[#350d36] hover:text-white transition"
+            className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-md text-xs hover:bg-black/15 hover:text-white transition cursor-pointer"
           >
             <Bell className="w-3.5 h-3.5 opacity-70" />
             <span>Activity & Mentions</span>
@@ -213,14 +209,14 @@ export const PrimarySidebar: React.FC<PrimarySidebarProps> = ({
             <button
               type="button"
               onClick={() => setChannelsCollapsed(!channelsCollapsed)}
-              className="flex items-center gap-1.5 focus:outline-none"
+              className="flex items-center gap-1.5 focus:outline-none cursor-pointer"
             >
               <ChevronDown
-                className={`w-3 h-3 transition-transform text-[#9E9EA6] ${
+                className={`w-3 h-3 transition-transform ${
                   channelsCollapsed ? '-rotate-90' : ''
                 }`}
               />
-              <span className="text-xs font-bold uppercase tracking-widest opacity-60">
+              <span className="text-xs font-bold uppercase tracking-widest opacity-70">
                 Channels
               </span>
             </button>
@@ -228,7 +224,7 @@ export const PrimarySidebar: React.FC<PrimarySidebarProps> = ({
               id="add-channel-plus-btn"
               type="button"
               onClick={onOpenCreateChannel}
-              className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-[#350d36] rounded text-[#9E9EA6] hover:text-white transition-opacity"
+              className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-black/20 rounded hover:text-white transition cursor-pointer"
               title="Add channel"
             >
               <Plus className="w-3.5 h-3.5" />
@@ -248,14 +244,22 @@ export const PrimarySidebar: React.FC<PrimarySidebarProps> = ({
                       selectChannel(channel.id);
                       setMobileView('chat');
                     }}
-                    className={`w-full flex items-center justify-between px-3 py-1 rounded-md text-xs sm:text-[13px] transition ${
+                    style={
                       isActive
-                        ? 'bg-[#1164A3] text-white font-semibold shadow-xs'
-                        : 'text-[#9E9EA6] hover:bg-[#350d36] hover:text-white'
+                        ? {
+                            backgroundColor: 'var(--theme-active-item-bg, #1164A3)',
+                            color: 'var(--theme-sidebar-text-active, #FFFFFF)',
+                          }
+                        : undefined
+                    }
+                    className={`w-full flex items-center justify-between px-3 py-1 rounded-md text-xs sm:text-[13px] transition cursor-pointer ${
+                      isActive
+                        ? 'font-semibold shadow-xs'
+                        : 'hover:bg-black/15 hover:text-white'
                     }`}
                   >
                     <div className="flex items-center truncate">
-                      <span className="opacity-50 mr-2 text-[13px] font-mono">
+                      <span className="opacity-60 mr-2 text-[13px] font-mono">
                         {channel.isPrivate ? '🔒' : '#'}
                       </span>
                       <span className="truncate">{channel.name}</span>
@@ -273,9 +277,9 @@ export const PrimarySidebar: React.FC<PrimarySidebarProps> = ({
                 id="add-channels-inline-btn"
                 type="button"
                 onClick={onOpenCreateChannel}
-                className="w-full flex items-center gap-2 px-3 py-1 rounded-md text-xs text-[#9E9EA6]/70 hover:bg-[#350d36] hover:text-white transition"
+                className="w-full flex items-center gap-2 px-3 py-1 rounded-md text-xs opacity-80 hover:bg-black/15 hover:text-white transition cursor-pointer"
               >
-                <span className="opacity-50 text-base leading-none">+</span>
+                <span className="opacity-60 text-base leading-none">+</span>
                 <span>Add channels</span>
               </button>
             </div>
@@ -288,14 +292,14 @@ export const PrimarySidebar: React.FC<PrimarySidebarProps> = ({
             <button
               type="button"
               onClick={() => setDmsCollapsed(!dmsCollapsed)}
-              className="flex items-center gap-1.5 focus:outline-none"
+              className="flex items-center gap-1.5 focus:outline-none cursor-pointer"
             >
               <ChevronDown
-                className={`w-3 h-3 transition-transform text-[#9E9EA6] ${
+                className={`w-3 h-3 transition-transform ${
                   dmsCollapsed ? '-rotate-90' : ''
                 }`}
               />
-              <span className="text-xs font-bold uppercase tracking-widest opacity-60">
+              <span className="text-xs font-bold uppercase tracking-widest opacity-70">
                 Direct Messages
               </span>
             </button>
@@ -303,7 +307,7 @@ export const PrimarySidebar: React.FC<PrimarySidebarProps> = ({
               id="add-dm-plus-btn"
               type="button"
               onClick={onOpenDirectMessage}
-              className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-[#350d36] rounded text-[#9E9EA6] hover:text-white transition-opacity"
+              className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-black/20 rounded hover:text-white transition cursor-pointer"
               title="New direct message"
             >
               <Plus className="w-3.5 h-3.5" />
@@ -333,10 +337,18 @@ export const PrimarySidebar: React.FC<PrimarySidebarProps> = ({
                         onOpenDirectMessage();
                       }
                     }}
-                    className={`w-full flex items-center px-3 py-1 rounded-md text-xs sm:text-[13px] transition ${
+                    style={
                       isActive
-                        ? 'bg-[#1164A3] text-white font-semibold'
-                        : 'text-[#9E9EA6] hover:bg-[#350d36] hover:text-white'
+                        ? {
+                            backgroundColor: 'var(--theme-active-item-bg, #1164A3)',
+                            color: 'var(--theme-sidebar-text-active, #FFFFFF)',
+                          }
+                        : undefined
+                    }
+                    className={`w-full flex items-center px-3 py-1 rounded-md text-xs sm:text-[13px] transition cursor-pointer ${
+                      isActive
+                        ? 'font-semibold shadow-xs'
+                        : 'hover:bg-black/15 hover:text-white'
                     }`}
                   >
                     <div
@@ -357,9 +369,9 @@ export const PrimarySidebar: React.FC<PrimarySidebarProps> = ({
                 id="add-teammates-dm-btn"
                 type="button"
                 onClick={onOpenInvite}
-                className="w-full flex items-center gap-2 px-3 py-1 rounded-md text-xs text-[#9E9EA6]/70 hover:bg-[#350d36] hover:text-white transition"
+                className="w-full flex items-center gap-2 px-3 py-1 rounded-md text-xs opacity-80 hover:bg-black/15 hover:text-white transition cursor-pointer"
               >
-                <span className="opacity-50 text-base leading-none">+</span>
+                <span className="opacity-60 text-base leading-none">+</span>
                 <span>Invite teammates</span>
               </button>
             </div>
@@ -372,7 +384,7 @@ export const PrimarySidebar: React.FC<PrimarySidebarProps> = ({
             id="simulate-peer-quick-btn"
             type="button"
             onClick={simulatePeerMessage}
-            className="w-full py-1.5 px-2.5 bg-white/5 hover:bg-white/10 text-white/80 hover:text-white text-xs font-semibold rounded-lg transition flex items-center justify-center gap-1.5 border border-white/10"
+            className="w-full py-1.5 px-2.5 bg-white/5 hover:bg-white/10 text-white/80 hover:text-white text-xs font-semibold rounded-lg transition flex items-center justify-center gap-1.5 border border-white/10 cursor-pointer"
             title="Simulate peer activity for demo/testing"
           >
             <Zap className="w-3.5 h-3.5 text-amber-400" />
@@ -382,7 +394,7 @@ export const PrimarySidebar: React.FC<PrimarySidebarProps> = ({
       </div>
 
       {/* Slack Huddle Action Bar at Bottom */}
-      <div className="p-3 bg-[#3F0E40] border-t border-[#522653]">
+      <div className="p-3 border-t border-black/20">
         <button
           id="sidebar-start-huddle-btn"
           type="button"
@@ -391,7 +403,7 @@ export const PrimarySidebar: React.FC<PrimarySidebarProps> = ({
               startOrJoinHuddle(activeChannel.id);
             }
           }}
-          className="w-full flex items-center space-x-2 bg-[#FFFFFF15] p-2 rounded-lg cursor-pointer hover:bg-[#FFFFFF20] transition text-left focus:outline-none"
+          className="w-full flex items-center space-x-2 bg-white/10 p-2 rounded-lg cursor-pointer hover:bg-white/20 transition text-left focus:outline-none"
         >
           <div className="w-6 h-6 bg-[#2BAC76] rounded flex items-center justify-center flex-shrink-0">
             <Radio className="w-3.5 h-3.5 text-white" />

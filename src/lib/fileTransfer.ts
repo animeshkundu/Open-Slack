@@ -44,7 +44,7 @@ export class FileChunkTransferManager {
    * Split a File or ArrayBuffer into 16 KB chunks
    */
   public async prepareFileForChunking(
-    file: File | { name: string; type: string; size: number; buffer: ArrayBuffer }
+    file: File | { name: string; type: string; size: number; buffer: ArrayBuffer | ArrayBufferLike }
   ): Promise<{
     header: FileChunkHeader;
     chunks: FileChunkData[];
@@ -190,7 +190,7 @@ export class FileChunkTransferManager {
    * Transmit file chunks with backpressure rate control
    */
   public async sendFileWithBackpressure(
-    file: File | { name: string; type: string; size: number; buffer: ArrayBuffer },
+    file: File | { name: string; type: string; size: number; buffer: ArrayBuffer | ArrayBufferLike },
     sendAction: (payload: FileChunkHeader | FileChunkData) => Promise<void> | void,
     onProgress?: (progress: FileTransferProgress) => void,
     chunkDelayMs = 5
@@ -222,7 +222,7 @@ export class FileChunkTransferManager {
     }
 
     const buffer = 'arrayBuffer' in file ? await file.arrayBuffer() : file.buffer;
-    const blob = new Blob([buffer], { type: header.mimeType });
+    const blob = new Blob([buffer as BlobPart], { type: header.mimeType });
     const dataUrl = await new Promise<string>((resolve) => {
       const reader = new FileReader();
       reader.onloadend = () => resolve(reader.result as string);
