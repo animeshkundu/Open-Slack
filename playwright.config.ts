@@ -45,7 +45,7 @@ export default defineConfig({
     ? undefined
     : {
         command: previewBuild
-          ? 'npm run preview -- --host 0.0.0.0 --port 4173'
+          ? `npm run preview -- --host 0.0.0.0 --port 4173 --base /${repositoryName}/`
           : 'npm run dev',
         url: localBaseURL,
         reuseExistingServer: !process.env.CI,

@@ -31,9 +31,9 @@ test.describe('Huddle Audio/Video Call Flow', () => {
     const expandBtn = page.locator('#huddle-expand-btn');
     if (await expandBtn.isVisible()) {
       await expandBtn.click();
-      await expect(page.locator('#huddle-stage-overlay')).toBeVisible();
+      await expect(page.locator('#huddle-expanded-modal')).toBeVisible();
       // Minimize back to dock
-      const minimizeBtn = page.locator('#huddle-stage-minimize-btn');
+      const minimizeBtn = page.locator('#minimize-huddle-btn');
       if (await minimizeBtn.isVisible()) {
         await minimizeBtn.click();
       }
