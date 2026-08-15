@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { isDNDActive, shouldNotify } from '../lib/notifications';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { isDNDActive, shouldNotify, showBrowserNotification } from '../lib/notifications';
 import { Message, UserPreferences } from '../types';
 
 describe('Notifications & DND Logic', () => {
@@ -18,6 +18,11 @@ describe('Notifications & DND Logic', () => {
     content: 'Regular update',
     timestamp: Date.now(),
   };
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    Reflect.deleteProperty(window, 'Notification');
+  });
 
   it('determines DND active status correctly', () => {
     expect(isDNDActive(basePrefs)).toBe(false);
@@ -75,5 +80,47 @@ describe('Notifications & DND Logic', () => {
 
     const decision = shouldNotify(sampleMessage, 'my_pubkey', '@me', overridePrefs);
     expect(decision).toBe(false);
+  });
+
+  it('creates a browser notification and focuses the app on click', () => {
+    const close = vi.fn();
+    const notification = { onclick: null as (() => void) | null, close };
+    const NotificationMock = vi.fn(function NotificationConstructor() {
+      return notification;
+    });
+    Object.defineProperty(window, 'Notification', {
+      configurable: true,
+      value: Object.assign(NotificationMock, { permission: 'granted' }),
+    });
+    const focus = vi.spyOn(window, 'focus').mockImplementation(() => undefined);
+    const onClick = vi.fn();
+
+    const result = showBrowserNotification('New message', {
+      body: 'Hello',
+      tag: 'message-1',
+      onClick,
+    });
+
+    expect(result).toBe(notification);
+    expect(NotificationMock).toHaveBeenCalledWith('New message', {
+      body: 'Hello',
+      icon: '/favicon.ico',
+      tag: 'message-1',
+    });
+    notification.onclick?.();
+    expect(focus).toHaveBeenCalledOnce();
+    expect(onClick).toHaveBeenCalledOnce();
+    expect(close).toHaveBeenCalledOnce();
+  });
+
+  it('does not construct notifications without granted permission', () => {
+    const NotificationMock = vi.fn();
+    Object.defineProperty(window, 'Notification', {
+      configurable: true,
+      value: Object.assign(NotificationMock, { permission: 'default' }),
+    });
+
+    expect(showBrowserNotification('Blocked')).toBeNull();
+    expect(NotificationMock).not.toHaveBeenCalled();
   });
 });

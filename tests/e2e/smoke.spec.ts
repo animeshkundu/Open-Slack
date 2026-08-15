@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 
 test.describe('QuietSlack Smoke & Core UI Suite', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
+    await page.goto('./');
   });
 
   test('loads QuietSlack interface with primary elements', async ({ page }) => {

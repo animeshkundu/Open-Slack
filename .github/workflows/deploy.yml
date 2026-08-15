@@ -42,8 +42,6 @@ jobs:
         run: npm test
 
       - name: Build project
-        env:
-          GITHUB_PAGES: 'true'
         run: npm run build
 
       - name: Copy index.html to 404.html for SPA subpath routing
@@ -61,6 +59,17 @@ jobs:
         env:
           PLAYWRIGHT_PREVIEW: 'true'
         run: npm run test:e2e
+
+      - name: Build project for GitHub Pages
+        env:
+          GITHUB_PAGES: 'true'
+        run: npm run build
+
+      - name: Prepare and verify Pages artifact
+        run: |
+          cp dist/index.html dist/404.html
+          test -s dist/index.html
+          test -s dist/404.html
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
