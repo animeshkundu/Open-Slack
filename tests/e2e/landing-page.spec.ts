@@ -78,7 +78,8 @@ test.describe('Landing Page & Responsiveness Suite', () => {
     await page.locator('#mobile-nav-home-btn').click();
     await expect(page.locator('#primary-sidebar-container')).toBeVisible();
     await page.locator('#mobile-nav-channels-btn').click();
-    await page.locator('#channel-details-btn').click();
+    await page.locator('#header-more-actions-btn').click();
+    await page.locator('#more-menu-details-btn').click();
     await expect(page.locator('#right-drawer-panel')).toBeVisible();
     await expect
       .poll(() =>

@@ -53,7 +53,9 @@ test.describe('Secondary workspace flows', () => {
     await expect(page.locator('#open-slack-landing-page')).toBeVisible();
     await page.locator('#hero-create-workspace-btn').click();
     await expect(page.getByTestId('onboarding-modal-card')).toBeVisible();
-    await page.locator('#close-onboarding-modal').click();
+    await page.locator('#landing-user-name-input').fill('Landing Flow Tester');
+    await page.locator('#step1-next-btn').click();
+    await page.locator('#submit-create-workspace-btn').click();
     await expect(page.locator('#openslack-root-shell')).toBeVisible();
   });
 });
