@@ -42,20 +42,22 @@ export const InviteModal: React.FC<InviteModalProps> = ({
   const [qrDataUrl, setQrDataUrl] = useState<string>('');
   const previewCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  if (!isOpen || !activeWorkspace) return null;
-
   // Generate Invite URL payload with base64 data
-  const payloadStr = btoa(JSON.stringify(activeWorkspace));
+  const payloadStr = activeWorkspace ? btoa(JSON.stringify(activeWorkspace)) : '';
   const huddleQuery = initialHuddleChannel ? `&huddle=${encodeURIComponent(initialHuddleChannel)}` : '';
   const inviteUrl = `${window.location.origin}${window.location.pathname}#invite=${payloadStr}${huddleQuery}`;
-  const jsonConfig = JSON.stringify(activeWorkspace, null, 2);
+  const jsonConfig = activeWorkspace ? JSON.stringify(activeWorkspace, null, 2) : '';
 
-  const personalizedText = recipientName.trim()
-    ? `Hey ${recipientName.trim()}, join our decentralized workspace "${activeWorkspace.name}" on Open-Slack:\n${inviteUrl}`
-    : `Join our decentralized, serverless workspace "${activeWorkspace.name}" on Open-Slack:\n${inviteUrl}`;
+  const personalizedText = activeWorkspace
+    ? recipientName.trim()
+      ? `Hey ${recipientName.trim()}, join our decentralized workspace "${activeWorkspace.name}" on Open-Slack:\n${inviteUrl}`
+      : `Join our decentralized, serverless workspace "${activeWorkspace.name}" on Open-Slack:\n${inviteUrl}`
+    : '';
 
   // Generate QR Code on mount / url change
   useEffect(() => {
+    if (!isOpen || !activeWorkspace) return;
+
     QRCode.toDataURL(inviteUrl, {
       width: 280,
       margin: 1.5,
@@ -163,6 +165,8 @@ export const InviteModal: React.FC<InviteModalProps> = ({
       ctx.fillText('Open-Slack Serverless', 460, 310);
     }
   }, [activeTab, activeWorkspace, activeChannel]);
+
+  if (!isOpen || !activeWorkspace) return null;
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(inviteUrl);

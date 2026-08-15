@@ -50,7 +50,7 @@ test.describe('Secondary workspace flows', () => {
     await page.locator('#workspace-header-menu-btn').click();
     await page.locator('#ws-menu-landing-page-btn').click();
     await expect(page.locator('#open-slack-landing-page')).toBeVisible();
-    await page.locator('#hero-launch-app-btn').click();
-    await expect(page.locator('#openslack-root-shell')).toBeVisible();
+    await page.locator('[data-testid="hero-launch-app-btn"]').click();
+    await expect(page.locator('#create-workspace-modal-card')).toBeVisible();
   });
 });

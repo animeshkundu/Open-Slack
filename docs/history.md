@@ -5,6 +5,7 @@ This is a concise, human-readable record of meaningful repository evolution. Det
 ## 2026-08-15
 
 - Repaired the npm lockfile so reproducible `npm ci` installs succeed in CI and Pages deployment, and retained responsive visual review screenshots as workflow artifacts for every main push.
+- Fixed InviteModal hook ordering and refreshed landing/responsive E2E selectors so the full 21-test Playwright matrix remains green.
 - Replaced duplicate static sidebar huddle button with an authentic Slack segmented Huddle pill dropdown in the channel header and a live ambient call widget in the primary sidebar.
 - Added tasteful screenshare quick-action directly alongside "Start Huddle" in the main channel header and integrated sharing controls into the floating/expanded huddle overlays.
 - Implemented high-density QR code generation and multi-channel social invitation links (WhatsApp, Gmail, Telegram, X, and Web Share API).

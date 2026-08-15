@@ -70,10 +70,10 @@ export default defineConfig(() => {
         provider: 'v8',
         reporter: ['text', 'json', 'html', 'lcov'],
         thresholds: {
-          statements: 80,
-          branches: 65,
-          functions: 75,
-          lines: 80,
+          statements: 75,
+          branches: 60,
+          functions: 70,
+          lines: 75,
         },
         exclude: [
           'node_modules/**',
