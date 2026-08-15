@@ -42,3 +42,5 @@ npm run test:e2e
 ```
 
 Prefer targeted Playwright runs while iterating, then run the full validation set before handoff.
+
+For a local production-preview E2E pass, build first and run `PLAYWRIGHT_PREVIEW=true npm run test:e2e`; CI automatically uses the GitHub Pages repository base path.
