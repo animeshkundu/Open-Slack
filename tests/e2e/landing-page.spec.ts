@@ -41,11 +41,12 @@ test.describe('Landing Page & Responsiveness Suite', () => {
     expect(landingScrollMetrics.scrollHeight).toBeGreaterThan(landingScrollMetrics.viewportHeight);
     expect(landingScrollMetrics.scrollWidth).toBeLessThanOrEqual(landingScrollMetrics.viewportWidth);
 
-    // Launch app from landing page
+    // Open and dismiss the workspace setup flow from the landing page
     await page.locator('#hero-create-workspace-btn').click();
     await expect(page.getByTestId('onboarding-modal-card')).toBeVisible();
     await page.locator('#close-onboarding-modal').click();
     await expect(page.getByTestId('onboarding-modal-card')).not.toBeVisible();
+    await expect(page.locator('#open-slack-landing-page')).toBeVisible();
   });
 
   test('responsive layout adapts smoothly to Mobile (375px), Tablet (768px), and Desktop (1440px)', async ({ page }) => {
