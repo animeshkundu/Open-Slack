@@ -30,6 +30,15 @@ test.describe('Landing Page & Responsiveness Suite', () => {
     await expect(page.getByText('End-to-End Encryption')).toBeVisible();
     await expect(page.getByText('Zero (100% Client-Side P2P)')).toBeVisible();
 
+    const landingScrollMetrics = await page.evaluate(() => ({
+      scrollHeight: document.documentElement.scrollHeight,
+      viewportHeight: window.innerHeight,
+      scrollWidth: document.documentElement.scrollWidth,
+      viewportWidth: window.innerWidth,
+    }));
+    expect(landingScrollMetrics.scrollHeight).toBeGreaterThan(landingScrollMetrics.viewportHeight);
+    expect(landingScrollMetrics.scrollWidth).toBeLessThanOrEqual(landingScrollMetrics.viewportWidth);
+
     // Launch app from landing page
     await page.locator('#hero-launch-app-btn').click();
     await expect(page.locator('#openslack-root-shell')).toBeVisible();
@@ -42,6 +51,11 @@ test.describe('Landing Page & Responsiveness Suite', () => {
     await expect(page.locator('#openslack-root-shell')).toBeVisible();
     await expect(page.locator('#workspace-rail-bar')).toBeVisible();
     await expect(page.locator('#primary-sidebar-container')).toBeVisible();
+    await expect
+      .poll(() =>
+        page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
+      )
+      .toBe(true);
 
     // Tablet Viewport
     await page.setViewportSize({ width: 768, height: 1024 });
@@ -51,5 +65,21 @@ test.describe('Landing Page & Responsiveness Suite', () => {
     await page.setViewportSize({ width: 375, height: 667 });
     await expect(page.locator('#openslack-root-shell')).toBeVisible();
     await expect(page.locator('#mobile-bottom-nav-bar')).toBeVisible();
+    await expect
+      .poll(() =>
+        page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
+      )
+      .toBe(true);
+
+    await page.locator('#mobile-nav-home-btn').click();
+    await expect(page.locator('#primary-sidebar-container')).toBeVisible();
+    await page.locator('#mobile-nav-chat-btn').click();
+    await page.locator('#channel-details-btn').click();
+    await expect(page.locator('#right-drawer-panel')).toBeVisible();
+    await expect
+      .poll(() =>
+        page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
+      )
+      .toBe(true);
   });
 });

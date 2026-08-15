@@ -50,6 +50,11 @@
 
 ## 🚀 Getting Started
 
+### Contributor & Agent Documentation
+
+- Read [`gemini.md`](gemini.md) before making changes; it is the contribution contract for all LLM agents.
+- Keep the living engineering docs in [`docs/`](docs/) updated with implementation changes.
+
 ### Prerequisites
 
 - Node.js 22+
