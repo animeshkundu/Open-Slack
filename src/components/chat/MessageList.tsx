@@ -104,13 +104,13 @@ export const MessageList: React.FC<MessageListProps> = ({ messages }) => {
         {/* Date Dividers & Message Items */}
         {groupedMessages.map((group) => (
           <div key={group.dateHeader} className="space-y-1">
-            {/* Date separator line */}
-            <div className="relative flex items-center py-4 px-6">
-              <div className="flex-1 border-t border-gray-200" />
-              <span className="mx-4 text-xs font-bold text-gray-400 px-2 bg-white">
+            {/* Sticky Date Separator Pill */}
+            <div className="sticky top-0 z-10 flex items-center justify-center py-2 px-6 bg-white/95 backdrop-blur-xs">
+              <div className="flex-1 border-t border-neutral-200" />
+              <span className="mx-3 text-[11px] font-bold text-neutral-600 px-3 py-1 bg-neutral-100/90 border border-neutral-200/80 rounded-full shadow-2xs">
                 {group.dateHeader}
               </span>
-              <div className="flex-1 border-t border-gray-200" />
+              <div className="flex-1 border-t border-neutral-200" />
             </div>
 
             {/* Messages in this date block */}

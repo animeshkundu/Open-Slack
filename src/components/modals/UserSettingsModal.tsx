@@ -1,33 +1,54 @@
 import {
+  Activity,
   Bell,
   Check,
   Clock,
   Copy,
+  Database,
   Download,
+  FileArchive,
   HardDrive,
+  Network,
   Palette,
+  Play,
   Radio,
+  RefreshCw,
   Save,
   Shield,
   Smile,
   Sparkles,
+  Trash2,
   Upload,
   User,
   Volume2,
+  Wifi,
   X,
   Zap,
 } from 'lucide-react';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useWorkspace } from '../../context/WorkspaceContext';
 import { generateAvatarSvg } from '../../lib/crypto';
+import { generateHandleFromName } from '../../lib/mentions';
 import { isDNDActive, requestNotificationPermission } from '../../lib/notifications';
-import { DEFAULT_RELAYS } from '../../lib/p2p';
+import {
+  ALL_RECOMMENDED_RELAYS,
+  DEFAULT_RELAYS,
+  DEFAULT_TORRENT_TRACKERS,
+  pingRelay,
+} from '../../lib/p2p';
 import {
   computeExpiryIso,
   EXPIRY_OPTIONS,
   isStatusExpired,
   STATUS_PRESETS,
 } from '../../lib/status';
+import {
+  clearAllStoredFiles,
+  compressBuffer,
+  formatBytes,
+  getStorageQuotaEstimate,
+  StorageQuotaInfo,
+} from '../../lib/storage';
 import { PRESET_THEMES, ThemeName } from '../../lib/theme';
 import { ThemeDefinition } from '../../types';
 
@@ -86,6 +107,78 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
 
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [savedSuccess, setSavedSuccess] = useState(false);
+
+  // Relay ping & latency test state
+  const [relayPings, setRelayPings] = useState<Record<string, { latency: number; ok: boolean }>>({});
+  const [isPingingRelays, setIsPingingRelays] = useState(false);
+
+  // Storage & Compression state
+  const [storageQuota, setStorageQuota] = useState<StorageQuotaInfo | null>(null);
+  const [compressionBenchmark, setCompressionBenchmark] = useState<{ rawBytes: number; compressedBytes: number; savings: string } | null>(null);
+  const [isCompressing, setIsCompressing] = useState(false);
+  const [clearedStorageSuccess, setClearedStorageSuccess] = useState(false);
+
+  useEffect(() => {
+    if (activeTab === 'storage') {
+      getStorageQuotaEstimate().then(setStorageQuota);
+    }
+  }, [activeTab]);
+
+  const handleRunCompressionBenchmark = async () => {
+    setIsCompressing(true);
+    try {
+      const samplePayload = JSON.stringify({
+        workspace: 'Open-Slack Engineering',
+        channels: ['#general', '#dev', '#random', '#announcements'],
+        messages: Array.from({ length: 200 }).map((_, i) => ({
+          id: `msg_${Date.now()}_${i}`,
+          author: 'Alex Rivera @alex.rivera',
+          content: `Encrypted decentralized message thread #${i} with cryptographic sign verification, reactions, nested metadata, and local IndexedDB CRDT state`,
+          timestamp: Date.now() - i * 60000,
+          reactions: { '👍': 4, '🚀': 2, '❤️': 3 },
+        })),
+      });
+
+      const rawUint8 = new TextEncoder().encode(samplePayload);
+      const res = await compressBuffer(rawUint8);
+      const savings = Math.round((1 - res.compressed.byteLength / rawUint8.byteLength) * 100);
+
+      setCompressionBenchmark({
+        rawBytes: rawUint8.byteLength,
+        compressedBytes: res.compressed.byteLength,
+        savings: `${savings}%`,
+      });
+    } catch (err) {
+      console.warn('Compression benchmark error:', err);
+    } finally {
+      setIsCompressing(false);
+    }
+  };
+
+  const handleClearMediaStorage = async () => {
+    const ok = await clearAllStoredFiles();
+    if (ok) {
+      setClearedStorageSuccess(true);
+      getStorageQuotaEstimate().then(setStorageQuota);
+      setTimeout(() => setClearedStorageSuccess(false), 2500);
+    }
+  };
+
+  const handlePingAll = async () => {
+    setIsPingingRelays(true);
+    const allEndpoints = [...DEFAULT_RELAYS, ...DEFAULT_TORRENT_TRACKERS];
+    const results: Record<string, { latency: number; ok: boolean }> = {};
+    
+    await Promise.all(
+      allEndpoints.map(async (url) => {
+        const res = await pingRelay(url, 2500);
+        results[url] = { latency: res.latency, ok: res.ok };
+      })
+    );
+    
+    setRelayPings(results);
+    setIsPingingRelays(false);
+  };
 
   if (!isOpen || !identity) return null;
 
@@ -188,16 +281,19 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
   return (
     <div
       id="user-settings-modal-backdrop"
-      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4"
       onClick={onClose}
     >
       <div
         id="user-settings-modal-card"
-        className="w-full max-w-2xl bg-white rounded-xl shadow-2xl border border-neutral-200 overflow-hidden flex flex-col max-h-[calc(100dvh-2rem)] animate-in fade-in zoom-in-95 duration-150"
+        className="w-full max-w-2xl bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl border-t sm:border border-neutral-200 overflow-hidden flex flex-col max-h-[92dvh] sm:max-h-[85vh] animate-in slide-in-from-bottom sm:zoom-in-95 duration-150"
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Mobile Drag Handle */}
+        <div className="w-10 h-1 bg-neutral-300 rounded-full mx-auto my-2 sm:hidden flex-shrink-0" />
+
         {/* Header */}
-        <div className="p-5 border-b border-neutral-200 flex items-center justify-between bg-neutral-50/60">
+        <div className="p-5 border-b border-neutral-200 flex items-center justify-between bg-neutral-50/60 flex-shrink-0">
           <h3 className="text-base font-black text-neutral-900">Preferences & Customization</h3>
           <button
             id="close-settings-modal"
@@ -211,14 +307,14 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
 
         <div className="flex flex-1 min-h-0 flex-col sm:flex-row overflow-hidden">
           {/* Tabs Sidebar */}
-          <div className="w-full sm:w-48 flex sm:block gap-1 overflow-x-auto bg-neutral-50/80 border-b sm:border-b-0 sm:border-r border-neutral-200 p-2 sm:p-3">
+          <div className="w-full sm:w-52 flex sm:block gap-1.5 overflow-x-auto no-scrollbar bg-neutral-50/80 border-b sm:border-b-0 sm:border-r border-neutral-200 p-2 sm:p-3 flex-shrink-0">
             <button
               id="tab-profile-btn"
               type="button"
               onClick={() => setActiveTab('profile')}
               className={`w-auto sm:w-full flex-shrink-0 flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition text-left cursor-pointer whitespace-nowrap ${
                 activeTab === 'profile'
-                  ? 'bg-neutral-900 text-white'
+                  ? 'bg-neutral-900 text-white shadow-xs'
                   : 'text-neutral-600 hover:bg-neutral-200/60'
               }`}
             >
@@ -232,7 +328,7 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
               onClick={() => setActiveTab('themes')}
               className={`w-auto sm:w-full flex-shrink-0 flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition text-left cursor-pointer whitespace-nowrap ${
                 activeTab === 'themes'
-                  ? 'bg-neutral-900 text-white'
+                  ? 'bg-neutral-900 text-white shadow-xs'
                   : 'text-neutral-600 hover:bg-neutral-200/60'
               }`}
             >
@@ -246,7 +342,7 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
               onClick={() => setActiveTab('notifications')}
               className={`w-auto sm:w-full flex-shrink-0 flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition text-left cursor-pointer whitespace-nowrap ${
                 activeTab === 'notifications'
-                  ? 'bg-neutral-900 text-white'
+                  ? 'bg-neutral-900 text-white shadow-xs'
                   : 'text-neutral-600 hover:bg-neutral-200/60'
               }`}
             >
@@ -260,7 +356,7 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
               onClick={() => setActiveTab('crypto')}
               className={`w-auto sm:w-full flex-shrink-0 flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition text-left cursor-pointer whitespace-nowrap ${
                 activeTab === 'crypto'
-                  ? 'bg-neutral-900 text-white'
+                  ? 'bg-neutral-900 text-white shadow-xs'
                   : 'text-neutral-600 hover:bg-neutral-200/60'
               }`}
             >
@@ -274,12 +370,12 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
               onClick={() => setActiveTab('network')}
               className={`w-auto sm:w-full flex-shrink-0 flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition text-left cursor-pointer whitespace-nowrap ${
                 activeTab === 'network'
-                  ? 'bg-neutral-900 text-white'
+                  ? 'bg-neutral-900 text-white shadow-xs'
                   : 'text-neutral-600 hover:bg-neutral-200/60'
               }`}
             >
-              <Radio className="w-4 h-4" />
-              <span>Nostr Mesh</span>
+              <Wifi className="w-4 h-4" />
+              <span>Nostr & Trackers</span>
             </button>
 
             <button
@@ -288,12 +384,12 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
               onClick={() => setActiveTab('storage')}
               className={`w-auto sm:w-full flex-shrink-0 flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition text-left cursor-pointer whitespace-nowrap ${
                 activeTab === 'storage'
-                  ? 'bg-neutral-900 text-white'
+                  ? 'bg-neutral-900 text-white shadow-xs'
                   : 'text-neutral-600 hover:bg-neutral-200/60'
               }`}
             >
               <HardDrive className="w-4 h-4" />
-              <span>Storage & Tests</span>
+              <span>Storage & Diagnostics</span>
             </button>
           </div>
 
@@ -408,25 +504,43 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
                     id="settings-display-name"
                     type="text"
                     value={displayName}
-                    onChange={(e) => setDisplayName(e.target.value)}
+                    onChange={(e) => {
+                      const newName = e.target.value;
+                      setDisplayName(newName);
+                    }}
                     required
                     className="w-full px-3 py-2 bg-neutral-50 border border-neutral-300 rounded-lg text-xs outline-none focus:border-blue-500 focus:bg-white"
                   />
                 </div>
 
-                {/* Handle */}
+                {/* Handle with Auto-format */}
                 <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-neutral-700 mb-1">
-                    Handle / Username
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-bold uppercase tracking-wider text-neutral-700">
+                      Handle / Username
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const generated = generateHandleFromName(displayName);
+                        setHandle(generated);
+                      }}
+                      className="text-[11px] font-semibold text-[#1264A3] hover:underline cursor-pointer flex items-center gap-1"
+                    >
+                      <Sparkles className="w-3 h-3" /> Auto @first.last
+                    </button>
+                  </div>
                   <input
                     id="settings-handle"
                     type="text"
                     value={handle}
                     onChange={(e) => setHandle(e.target.value)}
                     required
-                    className="w-full px-3 py-2 bg-neutral-50 border border-neutral-300 rounded-lg text-xs outline-none focus:border-blue-500 focus:bg-white"
+                    className="w-full px-3 py-2 bg-neutral-50 border border-neutral-300 rounded-lg text-xs outline-none focus:border-blue-500 focus:bg-white font-mono"
                   />
+                  <p className="text-[10.5px] text-neutral-500 mt-1">
+                    Canonical format: <code className="text-neutral-700 bg-neutral-100 px-1 py-0.5 rounded">@firstname.lastname</code> (auto-truncates on collisions).
+                  </p>
                 </div>
 
                 {/* Custom Status with Presets and Auto-Expiry */}
@@ -914,28 +1028,121 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
                       {connectedPeerCount} active WebRTC peer(s) connected
                     </div>
                   </div>
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-                    <span>{relayStatus.toUpperCase()}</span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handlePingAll}
+                      disabled={isPingingRelays}
+                      className="px-2.5 py-1 text-[11px] font-bold bg-white hover:bg-neutral-100 border border-neutral-300 rounded-md text-neutral-700 flex items-center gap-1 transition cursor-pointer shadow-2xs disabled:opacity-50"
+                    >
+                      <RefreshCw className={`w-3 h-3 ${isPingingRelays ? 'animate-spin' : ''}`} />
+                      <span>{isPingingRelays ? 'Pinging...' : 'Ping All'}</span>
+                    </button>
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                      <span>{relayStatus.toUpperCase()}</span>
+                    </div>
                   </div>
                 </div>
 
+                {/* Nostr WebSocket Relays */}
                 <div>
-                  <div className="text-xs font-bold uppercase tracking-wider text-neutral-700 mb-2">
-                    Active Nostr Relays
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="text-xs font-bold uppercase tracking-wider text-neutral-700 flex items-center gap-1.5">
+                      <Radio className="w-3.5 h-3.5 text-[#1264A3]" />
+                      <span>High-Availability Nostr Relays ({DEFAULT_RELAYS.length})</span>
+                    </div>
+                    <span className="text-[11px] text-neutral-500">NIP-01 Ephemeral Signaling</span>
+                  </div>
+                  <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                    {DEFAULT_RELAYS.map((relay, idx) => {
+                      const ping = relayPings[relay];
+                      return (
+                        <div
+                          key={idx}
+                          className="flex items-center justify-between px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-md text-xs font-mono text-neutral-700"
+                        >
+                          <span className="truncate max-w-[240px] sm:max-w-[340px]">{relay}</span>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            {ping ? (
+                              ping.ok ? (
+                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                                  ping.latency < 100
+                                    ? 'bg-emerald-100 text-emerald-800'
+                                    : ping.latency < 300
+                                    ? 'bg-amber-100 text-amber-800'
+                                    : 'bg-neutral-200 text-neutral-700'
+                                }`}>
+                                  {ping.latency}ms
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-bold text-red-600 bg-red-50 px-1.5 py-0.5 rounded">
+                                  Timeout
+                                </span>
+                              )
+                            ) : (
+                              <span className="text-[10px] font-bold text-emerald-600">
+                                Active
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* BitTorrent / WebTorrent Trackers */}
+                <div className="pt-2 border-t border-neutral-200">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="text-xs font-bold uppercase tracking-wider text-neutral-700 flex items-center gap-1.5">
+                      <Network className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>WebTorrent Signaling Trackers ({DEFAULT_TORRENT_TRACKERS.length})</span>
+                    </div>
+                    <span className="text-[11px] text-neutral-500">BEP-03 / WebTorrent Mesh</span>
                   </div>
                   <div className="space-y-1.5">
-                    {DEFAULT_RELAYS.map((relay, idx) => (
-                      <div
-                        key={idx}
-                        className="flex items-center justify-between px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-md text-xs font-mono text-neutral-700"
-                      >
-                        <span>{relay}</span>
-                        <span className="text-[10px] font-bold text-emerald-600">
-                          Active
-                        </span>
-                      </div>
-                    ))}
+                    {DEFAULT_TORRENT_TRACKERS.map((tracker, idx) => {
+                      const ping = relayPings[tracker];
+                      return (
+                        <div
+                          key={idx}
+                          className="flex items-center justify-between px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-md text-xs font-mono text-neutral-700"
+                        >
+                          <span className="truncate max-w-[240px] sm:max-w-[340px]">{tracker}</span>
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            {ping ? (
+                              ping.ok ? (
+                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                                  ping.latency < 150
+                                    ? 'bg-emerald-100 text-emerald-800'
+                                    : 'bg-amber-100 text-amber-800'
+                                }`}>
+                                  {ping.latency}ms
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-bold text-neutral-500 bg-neutral-100 px-1.5 py-0.5 rounded">
+                                  Standby
+                                </span>
+                              )
+                            ) : (
+                              <span className="text-[10px] font-bold text-emerald-600">
+                                Ready
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="p-3 bg-blue-50/60 rounded-lg border border-blue-100 text-xs text-blue-900 leading-relaxed">
+                  <div className="font-bold flex items-center gap-1 mb-0.5">
+                    <Shield className="w-3.5 h-3.5 text-blue-700" /> Multi-Protocol Redundancy
+                  </div>
+                  <div>
+                    Open Slack simultaneously publishes ephemeral rendezvous SDP offers to both Nostr relay clusters and WebTorrent tracker swarms. Direct WebRTC data-channels are negotiated peer-to-peer without central server dependencies.
                   </div>
                 </div>
               </div>
@@ -944,37 +1151,129 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
             {/* 6. STORAGE & LOCAL DATA TAB */}
             {activeTab === 'storage' && (
               <div className="space-y-4">
-                <div className="p-4 bg-neutral-50 border border-neutral-200 rounded-lg space-y-3">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-semibold text-neutral-700">
-                      Storage Architecture:
-                    </span>
-                    <span className="font-mono font-bold text-neutral-900">
-                      IndexedDB + Yjs CRDT
-                    </span>
+                {/* Storage Engine Status Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="p-3.5 bg-neutral-50 border border-neutral-200 rounded-xl space-y-1">
+                    <div className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider flex items-center gap-1.5">
+                      <Database className="w-3.5 h-3.5 text-blue-600" />
+                      <span>IndexedDB + CRDT</span>
+                    </div>
+                    <div className="text-sm font-bold text-neutral-900">Active & Syncing</div>
+                    <div className="text-[10.5px] text-neutral-500">100% Local-First Browser DB</div>
                   </div>
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-semibold text-neutral-700">
-                      Offline Mode & Local Cache:
-                    </span>
-                    <span className="font-bold text-emerald-600">
-                      100% Client-Side & Private
-                    </span>
+
+                  <div className="p-3.5 bg-neutral-50 border border-neutral-200 rounded-xl space-y-1">
+                    <div className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider flex items-center gap-1.5">
+                      <HardDrive className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>OPFS Persistence</span>
+                    </div>
+                    <div className="text-sm font-bold text-emerald-700">
+                      {storageQuota?.isOpfsSupported ? 'Supported & Ready' : 'IndexedDB Fallback'}
+                    </div>
+                    <div className="text-[10.5px] text-neutral-500">Origin Private File System</div>
                   </div>
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-semibold text-neutral-700">
-                      Zero Central Servers:
-                    </span>
-                    <span className="font-medium text-neutral-600">
-                      Data resides strictly in your browser and connected peers
-                    </span>
+
+                  <div className="p-3.5 bg-neutral-50 border border-neutral-200 rounded-xl space-y-1">
+                    <div className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider flex items-center gap-1.5">
+                      <FileArchive className="w-3.5 h-3.5 text-purple-600" />
+                      <span>Gzip Compression</span>
+                    </div>
+                    <div className="text-sm font-bold text-purple-700">Stream Gzip Active</div>
+                    <div className="text-[10.5px] text-neutral-500">Transparent on-disk gzip</div>
                   </div>
                 </div>
 
-                <div className="p-4 bg-amber-50/50 border border-amber-200/60 rounded-lg text-xs text-neutral-700 space-y-1">
-                  <p className="font-bold text-amber-900">Local-First Storage Guarantee</p>
+                {/* Storage Usage Bar */}
+                {storageQuota?.isQuotaAvailable && (
+                  <div className="p-4 bg-neutral-50 border border-neutral-200 rounded-xl space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-bold text-neutral-800 flex items-center gap-1.5">
+                        <HardDrive className="w-3.5 h-3.5 text-neutral-600" />
+                        <span>Browser Storage Allocated</span>
+                      </span>
+                      <span className="font-mono text-neutral-700 font-bold">
+                        {formatBytes(storageQuota.usage)} / {formatBytes(storageQuota.quota)} ({storageQuota.percentUsed}%)
+                      </span>
+                    </div>
+                    <div className="w-full bg-neutral-200 h-2 rounded-full overflow-hidden">
+                      <div
+                        className="bg-[#007a5a] h-full transition-all duration-300"
+                        style={{ width: `${Math.max(2, storageQuota.percentUsed)}%` }}
+                      />
+                    </div>
+                    <p className="text-[10.5px] text-neutral-500">
+                      Browser-managed sandboxed storage. Large file attachments and messages are stored with automatic gzip stream compression.
+                    </p>
+                  </div>
+                )}
+
+                {/* Interactive Compression Benchmark Card */}
+                <div className="p-4 bg-neutral-900 text-white rounded-xl border border-neutral-800 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-xs font-bold flex items-center gap-1.5 text-emerald-400">
+                        <FileArchive className="w-4 h-4" />
+                        <span>Storage Compression Engine</span>
+                      </div>
+                      <div className="text-[11px] text-neutral-400">
+                        Test live gzip stream compression efficiency on encrypted message stores
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleRunCompressionBenchmark}
+                      disabled={isCompressing}
+                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50"
+                    >
+                      <Play className={`w-3 h-3 ${isCompressing ? 'animate-spin' : ''}`} />
+                      <span>{isCompressing ? 'Testing...' : 'Run Compression Test'}</span>
+                    </button>
+                  </div>
+
+                  {compressionBenchmark && (
+                    <div className="p-3 bg-neutral-800/80 rounded-lg border border-neutral-700 space-y-1.5 text-xs font-mono animate-in fade-in">
+                      <div className="flex justify-between text-neutral-300">
+                        <span>Raw JSON Store Size:</span>
+                        <span className="text-white font-bold">{formatBytes(compressionBenchmark.rawBytes)}</span>
+                      </div>
+                      <div className="flex justify-between text-neutral-300">
+                        <span>Compressed Stream Size:</span>
+                        <span className="text-emerald-400 font-bold">{formatBytes(compressionBenchmark.compressedBytes)}</span>
+                      </div>
+                      <div className="flex justify-between pt-1 border-t border-neutral-700 text-emerald-300 font-bold">
+                        <span>Space Saved on Disk:</span>
+                        <span>{compressionBenchmark.savings} reduction</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Clear / Maintenance Row */}
+                <div className="p-4 bg-neutral-50 border border-neutral-200 rounded-xl flex items-center justify-between">
+                  <div>
+                    <div className="text-xs font-bold text-neutral-900">Local Media Cache Cleanup</div>
+                    <div className="text-[11px] text-neutral-500">
+                      Clear cached media and attachment files while preserving channel text history
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleClearMediaStorage}
+                    className="px-3 py-1.5 bg-neutral-200 hover:bg-red-50 hover:text-red-700 hover:border-red-300 border border-neutral-300 text-neutral-800 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>{clearedStorageSuccess ? 'Cache Cleared!' : 'Purge Media Cache'}</span>
+                  </button>
+                </div>
+
+                {/* Local-First Guarantee Notice */}
+                <div className="p-3.5 bg-amber-50/50 border border-amber-200/60 rounded-xl text-xs text-neutral-700 space-y-1">
+                  <p className="font-bold text-amber-900 flex items-center gap-1.5">
+                    <Shield className="w-3.5 h-3.5 text-amber-700" />
+                    <span>Local-First Storage Guarantee</span>
+                  </p>
                   <p className="text-[11px] text-neutral-600 leading-relaxed">
-                    Open Slack stores all workspace messages, encrypted keys, threads, and attachments directly inside your browser storage using standard WebCrypto and IndexedDB. No messages are ever uploaded to cloud servers.
+                    Open Slack stores workspace messages, cryptographic signing keys, threads, and attachments directly inside your local browser storage using standard WebCrypto, IndexedDB, and OPFS. No data is ever sent to or logged on centralized servers.
                   </p>
                 </div>
               </div>

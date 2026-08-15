@@ -28,20 +28,129 @@ import {
   Smartphone,
   Sparkles,
   Tablet,
+  User,
   Users,
   Video,
+  X,
   Zap,
 } from 'lucide-react';
 import React, { useState } from 'react';
 import { useWorkspace } from '../../context/WorkspaceContext';
+import { generateAvatarSvg } from '../../lib/crypto';
+import { generateHandleFromName } from '../../lib/mentions';
 
 interface LandingPageProps {
   onEnterApp: () => void;
 }
 
+const AVATAR_COLORS = [
+  '#E01E5A', // Slack Red
+  '#2BAC76', // Green
+  '#1164A3', // Blue
+  '#ECB22E', // Yellow
+  '#4A154B', // Deep Aubergine
+  '#007a5a', // Dark Green
+  '#611f69', // Berry
+  '#e8912d', // Orange
+];
+
 export const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
-  const { activeWorkspace, createWorkspace } = useWorkspace();
+  const { activeWorkspace, createWorkspace, identity, updateProfile, joinWorkspace } = useWorkspace();
   const [activeDocTab, setActiveDocTab] = useState<'p2p' | 'crdt' | 'security' | 'responsive'>('p2p');
+
+  // Two-Step Onboarding State
+  const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
+  const [onboardingStep, setOnboardingStep] = useState<1 | 2>(1);
+  const [onboardingMode, setOnboardingMode] = useState<'create' | 'join'>('create');
+
+  // Step 1: Profile fields
+  const [fullName, setFullName] = useState(identity?.displayName || 'Animesh Kundu');
+  const [handle, setHandle] = useState(identity?.handle || '@animesh');
+  const [selectedColor, setSelectedColor] = useState(identity?.color || '#4A154B');
+
+  // Step 2: Workspace fields
+  const [wsName, setWsName] = useState('Acme Corp P2P');
+  const [wsPassphrase, setWsPassphrase] = useState('');
+  const [requireApproval, setRequireApproval] = useState(false);
+  const [joinLinkInput, setJoinLinkInput] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [onboardingError, setOnboardingError] = useState('');
+
+  const handleOpenOnboarding = () => {
+    setOnboardingStep(1);
+    setOnboardingMode('create');
+    setIsOnboardingOpen(true);
+  };
+
+  const handleFullNameChange = (name: string) => {
+    setFullName(name);
+    // Auto-generate clean @firstname.lastname handle
+    const autoHandle = generateHandleFromName(name);
+    setHandle(autoHandle);
+  };
+
+  const handleProceedToStep2 = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!fullName.trim()) {
+      setOnboardingError('Please provide your full name.');
+      return;
+    }
+    const cleanHandle = handle.startsWith('@') ? handle : `@${handle}`;
+    if (cleanHandle.length < 2) {
+      setOnboardingError('Please provide a valid handle starting with @.');
+      return;
+    }
+
+    // Save profile updates to identity
+    const newAvatar = generateAvatarSvg(fullName, selectedColor);
+    updateProfile({
+      displayName: fullName.trim(),
+      handle: cleanHandle.trim(),
+      color: selectedColor,
+      avatarUrl: newAvatar,
+    });
+
+    setOnboardingError('');
+    setOnboardingStep(2);
+  };
+
+  const handleCompleteLaunch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    setOnboardingError('');
+
+    try {
+      if (onboardingMode === 'create') {
+        if (!wsName.trim()) {
+          throw new Error('Please provide a workspace name');
+        }
+        await createWorkspace(wsName.trim(), wsPassphrase.trim() || undefined, {
+          requireApprovalForInvites: requireApproval,
+          defaultChannels: ['chan_general', 'chan_random'],
+          allowGuestInvites: true,
+        });
+      } else {
+        const input = joinLinkInput.trim();
+        let wsData: any;
+        if (input.includes('#invite=')) {
+          const payloadStr = decodeURIComponent(input.split('#invite=')[1]);
+          wsData = JSON.parse(atob(payloadStr));
+        } else if (input.startsWith('{')) {
+          wsData = JSON.parse(input);
+        } else {
+          throw new Error('Invalid invite link or JSON config');
+        }
+        joinWorkspace(wsData);
+      }
+
+      setIsOnboardingOpen(false);
+      onEnterApp();
+    } catch (err: any) {
+      setOnboardingError(err?.message || 'Failed to complete setup');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <div id="open-slack-landing-page" className="min-h-screen w-full overflow-x-hidden bg-white text-neutral-900 font-sans selection:bg-amber-100 selection:text-amber-900 flex flex-col">
@@ -71,7 +180,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
             <button
               id="landing-open-app-nav-btn"
               type="button"
-              onClick={onEnterApp}
+              onClick={handleOpenOnboarding}
               className="px-4 py-2 bg-[#4A154B] hover:bg-[#611f69] text-white rounded-lg text-xs sm:text-sm font-bold transition flex items-center gap-1.5 shadow-sm cursor-pointer"
             >
               <span>Launch Open-Slack</span>
@@ -103,9 +212,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
           {/* CTA Buttons */}
           <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4 mb-14">
             <button
-              id="hero-launch-app-btn"
+              id="hero-create-workspace-btn"
+              data-testid="hero-launch-app-btn"
               type="button"
-              onClick={onEnterApp}
+              onClick={handleOpenOnboarding}
               className="px-6 py-3.5 bg-[#4A154B] hover:bg-[#611f69] text-white rounded-xl text-sm sm:text-base font-bold transition flex items-center gap-2 shadow-md cursor-pointer"
             >
               <span>Open Your Workspace</span>
@@ -363,13 +473,13 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
 
           <div className="bg-white rounded-2xl border border-neutral-200 shadow-lg overflow-hidden flex flex-col md:flex-row min-h-[460px]">
             {/* Docs Tabs */}
-            <div className="w-full md:w-64 bg-neutral-50 border-r border-neutral-200 p-4 space-y-1">
+            <div className="w-full md:w-64 bg-neutral-50 border-b md:border-b-0 md:border-r border-neutral-200 p-3 sm:p-4 flex md:block gap-1.5 overflow-x-auto no-scrollbar flex-shrink-0">
               <button
                 type="button"
                 onClick={() => setActiveDocTab('p2p')}
-                className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-xs font-bold transition text-left ${
+                className={`w-auto md:w-full flex-shrink-0 flex items-center gap-2 px-3 py-2.5 rounded-lg text-xs font-bold transition text-left cursor-pointer whitespace-nowrap ${
                   activeDocTab === 'p2p'
-                    ? 'bg-neutral-900 text-white'
+                    ? 'bg-neutral-900 text-white shadow-xs'
                     : 'text-neutral-600 hover:bg-neutral-200/60'
                 }`}
               >
@@ -380,9 +490,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
               <button
                 type="button"
                 onClick={() => setActiveDocTab('crdt')}
-                className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-xs font-bold transition text-left ${
+                className={`w-auto md:w-full flex-shrink-0 flex items-center gap-2 px-3 py-2.5 rounded-lg text-xs font-bold transition text-left cursor-pointer whitespace-nowrap ${
                   activeDocTab === 'crdt'
-                    ? 'bg-neutral-900 text-white'
+                    ? 'bg-neutral-900 text-white shadow-xs'
                     : 'text-neutral-600 hover:bg-neutral-200/60'
                 }`}
               >
@@ -393,9 +503,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
               <button
                 type="button"
                 onClick={() => setActiveDocTab('security')}
-                className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-xs font-bold transition text-left ${
+                className={`w-auto md:w-full flex-shrink-0 flex items-center gap-2 px-3 py-2.5 rounded-lg text-xs font-bold transition text-left cursor-pointer whitespace-nowrap ${
                   activeDocTab === 'security'
-                    ? 'bg-neutral-900 text-white'
+                    ? 'bg-neutral-900 text-white shadow-xs'
                     : 'text-neutral-600 hover:bg-neutral-200/60'
                 }`}
               >
@@ -406,9 +516,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
               <button
                 type="button"
                 onClick={() => setActiveDocTab('responsive')}
-                className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-xs font-bold transition text-left ${
+                className={`w-auto md:w-full flex-shrink-0 flex items-center gap-2 px-3 py-2.5 rounded-lg text-xs font-bold transition text-left cursor-pointer whitespace-nowrap ${
                   activeDocTab === 'responsive'
-                    ? 'bg-neutral-900 text-white'
+                    ? 'bg-neutral-900 text-white shadow-xs'
                     : 'text-neutral-600 hover:bg-neutral-200/60'
                 }`}
               >
@@ -597,8 +707,8 @@ channel.onmessage = (e) => Y.applyUpdate(ydoc, new Uint8Array(e.data));`}</code>
           <div className="flex items-center gap-6">
             <button
               type="button"
-              onClick={onEnterApp}
-              className="text-neutral-300 hover:text-white font-semibold transition"
+              onClick={handleOpenOnboarding}
+              className="text-neutral-300 hover:text-white font-semibold transition cursor-pointer"
             >
               Launch App
             </button>
@@ -614,6 +724,272 @@ channel.onmessage = (e) => Y.applyUpdate(ydoc, new Uint8Array(e.data));`}</code>
           </div>
         </div>
       </footer>
+
+      {/* TWO-STEP MANDATORY ONBOARDING MODAL */}
+      {isOnboardingOpen && (
+        <div
+          id="onboarding-modal-backdrop"
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4"
+          onClick={() => setIsOnboardingOpen(false)}
+        >
+          <div
+            id="create-workspace-modal-card"
+            data-testid="onboarding-modal-card"
+            className="w-full max-w-lg bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl border-t sm:border border-neutral-200 overflow-hidden flex flex-col max-h-[92dvh] sm:max-h-[85vh] animate-in slide-in-from-bottom sm:zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Mobile Drag Handle */}
+            <div className="w-10 h-1 bg-neutral-300 rounded-full mx-auto my-2 sm:hidden flex-shrink-0" />
+
+            {/* Header with Step Indicator */}
+            <div className="p-5 border-b border-neutral-100 bg-neutral-50/70 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-[#4A154B] text-white flex items-center justify-center font-bold">
+                  {onboardingStep === 1 ? <User className="w-5 h-5" /> : <Layers className="w-5 h-5" />}
+                </div>
+                <div>
+                  <div className="text-xs font-bold uppercase tracking-wider text-[#4A154B]">
+                    Step {onboardingStep} of 2 • {onboardingStep === 1 ? 'Your Cryptographic Identity' : 'Workspace Setup'}
+                  </div>
+                  <h3 className="text-base font-black text-neutral-900">
+                    {onboardingStep === 1 ? 'Set Up Your Profile' : 'Create or Join Workspace'}
+                  </h3>
+                </div>
+              </div>
+              <button
+                id="close-onboarding-modal"
+                type="button"
+                onClick={() => setIsOnboardingOpen(false)}
+                className="p-1 hover:bg-neutral-200 rounded-lg text-neutral-500 hover:text-neutral-900"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Error Message */}
+            {onboardingError && (
+              <div className="mx-5 mt-4 p-3 bg-red-50 text-red-700 text-xs font-medium rounded-lg border border-red-200">
+                {onboardingError}
+              </div>
+            )}
+
+            {/* Step 1: Mandatory Identity & Name Setup */}
+            {onboardingStep === 1 ? (
+              <form onSubmit={handleProceedToStep2} className="p-6 space-y-5 overflow-y-auto flex-1">
+                <div className="p-3.5 bg-purple-50/70 rounded-xl border border-purple-100 text-xs text-purple-900 flex items-start gap-2.5">
+                  <ShieldCheck className="w-4 h-4 text-[#4A154B] flex-shrink-0 mt-0.5" />
+                  <div className="leading-relaxed">
+                    <strong>Decentralized Mesh Identity:</strong> In peer-to-peer networks, your real name and handle prevent anonymous collision and identify you to your teammates.
+                  </div>
+                </div>
+
+                {/* Avatar Preview & Color Picker */}
+                <div className="flex items-center gap-4 p-3 bg-neutral-50 rounded-xl border border-neutral-200">
+                  <div
+                    className="w-14 h-14 rounded-2xl flex items-center justify-center font-bold text-white text-lg shadow-sm flex-shrink-0"
+                    style={{ backgroundColor: selectedColor }}
+                  >
+                    {fullName.trim().slice(0, 2).toUpperCase() || 'ME'}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-bold text-neutral-700 mb-1.5">Avatar Color</div>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {AVATAR_COLORS.map((c) => (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => setSelectedColor(c)}
+                          className={`w-6 h-6 rounded-full transition-transform cursor-pointer ${
+                            selectedColor === c ? 'ring-2 ring-neutral-900 scale-110' : 'hover:scale-105'
+                          }`}
+                          style={{ backgroundColor: c }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-neutral-700 mb-1.5">
+                    Full Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    id="landing-user-name-input"
+                    data-testid="onboarding-fullname-input"
+                    type="text"
+                    required
+                    placeholder="e.g. Animesh Kundu"
+                    value={fullName}
+                    onChange={(e) => handleFullNameChange(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-neutral-50 border border-neutral-300 rounded-lg text-sm text-neutral-900 outline-none focus:border-blue-500 focus:bg-white font-medium transition"
+                    autoFocus
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-neutral-700 mb-1.5">
+                    Display Handle (@mention) <span className="text-red-500">*</span>
+                  </label>
+                  <div className="relative flex items-center">
+                    <span className="absolute left-3 text-neutral-400 font-bold">@</span>
+                    <input
+                      id="landing-user-handle-input"
+                      data-testid="onboarding-handle-input"
+                      type="text"
+                      required
+                      placeholder="animesh"
+                      value={handle.replace(/^@/, '')}
+                      onChange={(e) => setHandle(`@${e.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, '')}`)}
+                      className="w-full pl-8 pr-3.5 py-2.5 bg-neutral-50 border border-neutral-300 rounded-lg text-sm text-neutral-900 outline-none focus:border-blue-500 focus:bg-white font-mono font-medium transition"
+                    />
+                  </div>
+                  <p className="text-[11px] text-neutral-500 mt-1">
+                    Teammates will use this to notify and @mention you in channels.
+                  </p>
+                </div>
+
+                <div className="pt-3">
+                  <button
+                    id="step1-next-btn"
+                    data-testid="onboarding-next-step-btn"
+                    type="submit"
+                    disabled={!fullName.trim()}
+                    className="w-full py-3 bg-[#4A154B] hover:bg-[#611f69] text-white rounded-xl text-sm font-bold transition flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 cursor-pointer"
+                  >
+                    <span>Continue to Workspace Setup</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </form>
+            ) : (
+              /* Step 2: Workspace Creation or Direct Join */
+              <form onSubmit={handleCompleteLaunch} className="p-6 space-y-5 overflow-y-auto flex-1">
+                <div className="flex gap-2 p-1 bg-neutral-100 rounded-xl">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOnboardingMode('create');
+                      setOnboardingError('');
+                    }}
+                    className={`flex-1 py-2 text-xs font-bold rounded-lg transition ${
+                      onboardingMode === 'create'
+                        ? 'bg-white text-neutral-900 shadow-xs'
+                        : 'text-neutral-600 hover:text-neutral-900'
+                    }`}
+                  >
+                    Create New Workspace
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOnboardingMode('join');
+                      setOnboardingError('');
+                    }}
+                    className={`flex-1 py-2 text-xs font-bold rounded-lg transition ${
+                      onboardingMode === 'join'
+                        ? 'bg-white text-neutral-900 shadow-xs'
+                        : 'text-neutral-600 hover:text-neutral-900'
+                    }`}
+                  >
+                    Join with Invite Link
+                  </button>
+                </div>
+
+                {onboardingMode === 'create' ? (
+                  <>
+                    <div>
+                      <label className="block text-xs font-bold uppercase tracking-wider text-neutral-700 mb-1.5">
+                        Workspace Name <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        id="landing-ws-name-input"
+                        data-testid="onboarding-workspace-name-input"
+                        type="text"
+                        required
+                        placeholder="e.g. Acme Corp P2P"
+                        value={wsName}
+                        onChange={(e) => setWsName(e.target.value)}
+                        className="w-full px-3.5 py-2.5 bg-neutral-50 border border-neutral-300 rounded-lg text-sm text-neutral-900 outline-none focus:border-blue-500 focus:bg-white font-medium transition"
+                        autoFocus
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold uppercase tracking-wider text-neutral-700 mb-1.5">
+                        Passphrase (Optional)
+                      </label>
+                      <input
+                        id="onboarding-passphrase-input"
+                        type="text"
+                        placeholder="Auto-generated 256-bit key if left blank"
+                        value={wsPassphrase}
+                        onChange={(e) => setWsPassphrase(e.target.value)}
+                        className="w-full px-3.5 py-2.5 bg-neutral-50 border border-neutral-300 rounded-lg text-sm text-neutral-900 outline-none focus:border-blue-500 focus:bg-white font-mono text-xs transition"
+                      />
+                    </div>
+
+                    {/* Require Approval Toggle */}
+                    <div className="flex items-center justify-between p-3.5 bg-neutral-50 rounded-xl border border-neutral-200">
+                      <div>
+                        <div className="font-bold text-xs text-neutral-900">Require Admin Approval</div>
+                        <div className="text-[11px] text-neutral-500">
+                          Incoming members must be approved before viewing messages.
+                        </div>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          id="onboarding-require-approval-toggle"
+                          type="checkbox"
+                          checked={requireApproval}
+                          onChange={(e) => setRequireApproval(e.target.checked)}
+                          className="sr-only peer"
+                        />
+                        <div className="w-10 h-5.5 bg-neutral-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-300 after:border after:rounded-full after:h-4.5 after:w-4.5 after:transition-all peer-checked:bg-[#007a5a]"></div>
+                      </label>
+                    </div>
+                  </>
+                ) : (
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-neutral-700 mb-1.5">
+                      Invite Link or Workspace JSON
+                    </label>
+                    <textarea
+                      id="onboarding-join-invite-input"
+                      rows={4}
+                      placeholder="Paste your #invite=... link or JSON configuration here"
+                      value={joinLinkInput}
+                      onChange={(e) => setJoinLinkInput(e.target.value)}
+                      required
+                      className="w-full p-3 bg-neutral-50 border border-neutral-300 rounded-lg text-xs font-mono outline-none focus:border-blue-500 focus:bg-white resize-none"
+                      autoFocus
+                    />
+                  </div>
+                )}
+
+                <div className="pt-3 flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setOnboardingStep(1)}
+                    className="px-4 py-2.5 text-xs font-bold text-neutral-600 hover:bg-neutral-100 rounded-xl transition"
+                  >
+                    ← Back
+                  </button>
+
+                  <button
+                    id="submit-create-workspace-btn"
+                    data-testid="onboarding-launch-workspace-btn"
+                    type="submit"
+                    disabled={isSubmitting || (onboardingMode === 'create' ? !wsName.trim() : !joinLinkInput.trim())}
+                    className="flex-1 py-3 bg-[#007a5a] hover:bg-[#148567] text-white rounded-xl text-sm font-bold transition flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 cursor-pointer"
+                  >
+                    <span>{isSubmitting ? 'Initializing...' : 'Launch Open-Slack 🚀'}</span>
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

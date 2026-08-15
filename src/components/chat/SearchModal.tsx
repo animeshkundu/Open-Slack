@@ -65,12 +65,12 @@ export const SearchModal: React.FC = () => {
   return (
     <div
       id="search-modal-backdrop"
-      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-start justify-center pt-16 px-4"
+      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-start justify-center p-2 pt-12 sm:pt-16 sm:px-4"
       onClick={() => setIsSearchOpen(false)}
     >
       <div
         id="search-modal-card"
-        className="w-full max-w-2xl bg-white rounded-xl shadow-2xl border border-neutral-200 overflow-hidden flex flex-col max-h-[80vh] animate-in fade-in zoom-in-95 duration-150"
+        className="w-full max-w-2xl bg-white rounded-xl shadow-2xl border border-neutral-200 overflow-hidden flex flex-col max-h-[88vh] sm:max-h-[80vh] animate-in fade-in zoom-in-95 duration-150"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Search Header Input */}

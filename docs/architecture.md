@@ -20,11 +20,23 @@ The shell owns the viewport height and keeps its internal scroll regions explici
 
 `WorkspaceContext` is the application state boundary. It owns identity, workspaces, channels, messages, notifications, huddles, mobile view state, and modal-facing actions. Components consume actions through `useWorkspace` rather than coordinating shared state locally.
 
-Local persistence is handled through the storage helpers and IndexedDB. Yjs documents provide conflict-free replication for workspace state. Cryptographic identity and message protection remain client-side.
+Local persistence is handled through the storage layer (`src/lib/storage.ts`) using IndexedDB and high-throughput Origin Private File System (OPFS). Stored message blobs, CRDT payloads, and attachments are processed with transparent on-disk Gzip `CompressionStream` / `DecompressionStream` to minimize browser storage footprints. Yjs documents provide conflict-free replication for workspace state. Cryptographic identity and message protection remain client-side.
 
-## Peer networking
+## Teammate Invitation & Sharing
 
-WebRTC data channels carry synchronized workspace state and direct payloads. Nostr relays are an ephemeral signaling/discovery layer; they are not the source of truth for messages. File transfers use chunked peer channels with integrity verification, and huddles use peer media streams.
+Invitations support multi-channel distribution via `InviteModal.tsx` and in-huddle sharing controls:
+- **Instant Hash-Based Link**: Encodes cryptographic workspace metadata in the URL hash, keeping invite keys out of server query logs.
+- **Direct QR Code**: Generates high-density SVG/Canvas QR codes for fast mobile onboarding.
+- **Social Connectors**: One-click sharing deep links for WhatsApp, Gmail, Telegram, and X, alongside the Web Share API on mobile devices.
+- **Privacy-Safe Preview Cards**: Dynamically renders an abstracted wireframe canvas preview card that represents the workspace layout visually without exposing any confidential chat history, member PII, or internal tokens.
+
+## Peer networking & signaling resilience
+
+WebRTC data channels carry synchronized workspace state and direct payloads. Multi-protocol signaling uses both high-availability Nostr relays (NIP-01 ephemeral events) and WebTorrent / BitTorrent tracker swarms (BEP-03) for peer discovery without central servers. Relays are purely an ephemeral rendezvous layer; they are never the source of truth for messages. File transfers use chunked peer channels with SHA-256 integrity verification, and huddles use mesh peer media streams.
+
+## Identity & Mentions
+
+User identities use ECDSA P-256 for message signing and ECDH P-256 for end-to-end encryption. Display handles adhere to the `@firstname.lastname` canonical format. The `generateHandleFromName` system enforces automated collision resolution by progressively truncating first name initials, 3-character prefixes, last name initials, or numeric suffixes against active workspace members.
 
 ## Change boundaries
 

@@ -18,6 +18,10 @@ Viewport-locked app surfaces use `100dvh`, `min-h-0`, and explicit nested overfl
 
 - Use `min-w-0` on flex children that contain text.
 - Prefer `w-full` with a breakpoint-specific max width over fixed mobile widths.
+- Keep horizontal tab strips and chips styled with `no-scrollbar` and `whitespace-nowrap` to prevent awkward default browser scrollbars.
 - Keep data tables and code blocks horizontally scrollable within a bounded container.
 - Hide secondary labels before shrinking primary controls below a usable tap target.
 - Include safe-area padding for fixed mobile navigation.
+- Main channel header uses a unified Slack-authentic segmented pill button for Huddle (`[ 🎧 Huddle | ▾ ]`). Clicking the dropdown reveals quick actions for Audio Huddle, Screen Share, Copy Huddle Link, and Invite Teammates.
+- Primary sidebar removes idle duplicate Huddle buttons and displays a live, ambient Active Huddle Mini-Widget with speaking audio wave indicators and quick mute/leave controls only while participating in an active call.
+- The `InviteModal` provides dedicated sub-views for direct link copying, instant QR code presentation, social deep links, and a canvas-rendered Privacy Preview Card.

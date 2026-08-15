@@ -54,15 +54,18 @@ export const WorkspaceSettingsModal: React.FC<WorkspaceSettingsModalProps> = ({
   return (
     <div
       id="workspace-settings-modal-backdrop"
-      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4"
       onClick={onClose}
     >
       <div
         id="workspace-settings-modal-card"
-        className="w-full max-w-lg max-h-[calc(100dvh-2rem)] bg-white rounded-xl shadow-2xl border border-neutral-200 overflow-y-auto animate-in fade-in zoom-in-95 duration-150"
+        className="w-full max-w-lg max-h-[92dvh] sm:max-h-[85vh] bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl border-t sm:border border-neutral-200 overflow-y-auto flex flex-col animate-in slide-in-from-bottom sm:zoom-in-95 duration-150"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="p-5 border-b border-neutral-200 flex items-center justify-between bg-neutral-50/60">
+        {/* Mobile Drag Handle */}
+        <div className="w-10 h-1 bg-neutral-300 rounded-full mx-auto my-2 sm:hidden flex-shrink-0" />
+
+        <div className="p-5 border-b border-neutral-200 flex items-center justify-between bg-neutral-50/60 flex-shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-neutral-900 text-white flex items-center justify-center font-bold">
               <Settings className="w-4 h-4" />
@@ -76,13 +79,13 @@ export const WorkspaceSettingsModal: React.FC<WorkspaceSettingsModalProps> = ({
             id="close-ws-settings-modal"
             type="button"
             onClick={onClose}
-            className="p-1 hover:bg-neutral-200 rounded-lg text-neutral-500 hover:text-neutral-900"
+            className="p-1 hover:bg-neutral-200 rounded-lg text-neutral-500 hover:text-neutral-900 cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <form onSubmit={handleSave} className="p-6 space-y-5">
+        <form onSubmit={handleSave} className="p-6 space-y-5 flex-1 overflow-y-auto">
           {/* Access Control Firewall Section */}
           <div className="space-y-3">
             <div className="text-xs font-bold uppercase tracking-wider text-neutral-700 flex items-center gap-1.5">

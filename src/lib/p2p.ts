@@ -14,7 +14,64 @@ export const DEFAULT_RELAYS = [
   'wss://relay.primal.net',
   'wss://nostr.mom',
   'wss://relay.nostr.band',
+  'wss://relay.snort.social',
+  'wss://relay.current.fyi',
+  'wss://purplerelay.com',
+  'wss://offchain.pub',
+  'wss://nostr.wine',
 ];
+
+export const DEFAULT_TORRENT_TRACKERS = [
+  'wss://tracker.openwebtorrent.com',
+  'wss://tracker.btorrent.xyz',
+  'wss://tracker.webtorrent.dev',
+  'wss://tracker.files.fm:7073/announce',
+];
+
+export const ALL_RECOMMENDED_RELAYS = [
+  ...DEFAULT_RELAYS,
+  'wss://nostr-pub.wellorder.net',
+  'wss://relay.nostr.net',
+  'wss://eden.nostr.land',
+  'wss://relay.orangepill.dev',
+];
+
+/**
+ * Tests the latency of a WebSocket relay or tracker endpoint
+ */
+export async function pingRelay(url: string, timeoutMs = 3000): Promise<{ url: string; latency: number; ok: boolean }> {
+  const start = performance.now();
+  return new Promise((resolve) => {
+    try {
+      const ws = new WebSocket(url);
+      const timer = setTimeout(() => {
+        try {
+          ws.close();
+        } catch (_) {}
+        resolve({ url, latency: timeoutMs, ok: false });
+      }, timeoutMs);
+
+      ws.onopen = () => {
+        const latency = Math.round(performance.now() - start);
+        clearTimeout(timer);
+        try {
+          ws.close();
+        } catch (_) {}
+        resolve({ url, latency, ok: true });
+      };
+
+      ws.onerror = () => {
+        clearTimeout(timer);
+        try {
+          ws.close();
+        } catch (_) {}
+        resolve({ url, latency: Math.round(performance.now() - start), ok: false });
+      };
+    } catch (_) {
+      resolve({ url, latency: timeoutMs, ok: false });
+    }
+  });
+}
 
 export const DEFAULT_ICE_SERVERS: RTCIceServer[] = [
   { urls: 'stun:stun.l.google.com:19302' },

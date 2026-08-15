@@ -130,3 +130,81 @@ export function getMentionSuggestions(
     )
     .slice(0, 8);
 }
+
+/**
+ * Generates a clean @firstname.lastname handle from a full name.
+ * If collision occurs with existing members, automatically disambiguates by
+ * truncating names or adding a clean suffix.
+ */
+export function generateHandleFromName(
+  fullName: string,
+  existingUsers: (UserIdentity | string)[] = []
+): string {
+  const trimmed = (fullName || '').trim().toLowerCase();
+  if (!trimmed) return '@user';
+
+  const parts = trimmed
+    .split(/\s+/)
+    .map((p) => p.replace(/[^a-z0-9]/g, ''))
+    .filter(Boolean);
+
+  if (parts.length === 0) return '@user';
+
+  let baseHandle = '';
+  if (parts.length === 1) {
+    baseHandle = `@${parts[0]}`;
+  } else {
+    const first = parts[0];
+    const last = parts[parts.length - 1];
+    baseHandle = `@${first}.${last}`;
+  }
+
+  const existingHandles = new Set(
+    existingUsers
+      .map((u) => {
+        const h = typeof u === 'string' ? u : u?.handle;
+        return h ? h.toLowerCase().replace(/^@/, '') : '';
+      })
+      .filter(Boolean)
+  );
+
+  const cleanBase = baseHandle.replace(/^@/, '');
+  if (!existingHandles.has(cleanBase)) {
+    return baseHandle;
+  }
+
+  // Collision resolution strategy:
+  if (parts.length >= 2) {
+    // 1. Truncate first name to initial: e.g. @a.kundu
+    const initialHandle = `${parts[0][0]}.${parts[parts.length - 1]}`;
+    if (!existingHandles.has(initialHandle)) {
+      return `@${initialHandle}`;
+    }
+
+    // 2. Truncate first 3 chars of first name: e.g. @ani.kundu
+    if (parts[0].length > 3) {
+      const shortFirstHandle = `${parts[0].slice(0, 3)}.${parts[parts.length - 1]}`;
+      if (!existingHandles.has(shortFirstHandle)) {
+        return `@${shortFirstHandle}`;
+      }
+    }
+
+    // 3. Truncate last name: e.g. @animesh.k
+    const shortLastHandle = `${parts[0]}.${parts[parts.length - 1][0]}`;
+    if (!existingHandles.has(shortLastHandle)) {
+      return `@${shortLastHandle}`;
+    }
+  }
+
+  // 4. Numerical suffix
+  let counter = 2;
+  while (counter <= 99) {
+    const candidate = `${cleanBase}${counter}`;
+    if (!existingHandles.has(candidate)) {
+      return `@${candidate}`;
+    }
+    counter++;
+  }
+
+  return `@${cleanBase}_${Math.random().toString(36).slice(2, 5)}`;
+}

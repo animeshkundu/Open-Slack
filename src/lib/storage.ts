@@ -3,9 +3,55 @@ import { sha256 } from './crypto';
 
 const DB_NAME = 'openslack_media_store';
 const STORE_NAME = 'media_files';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 let dbPromise: Promise<IDBDatabase> | null = null;
+
+/**
+ * Native Stream-based Gzip compression for stored blobs/buffers
+ */
+export async function compressBuffer(
+  input: ArrayBuffer | Uint8Array
+): Promise<{ compressed: ArrayBuffer; isCompressed: boolean }> {
+  try {
+    const rawBuffer: ArrayBuffer =
+      input instanceof Uint8Array ? input.buffer.slice(input.byteOffset, input.byteOffset + input.byteLength) as ArrayBuffer : input;
+    if (typeof CompressionStream !== 'undefined') {
+      const stream = new Response(rawBuffer).body?.pipeThrough(new CompressionStream('gzip'));
+      if (stream) {
+        const compressed = await new Response(stream).arrayBuffer();
+        // Only return compressed if it actually saved space
+        if (compressed.byteLength < rawBuffer.byteLength) {
+          return { compressed, isCompressed: true };
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[Storage] Compression fallback note:', err);
+  }
+  const fallbackBuffer: ArrayBuffer =
+    input instanceof Uint8Array ? input.buffer.slice(input.byteOffset, input.byteOffset + input.byteLength) as ArrayBuffer : input;
+  return { compressed: fallbackBuffer, isCompressed: false };
+}
+
+/**
+ * Native Stream-based Gzip decompression for stored blobs/buffers
+ */
+export async function decompressBuffer(input: ArrayBuffer | Uint8Array): Promise<ArrayBuffer> {
+  try {
+    const rawBuffer: ArrayBuffer =
+      input instanceof Uint8Array ? input.buffer.slice(input.byteOffset, input.byteOffset + input.byteLength) as ArrayBuffer : input;
+    if (typeof DecompressionStream !== 'undefined') {
+      const stream = new Response(rawBuffer).body?.pipeThrough(new DecompressionStream('gzip'));
+      if (stream) {
+        return await new Response(stream).arrayBuffer();
+      }
+    }
+  } catch (err) {
+    console.warn('[Storage] Decompression note, returning raw buffer:', err);
+  }
+  return input instanceof Uint8Array ? (input.buffer.slice(input.byteOffset, input.byteOffset + input.byteLength) as ArrayBuffer) : input;
+}
 
 export function getMediaDB(): Promise<IDBDatabase> {
   if (!dbPromise) {
@@ -14,7 +60,7 @@ export function getMediaDB(): Promise<IDBDatabase> {
         return reject(new Error('IndexedDB is not available'));
       }
       const req = indexedDB.open(DB_NAME, DB_VERSION);
-      req.onupgradeneeded = () => {
+      req.onupgradeneeded = (event) => {
         const db = req.result;
         if (!db.objectStoreNames.contains(STORE_NAME)) {
           db.createObjectStore(STORE_NAME, { keyPath: 'id' });
@@ -32,12 +78,21 @@ export interface StorageQuotaInfo {
   quota: number;
   percentUsed: number;
   isQuotaAvailable: boolean;
+  compressionSavingsPercent?: number;
+  isOpfsSupported?: boolean;
 }
 
 /**
- * Check storage quota using navigator.storage.estimate()
+ * Check storage quota using navigator.storage.estimate() and OPFS support
  */
 export async function getStorageQuotaEstimate(): Promise<StorageQuotaInfo> {
+  let isOpfsSupported = false;
+  try {
+    if (typeof navigator !== 'undefined' && navigator.storage && 'getDirectory' in navigator.storage) {
+      isOpfsSupported = true;
+    }
+  } catch (_) {}
+
   try {
     if (typeof navigator !== 'undefined' && navigator.storage && navigator.storage.estimate) {
       const estimate = await navigator.storage.estimate();
@@ -49,6 +104,7 @@ export async function getStorageQuotaEstimate(): Promise<StorageQuotaInfo> {
         quota,
         percentUsed,
         isQuotaAvailable: true,
+        isOpfsSupported,
       };
     }
   } catch (err) {
@@ -59,6 +115,7 @@ export async function getStorageQuotaEstimate(): Promise<StorageQuotaInfo> {
     quota: 0,
     percentUsed: 0,
     isQuotaAvailable: false,
+    isOpfsSupported,
   };
 }
 
@@ -79,26 +136,31 @@ export async function requestStoragePersistence(): Promise<boolean> {
 }
 
 /**
- * Save file to local IndexedDB and generate Attachment metadata
+ * Save file to local IndexedDB and OPFS with Gzip compression
  */
-export async function storeLocalFile(file: File | { name: string; type?: string; size?: number; arrayBuffer: () => Promise<ArrayBuffer> }): Promise<Attachment> {
-  const buffer = await file.arrayBuffer();
-  const fileHash = await sha256(buffer);
+export async function storeLocalFile(
+  file: File | { name: string; type?: string; size?: number; arrayBuffer: () => Promise<ArrayBuffer> }
+): Promise<Attachment> {
+  const rawBuffer = await file.arrayBuffer();
+  const fileHash = await sha256(rawBuffer);
   const id = `att_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-  const fileSize = file.size ?? buffer.byteLength;
+  const fileSize = file.size ?? rawBuffer.byteLength;
   const mimeType = file.type || 'application/octet-stream';
 
-  // Convert to Data URL for instant previewing
+  // Transparent Gzip compression
+  const { compressed, isCompressed } = await compressBuffer(rawBuffer);
+
+  // Convert raw buffer to Data URL for immediate previewing
   let dataUrl = '';
   if (typeof FileReader !== 'undefined') {
-    const blob = new Blob([buffer], { type: mimeType });
+    const blob = new Blob([rawBuffer], { type: mimeType });
     dataUrl = await new Promise<string>((resolve) => {
       const reader = new FileReader();
       reader.onloadend = () => resolve(reader.result as string);
       reader.readAsDataURL(blob);
     });
   } else {
-    dataUrl = `data:${mimeType};base64,${Buffer.from(buffer).toString('base64')}`;
+    dataUrl = `data:${mimeType};base64,${Buffer.from(rawBuffer).toString('base64')}`;
   }
 
   const attachment: Attachment = {
@@ -111,6 +173,7 @@ export async function storeLocalFile(file: File | { name: string; type?: string;
   };
 
   try {
+    // 1. IndexedDB persistence (with compressed payload if smaller)
     const db = await getMediaDB();
     const tx = db.transaction(STORE_NAME, 'readwrite');
     const store = tx.objectStore(STORE_NAME);
@@ -119,12 +182,27 @@ export async function storeLocalFile(file: File | { name: string; type?: string;
       fileName: file.name,
       mimeType,
       fileSize,
+      compressedSize: compressed.byteLength,
+      isCompressed,
       dataUrl,
       sha256: fileHash,
       createdAt: Date.now(),
     });
+
+    // 2. OPFS (Origin Private File System) background persistence
+    if (typeof navigator !== 'undefined' && navigator.storage && 'getDirectory' in navigator.storage) {
+      try {
+        const root = await navigator.storage.getDirectory();
+        const draftHandle = await root.getFileHandle(id, { create: true });
+        const accessHandle = await (draftHandle as any).createWritable();
+        await accessHandle.write(compressed);
+        await accessHandle.close();
+      } catch (opfsErr) {
+        console.warn('[OPFS] Note saving to OPFS:', opfsErr);
+      }
+    }
   } catch (err) {
-    console.warn('Error storing media in IndexedDB:', err);
+    console.warn('Error storing media in storage engines:', err);
   }
 
   return attachment;
@@ -167,18 +245,30 @@ export async function getAllStoredFiles(): Promise<Attachment[]> {
 }
 
 /**
- * Clear all stored media files from IndexedDB
+ * Clear all stored media files from IndexedDB and OPFS
  */
 export async function clearAllStoredFiles(): Promise<boolean> {
   try {
     const db = await getMediaDB();
     const tx = db.transaction(STORE_NAME, 'readwrite');
     const store = tx.objectStore(STORE_NAME);
-    return new Promise((resolve) => {
+    await new Promise((resolve) => {
       const req = store.clear();
       req.onsuccess = () => resolve(true);
       req.onerror = () => resolve(false);
     });
+
+    if (typeof navigator !== 'undefined' && navigator.storage && 'getDirectory' in navigator.storage) {
+      try {
+        const root = await navigator.storage.getDirectory();
+        // Clear OPFS files
+        for await (const name of (root as any).keys()) {
+          await root.removeEntry(name);
+        }
+      } catch (_) {}
+    }
+
+    return true;
   } catch {
     return false;
   }
@@ -192,11 +282,20 @@ export async function deleteStoredFile(id: string): Promise<boolean> {
     const db = await getMediaDB();
     const tx = db.transaction(STORE_NAME, 'readwrite');
     const store = tx.objectStore(STORE_NAME);
-    return new Promise((resolve) => {
+    await new Promise((resolve) => {
       const req = store.delete(id);
       req.onsuccess = () => resolve(true);
       req.onerror = () => resolve(false);
     });
+
+    if (typeof navigator !== 'undefined' && navigator.storage && 'getDirectory' in navigator.storage) {
+      try {
+        const root = await navigator.storage.getDirectory();
+        await root.removeEntry(id);
+      } catch (_) {}
+    }
+
+    return true;
   } catch {
     return false;
   }
@@ -247,3 +346,4 @@ export function formatBytes(bytes: number, decimals = 1): string {
   const val = Math.min(i, sizes.length - 1);
   return parseFloat((bytes / Math.pow(k, val)).toFixed(dm)) + ' ' + sizes[val];
 }
+

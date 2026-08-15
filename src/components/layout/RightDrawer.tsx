@@ -47,7 +47,7 @@ export const RightDrawer: React.FC = () => {
   return (
     <div
       id="right-drawer-panel"
-      className="w-full sm:w-80 md:w-96 border-l border-neutral-200 bg-white flex flex-col flex-shrink-0 z-30 shadow-xl sm:shadow-xs h-full absolute sm:relative inset-y-0 right-0"
+      className="w-full md:w-80 lg:w-96 border-l border-neutral-200 bg-white flex flex-col flex-shrink-0 z-30 shadow-xl md:shadow-xs h-full absolute md:relative inset-0 md:inset-auto right-0"
     >
       {/* THREAD VIEW */}
       {rightPanel === 'thread' && <ThreadView />}

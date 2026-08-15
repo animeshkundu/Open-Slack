@@ -34,16 +34,19 @@ export const PendingApprovalsModal: React.FC<PendingApprovalsModalProps> = ({
   return (
     <div
       id="pending-approvals-modal-backdrop"
-      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4"
       onClick={onClose}
     >
       <div
         id="pending-approvals-modal-card"
-        className="w-full max-w-xl bg-white rounded-xl shadow-2xl border border-neutral-200 overflow-hidden flex flex-col max-h-[calc(100dvh-2rem)] animate-in fade-in zoom-in-95 duration-150"
+        className="w-full max-w-xl bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl border-t sm:border border-neutral-200 overflow-hidden flex flex-col max-h-[92dvh] sm:max-h-[85vh] animate-in slide-in-from-bottom sm:zoom-in-95 duration-150"
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Mobile Drag Handle */}
+        <div className="w-10 h-1 bg-neutral-300 rounded-full mx-auto my-2 sm:hidden flex-shrink-0" />
+
         {/* Header */}
-        <div className="p-5 border-b border-neutral-200 flex items-center justify-between bg-neutral-50/60">
+        <div className="p-5 border-b border-neutral-200 flex items-center justify-between bg-neutral-50/60 flex-shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-blue-50 text-[#1264A3] flex items-center justify-center font-bold">
               <UserCheck className="w-4 h-4" />
@@ -82,7 +85,7 @@ export const PendingApprovalsModal: React.FC<PendingApprovalsModalProps> = ({
                 {pendingRequests.map((req) => (
                   <div
                     key={req.id}
-                    className="p-4 bg-neutral-50 rounded-xl border border-neutral-200 flex items-center justify-between gap-4"
+                    className="p-4 bg-neutral-50 rounded-xl border border-neutral-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4"
                   >
                     <div className="space-y-1 min-w-0">
                       <div className="flex items-center gap-2">
@@ -104,12 +107,12 @@ export const PendingApprovalsModal: React.FC<PendingApprovalsModalProps> = ({
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 flex-shrink-0">
+                    <div className="flex items-center justify-end gap-2 flex-shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-neutral-200/60">
                       <button
                         id={`reject-join-req-${req.id}`}
                         type="button"
                         onClick={() => rejectJoinRequest(req.id)}
-                        className="px-3 py-1.5 bg-white hover:bg-red-50 text-red-600 border border-neutral-200 hover:border-red-300 rounded-lg text-xs font-bold transition flex items-center gap-1"
+                        className="px-3 py-1.5 bg-white hover:bg-red-50 text-red-600 border border-neutral-200 hover:border-red-300 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer"
                       >
                         <UserX className="w-3.5 h-3.5" /> Reject
                       </button>
@@ -117,7 +120,7 @@ export const PendingApprovalsModal: React.FC<PendingApprovalsModalProps> = ({
                         id={`approve-join-req-${req.id}`}
                         type="button"
                         onClick={() => approveJoinRequest(req.id)}
-                        className="px-3 py-1.5 bg-[#007a5a] hover:bg-[#148567] text-white rounded-lg text-xs font-bold transition flex items-center gap-1 shadow-xs"
+                        className="px-3 py-1.5 bg-[#007a5a] hover:bg-[#148567] text-white rounded-lg text-xs font-bold transition flex items-center gap-1 shadow-xs cursor-pointer"
                       >
                         <Check className="w-3.5 h-3.5" /> Approve
                       </button>

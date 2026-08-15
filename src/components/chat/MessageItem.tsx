@@ -293,14 +293,14 @@ export const MessageItem: React.FC<MessageItemProps> = ({
         )}
       </div>
 
-      {/* Slack Quick Hover Action Bar */}
-      <div className="absolute right-4 -top-3 hidden group-hover:flex items-center bg-white border border-neutral-200 rounded-lg shadow-md py-0.5 px-1 z-10">
+      {/* Slack Quick Action Bar (Hover on desktop, accessible on mobile) */}
+      <div className="absolute right-2 sm:right-4 -top-3 flex opacity-0 group-hover:opacity-100 sm:opacity-0 focus-within:opacity-100 sm:group-hover:flex items-center bg-white border border-neutral-200 rounded-lg shadow-md py-0.5 px-1 z-10 transition-opacity">
         <div className="relative">
           <button
             id={`hover-reaction-btn-${message.id}`}
             type="button"
             onClick={() => setShowPicker(!showPicker)}
-            className="p-1.5 hover:bg-neutral-100 rounded-md text-neutral-600 hover:text-neutral-900 transition"
+            className="p-1.5 hover:bg-neutral-100 rounded-md text-neutral-600 hover:text-neutral-900 transition cursor-pointer"
             title="Add reaction"
           >
             <Smile className="w-3.5 h-3.5" />
@@ -318,7 +318,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
             id={`hover-thread-btn-${message.id}`}
             type="button"
             onClick={() => openThread(message)}
-            className="p-1.5 hover:bg-neutral-100 rounded-md text-neutral-600 hover:text-neutral-900 transition"
+            className="p-1.5 hover:bg-neutral-100 rounded-md text-neutral-600 hover:text-neutral-900 transition cursor-pointer"
             title="Reply in thread"
           >
             <MessageSquare className="w-3.5 h-3.5" />
@@ -329,7 +329,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
           id={`hover-pin-btn-${message.id}`}
           type="button"
           onClick={() => togglePinMessage(message.id)}
-          className={`p-1.5 hover:bg-neutral-100 rounded-md transition ${
+          className={`p-1.5 hover:bg-neutral-100 rounded-md transition cursor-pointer ${
             message.pinned ? 'text-amber-600' : 'text-neutral-600 hover:text-neutral-900'
           }`}
           title={message.pinned ? 'Unpin from channel' : 'Pin to channel'}
@@ -341,7 +341,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
           id={`hover-copy-btn-${message.id}`}
           type="button"
           onClick={handleCopy}
-          className="p-1.5 hover:bg-neutral-100 rounded-md text-neutral-600 hover:text-neutral-900 transition"
+          className="p-1.5 hover:bg-neutral-100 rounded-md text-neutral-600 hover:text-neutral-900 transition cursor-pointer"
           title="Copy message text"
         >
           {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5 text-neutral-600" />}
@@ -352,7 +352,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
             id={`hover-delete-btn-${message.id}`}
             type="button"
             onClick={() => deleteMessage(message.id)}
-            className="p-1.5 hover:bg-red-50 rounded-md text-neutral-600 hover:text-red-600 transition"
+            className="p-1.5 hover:bg-red-50 rounded-md text-neutral-600 hover:text-red-600 transition cursor-pointer"
             title="Delete message"
           >
             <Trash2 className="w-3.5 h-3.5" />

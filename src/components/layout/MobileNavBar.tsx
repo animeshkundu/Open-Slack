@@ -10,7 +10,11 @@ import {
 import React from 'react';
 import { useWorkspace } from '../../context/WorkspaceContext';
 
-export const MobileNavBar: React.FC = () => {
+interface MobileNavBarProps {
+  onOpenSettings?: () => void;
+}
+
+export const MobileNavBar: React.FC<MobileNavBarProps> = ({ onOpenSettings }) => {
   const {
     mobileView,
     setMobileView,
@@ -24,7 +28,8 @@ export const MobileNavBar: React.FC = () => {
 
   return (
     <nav
-      id="mobile-bottom-nav-bar"
+      id="mobile-nav-bar"
+      data-testid="mobile-nav-bar"
       className="md:hidden h-14 box-content pb-[env(safe-area-inset-bottom)] bg-white border-t border-neutral-200 flex items-center justify-around px-2 z-30 flex-shrink-0"
     >
       {/* Home (Sidebar / Channels) */}
@@ -35,7 +40,7 @@ export const MobileNavBar: React.FC = () => {
           setMobileView('sidebar');
           setRightPanel('none');
         }}
-        className={`flex flex-col items-center justify-center py-1 px-3 rounded-lg transition ${
+        className={`flex flex-col items-center justify-center py-1 px-3 rounded-lg transition cursor-pointer ${
           mobileView === 'sidebar'
             ? 'text-[#4A154B] font-bold'
             : 'text-neutral-500 hover:text-neutral-800'
@@ -47,13 +52,13 @@ export const MobileNavBar: React.FC = () => {
 
       {/* Chat / Channels */}
       <button
-        id="mobile-nav-chat-btn"
+        id="mobile-nav-channels-btn"
         type="button"
         onClick={() => {
           setMobileView('chat');
           setRightPanel('none');
         }}
-        className={`flex flex-col items-center justify-center py-1 px-3 rounded-lg transition ${
+        className={`flex flex-col items-center justify-center py-1 px-3 rounded-lg transition cursor-pointer ${
           mobileView === 'chat'
             ? 'text-[#4A154B] font-bold'
             : 'text-neutral-500 hover:text-neutral-800'
@@ -71,7 +76,7 @@ export const MobileNavBar: React.FC = () => {
           setMobileView('dms');
           setRightPanel('none');
         }}
-        className={`flex flex-col items-center justify-center py-1 px-3 rounded-lg transition ${
+        className={`flex flex-col items-center justify-center py-1 px-3 rounded-lg transition cursor-pointer ${
           mobileView === 'dms'
             ? 'text-[#4A154B] font-bold'
             : 'text-neutral-500 hover:text-neutral-800'
@@ -89,7 +94,7 @@ export const MobileNavBar: React.FC = () => {
           setMobileView('activity');
           setRightPanel('activity_feed');
         }}
-        className={`relative flex flex-col items-center justify-center py-1 px-3 rounded-lg transition ${
+        className={`relative flex flex-col items-center justify-center py-1 px-3 rounded-lg transition cursor-pointer ${
           mobileView === 'activity'
             ? 'text-[#4A154B] font-bold'
             : 'text-neutral-500 hover:text-neutral-800'
@@ -104,15 +109,19 @@ export const MobileNavBar: React.FC = () => {
         )}
       </button>
 
-      {/* You / Profile */}
+      {/* You / Profile & Settings */}
       <button
         id="mobile-nav-you-btn"
         type="button"
         onClick={() => {
           setMobileView('you');
-          if (identity) openUserProfile(identity);
+          if (onOpenSettings) {
+            onOpenSettings();
+          } else if (identity) {
+            openUserProfile(identity);
+          }
         }}
-        className={`flex flex-col items-center justify-center py-1 px-3 rounded-lg transition ${
+        className={`flex flex-col items-center justify-center py-1 px-3 rounded-lg transition cursor-pointer ${
           mobileView === 'you'
             ? 'text-[#4A154B] font-bold'
             : 'text-neutral-500 hover:text-neutral-800'

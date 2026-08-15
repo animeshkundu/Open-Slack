@@ -75,9 +75,9 @@ export const AppLayout: React.FC = () => {
         {/* 2. Secondary Sidebar: Channels & DMs */}
         <div
           className={`${
-            mobileView === 'chat' || rightPanel !== 'none'
-              ? 'hidden md:flex'
-              : 'flex flex-1 md:flex-none'
+            (mobileView === 'sidebar' || mobileView === 'dms') && rightPanel === 'none'
+              ? 'flex flex-1 w-full md:w-[260px] md:flex-none'
+              : 'hidden md:flex md:w-[260px] md:flex-none'
           }`}
         >
           <PrimarySidebar
@@ -94,9 +94,9 @@ export const AppLayout: React.FC = () => {
         <div
           id="main-chat-viewport"
           className={`flex-1 min-h-0 flex-col min-w-0 bg-white h-full relative ${
-            mobileView === 'sidebar' && rightPanel === 'none'
-              ? 'hidden md:flex'
-              : 'flex'
+            mobileView === 'chat' && rightPanel === 'none'
+              ? 'flex w-full'
+              : 'hidden md:flex'
           }`}
         >
           {/* Media Permission Error Banner */}
@@ -160,10 +160,10 @@ export const AppLayout: React.FC = () => {
       </div>
 
       {/* Mobile Bottom Navigation Bar (< 768px) */}
-      <MobileNavBar />
+      <MobileNavBar onOpenSettings={() => setIsSettingsOpen(true)} />
 
       {/* 5. Active Huddle Audio/Video Overlay */}
-      <HuddleOverlay />
+      <HuddleOverlay onOpenInvite={() => setIsInviteOpen(true)} />
 
       {/* 6. Full-Text Search Modal */}
       <SearchModal />

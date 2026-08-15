@@ -73,7 +73,7 @@ interface WorkspaceContextValue {
   activeChannel: Channel | null;
   selectChannel: (channelId: string) => void;
   createChannel: (name: string, topic?: string, isPrivate?: boolean) => Promise<Channel>;
-  openDirectMessage: (peerPubkey: string) => Promise<Channel>;
+  openDirectMessage: (peerPubkeys: string | string[]) => Promise<Channel>;
 
   // Messages & Reactions
   messages: Message[];
@@ -818,27 +818,41 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     return newChan;
   };
 
-  const openDirectMessage = async (peerPubkey: string): Promise<Channel> => {
+  const openDirectMessage = async (peerPubkeys: string | string[]): Promise<Channel> => {
     if (!identity || !ydocRef.current) throw new Error('Not ready');
-    const existing = channels.find(
-      (c) => c.isDirectMessage && c.members?.includes(peerPubkey) && c.members?.includes(identity.pubkey)
-    );
+    const pubkeyList = Array.isArray(peerPubkeys) ? peerPubkeys : [peerPubkeys];
+    if (pubkeyList.length === 0) throw new Error('No peers selected');
+
+    const allMembers = Array.from(new Set([identity.pubkey, ...pubkeyList]));
+
+    // Check if an identical DM channel already exists
+    const existing = channels.find((c) => {
+      if (!c.isDirectMessage || !c.members) return false;
+      if (c.members.length !== allMembers.length) return false;
+      return allMembers.every((m) => c.members?.includes(m));
+    });
+
     if (existing) {
       setActiveChannelId(existing.id);
       setMobileView('chat');
       return existing;
     }
 
-    const peer = peerUsers.get(peerPubkey);
-    const id = `dm_${[identity.pubkey, peerPubkey].sort().join('_').slice(0, 24)}`;
+    const peerNames = pubkeyList.map((pk) => {
+      const p = peerUsers.get(pk);
+      return p?.displayName || `User ${pk.slice(0, 6)}`;
+    });
+
+    const dmTitle = peerNames.join(', ');
+    const id = `dm_${[...allMembers].sort().join('_').slice(0, 32)}`;
     const newDm: Channel = {
       id,
       workspaceId: activeWorkspace?.id,
-      name: peer?.displayName || `DM with ${peerPubkey.slice(0, 6)}`,
-      topic: `Direct Message with ${peer?.displayName || peerPubkey.slice(0, 6)}`,
+      name: dmTitle,
+      topic: `Direct Message between ${[identity.displayName, ...peerNames].join(', ')}`,
       isPrivate: true,
       isDirectMessage: true,
-      members: [identity.pubkey, peerPubkey],
+      members: allMembers,
       created: Date.now(),
       creatorPubkey: identity.pubkey,
     };

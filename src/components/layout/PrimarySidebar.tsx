@@ -2,14 +2,17 @@ import {
   Bell,
   ChevronDown,
   Globe,
+  Headphones,
+  Mic,
+  MicOff,
+  PhoneOff,
   Plus,
-  Radio,
   Search,
   Settings,
   ShieldAlert,
   UserCheck,
   UserPlus,
-  Zap,
+  Users,
 } from 'lucide-react';
 import React, { useState } from 'react';
 import { useWorkspace } from '../../context/WorkspaceContext';
@@ -39,8 +42,9 @@ export const PrimarySidebar: React.FC<PrimarySidebarProps> = ({
     peerUsers,
     identity,
     setIsSearchOpen,
-    startOrJoinHuddle,
     huddleState,
+    leaveHuddle,
+    toggleHuddleMute,
     joinRequests,
     setRightPanel,
     setShowLandingPage,
@@ -55,6 +59,7 @@ export const PrimarySidebar: React.FC<PrimarySidebarProps> = ({
   const directChannels = channels.filter((c) => c.isDirectMessage);
 
   const pendingApprovalsCount = joinRequests.filter((r) => r.status === 'PENDING').length;
+  const huddleChannel = channels.find((c) => c.id === huddleState.channelId);
 
   return (
     <div
@@ -234,6 +239,7 @@ export const PrimarySidebar: React.FC<PrimarySidebarProps> = ({
             <div className="space-y-0.5">
               {publicChannels.map((channel) => {
                 const isActive = channel.id === activeChannel?.id;
+                const isChannelInHuddle = huddleState.isActive && huddleState.channelId === channel.id;
                 return (
                   <button
                     key={channel.id}
@@ -263,11 +269,16 @@ export const PrimarySidebar: React.FC<PrimarySidebarProps> = ({
                       </span>
                       <span className="truncate">{channel.name}</span>
                     </div>
-                    {channel.unreadCount ? (
-                      <span className="bg-[#E01E5A] text-white text-[10px] font-bold px-1.5 rounded-full">
-                        {channel.unreadCount}
-                      </span>
-                    ) : null}
+                    <div className="flex items-center gap-1.5">
+                      {isChannelInHuddle && (
+                        <span className="w-2 h-2 rounded-full bg-[#2BAC76] animate-pulse" title="Active huddle in progress" />
+                      )}
+                      {channel.unreadCount ? (
+                        <span className="bg-[#E01E5A] text-white text-[10px] font-bold px-1.5 rounded-full">
+                          {channel.unreadCount}
+                        </span>
+                      ) : null}
+                    </div>
                   </button>
                 );
               })}
@@ -378,28 +389,74 @@ export const PrimarySidebar: React.FC<PrimarySidebarProps> = ({
         </div>
       </div>
 
-      {/* Slack Huddle Action Bar at Bottom */}
-      <div className="p-3 border-t border-black/20">
-        <button
-          id="sidebar-start-huddle-btn"
-          type="button"
-          onClick={() => {
-            if (activeChannel) {
-              startOrJoinHuddle(activeChannel.id);
-            }
-          }}
-          className="w-full flex items-center space-x-2 bg-white/10 p-2 rounded-lg cursor-pointer hover:bg-white/20 transition text-left focus:outline-none"
+      {/* Live Active Huddle Widget (Displayed ONLY when in an active call) */}
+      {huddleState.isActive && (
+        <div
+          id="sidebar-active-huddle-bar"
+          className="p-2.5 m-2 bg-[#2BAC76]/20 border border-[#2BAC76]/40 rounded-xl backdrop-blur-xs text-white animate-in slide-in-from-bottom-2 duration-150 shadow-lg"
         >
-          <div className="w-6 h-6 bg-[#2BAC76] rounded flex items-center justify-center flex-shrink-0">
-            <Radio className="w-3.5 h-3.5 text-white" />
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-5 h-5 rounded-full bg-[#2BAC76] flex items-center justify-center text-white flex-shrink-0 animate-pulse">
+                <Headphones className="w-3 h-3" />
+              </div>
+              <div className="min-w-0">
+                <div className="text-[11px] font-bold truncate text-white leading-tight">
+                  #{huddleChannel?.name || 'huddle'}
+                </div>
+                <div className="text-[9.5px] text-emerald-200">
+                  {huddleState.participants.size} in call
+                </div>
+              </div>
+            </div>
+
+            {/* Speaking audio wave indicator */}
+            <div className="flex items-end gap-0.5 h-3 px-1">
+              <span className="w-0.5 h-2 bg-[#2BAC76] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+              <span className="w-0.5 h-3 bg-[#2BAC76] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+              <span className="w-0.5 h-1.5 bg-[#2BAC76] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+            </div>
           </div>
-          <div className="min-w-0 flex-1">
-            <span className="text-white text-xs font-bold block">
-              {huddleState.isActive ? 'In Huddle' : 'Start Huddle'}
-            </span>
+
+          {/* Quick controls */}
+          <div className="flex items-center gap-1.5 pt-1 border-t border-white/10">
+            <button
+              id="sidebar-huddle-mute-toggle"
+              type="button"
+              onClick={toggleHuddleMute}
+              className={`flex-1 py-1 px-2 rounded-md text-[11px] font-bold flex items-center justify-center gap-1 transition cursor-pointer ${
+                huddleState.isMuted
+                  ? 'bg-red-500/30 text-red-200 border border-red-400/40 hover:bg-red-500/40'
+                  : 'bg-white/15 text-white hover:bg-white/25'
+              }`}
+            >
+              {huddleState.isMuted ? (
+                <>
+                  <MicOff className="w-3 h-3 text-red-300" />
+                  <span>Unmute</span>
+                </>
+              ) : (
+                <>
+                  <Mic className="w-3 h-3 text-emerald-300" />
+                  <span>Mute</span>
+                </>
+              )}
+            </button>
+
+            <button
+              id="sidebar-huddle-leave-btn"
+              type="button"
+              onClick={leaveHuddle}
+              className="py-1 px-2.5 rounded-md bg-red-600/80 hover:bg-red-600 text-white text-[11px] font-bold flex items-center justify-center gap-1 transition cursor-pointer"
+              title="Leave call"
+            >
+              <PhoneOff className="w-3 h-3" />
+              <span>Leave</span>
+            </button>
           </div>
-        </button>
-      </div>
+        </div>
+      )}
     </div>
   );
 };
+

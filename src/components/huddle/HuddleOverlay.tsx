@@ -18,7 +18,11 @@ import React, { useState } from 'react';
 import { useWorkspace } from '../../context/WorkspaceContext';
 import { VideoGrid } from './VideoGrid';
 
-export const HuddleOverlay: React.FC = () => {
+interface HuddleOverlayProps {
+  onOpenInvite?: () => void;
+}
+
+export const HuddleOverlay: React.FC<HuddleOverlayProps> = ({ onOpenInvite }) => {
   const {
     huddleState,
     leaveHuddle,
@@ -26,13 +30,37 @@ export const HuddleOverlay: React.FC = () => {
     toggleHuddleVideo,
     toggleHuddleScreenShare,
     identity,
+    activeWorkspace,
   } = useWorkspace();
 
   const [isExpanded, setIsExpanded] = useState(false);
+  const [copiedHuddleLink, setCopiedHuddleLink] = useState(false);
 
   if (!huddleState.isActive) return null;
 
   const participantsList = Array.from(huddleState.participants.values());
+
+  const handleShareHuddle = () => {
+    if (onOpenInvite) {
+      onOpenInvite();
+      return;
+    }
+    if (activeWorkspace) {
+      const payloadStr = btoa(JSON.stringify(activeWorkspace));
+      const huddleUrl = `${window.location.origin}${window.location.pathname}#invite=${payloadStr}&huddle=${encodeURIComponent(huddleState.channelName || '')}`;
+      if (typeof navigator !== 'undefined' && (navigator as any).share) {
+        navigator.share({
+          title: `Join Huddle in #${huddleState.channelName}`,
+          text: `Join our live audio/video huddle in #${huddleState.channelName} on ${activeWorkspace.name}:`,
+          url: huddleUrl,
+        }).catch(() => {});
+      } else {
+        navigator.clipboard.writeText(huddleUrl);
+        setCopiedHuddleLink(true);
+        setTimeout(() => setCopiedHuddleLink(false), 2000);
+      }
+    }
+  };
 
   return (
     <>
@@ -120,6 +148,16 @@ export const HuddleOverlay: React.FC = () => {
               </button>
 
               <button
+                id="huddle-share-btn-exp"
+                type="button"
+                onClick={handleShareHuddle}
+                className="p-3.5 rounded-full font-semibold bg-neutral-800 text-white hover:bg-neutral-700 transition"
+                title="Invite teammates to Huddle (Link / QR / Social)"
+              >
+                <Share2 className="w-5 h-5 text-emerald-400" />
+              </button>
+
+              <button
                 id="huddle-leave-btn-exp"
                 type="button"
                 onClick={leaveHuddle}
@@ -138,15 +176,15 @@ export const HuddleOverlay: React.FC = () => {
       {!isExpanded && (
         <div
           id="huddle-floating-dock"
-          className="fixed bottom-4 left-72 z-40 bg-neutral-900 text-white border border-neutral-800 rounded-xl shadow-2xl p-2.5 flex items-center gap-3 animate-in slide-in-from-bottom-4 duration-150"
+          className="fixed bottom-20 sm:bottom-4 left-3 right-3 sm:right-auto sm:left-72 z-40 bg-neutral-900 text-white border border-neutral-800 rounded-xl shadow-2xl p-2 sm:p-2.5 flex items-center justify-between sm:justify-start gap-2 sm:gap-3 animate-in slide-in-from-bottom-4 duration-150"
         >
-          <div className="flex items-center gap-2 pl-2">
-            <div className="relative">
+          <div className="flex items-center gap-2 pl-1 sm:pl-2 min-w-0">
+            <div className="relative flex-shrink-0">
               <Headphones className="w-5 h-5 text-green-400" />
               <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-green-500 animate-ping" />
             </div>
-            <div className="flex flex-col">
-              <span className="text-xs font-bold truncate max-w-[130px]">
+            <div className="flex flex-col min-w-0">
+              <span className="text-xs font-bold truncate max-w-[100px] sm:max-w-[130px]">
                 #{huddleState.channelName}
               </span>
               <span className="text-[10px] text-neutral-400">
@@ -155,10 +193,10 @@ export const HuddleOverlay: React.FC = () => {
             </div>
           </div>
 
-          <div className="h-6 w-px bg-neutral-700" />
+          <div className="h-6 w-px bg-neutral-700 flex-shrink-0" />
 
           {/* Quick Controls */}
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 flex-shrink-0">
             <button
               id="huddle-mute-btn"
               type="button"
@@ -185,6 +223,16 @@ export const HuddleOverlay: React.FC = () => {
               title={huddleState.isVideoOn ? 'Camera off' : 'Camera on'}
             >
               {huddleState.isVideoOn ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />}
+            </button>
+
+            <button
+              id="huddle-share-btn-dock"
+              type="button"
+              onClick={handleShareHuddle}
+              className="p-2 hover:bg-neutral-800 rounded-lg text-emerald-400"
+              title="Share / Invite to Huddle"
+            >
+              <Share2 className="w-4 h-4" />
             </button>
 
             <button
