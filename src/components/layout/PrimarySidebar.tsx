@@ -59,7 +59,7 @@ export const PrimarySidebar: React.FC<PrimarySidebarProps> = ({
   return (
     <div
       id="primary-sidebar-container"
-      className="w-full max-w-full md:w-[260px] h-full flex flex-col flex-shrink-0 select-none border-r border-white/10 relative transition-colors"
+      className="w-full md:w-[260px] h-full flex flex-col flex-shrink-0 select-none border-r border-white/10 relative transition-colors"
       style={{
         backgroundColor: 'var(--theme-sidebar-bg, #3F0E40)',
         color: 'var(--theme-sidebar-text, #BCABB6)',
