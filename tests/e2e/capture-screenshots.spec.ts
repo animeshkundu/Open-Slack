@@ -74,7 +74,8 @@ test.describe('Pixel-Perfect Visual Screenshots Suite Across 3 Device Types', ()
     await page.locator('#close-activity-drawer-btn').click();
 
     // Search Modal (Cmd+K)
-    await page.locator('#header-search-bar-trigger').click();
+    const searchTrigger = page.locator('#header-search-bar-trigger:visible, #mobile-header-search-btn:visible').first();
+    await searchTrigger.click();
     await expect(page.locator('#search-modal-card')).toBeVisible({ timeout: 5000 });
     await page.screenshot({ path: 'screenshots/06-search-modal.png' });
     await page.locator('#search-modal-backdrop').click({ position: { x: 10, y: 10 } });
