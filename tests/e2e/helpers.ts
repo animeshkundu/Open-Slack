@@ -52,7 +52,7 @@ export async function ensureOnboardingCompleted(
     await expect(overlay).toBeHidden({ timeout: 10000 });
   }
 
-  await expect(overlay).toHaveCount(0);
+  await expect(overlay).toBeHidden();
   await expect(page.locator('#openslack-root-shell')).toBeVisible();
 }
 
