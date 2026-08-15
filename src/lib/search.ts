@@ -6,6 +6,7 @@ export interface ParsedSearchQuery {
   fromUser?: string;
   inChannel?: string;
   hasFile?: boolean;
+  hasMention?: boolean;
 }
 
 export function parseSearchQuery(query: string): ParsedSearchQuery {
@@ -14,6 +15,7 @@ export function parseSearchQuery(query: string): ParsedSearchQuery {
   let fromUser: string | undefined;
   let inChannel: string | undefined;
   let hasFile: boolean | undefined;
+  let hasMention: boolean | undefined;
 
   for (const token of tokens) {
     if (token.toLowerCase().startsWith('from:')) {
@@ -22,6 +24,8 @@ export function parseSearchQuery(query: string): ParsedSearchQuery {
       inChannel = token.substring(3).replace(/^#/, '').toLowerCase();
     } else if (token.toLowerCase() === 'has:file' || token.toLowerCase() === 'has:image') {
       hasFile = true;
+    } else if (token.toLowerCase() === 'has:mention' || token.toLowerCase() === 'is:mention') {
+      hasMention = true;
     } else if (token.length > 0) {
       keywords.push(token.toLowerCase());
     }
@@ -33,6 +37,7 @@ export function parseSearchQuery(query: string): ParsedSearchQuery {
     fromUser,
     inChannel,
     hasFile,
+    hasMention,
   };
 }
 
@@ -70,6 +75,11 @@ export function searchWorkspaceMessages(
 
     // Filter: has:file
     if (parsed.hasFile && (!msg.attachments || msg.attachments.length === 0)) {
+      continue;
+    }
+
+    // Filter: has:mention
+    if (parsed.hasMention && (!msg.mentions || msg.mentions.length === 0) && !/@\w+/.test(msg.content || '')) {
       continue;
     }
 

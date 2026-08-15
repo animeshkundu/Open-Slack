@@ -1,4 +1,5 @@
 import {
+  Bell,
   Check,
   Copy,
   Hash,
@@ -14,6 +15,7 @@ import {
 } from 'lucide-react';
 import React, { useState } from 'react';
 import { useWorkspace } from '../../context/WorkspaceContext';
+import { ActivityFeedDrawer } from '../chat/ActivityFeedDrawer';
 import { MessageItem } from '../chat/MessageItem';
 import { ThreadView } from '../chat/ThreadView';
 
@@ -45,18 +47,23 @@ export const RightDrawer: React.FC = () => {
   return (
     <div
       id="right-drawer-panel"
-      className="w-80 md:w-96 border-l border-[#E8E8E8] bg-white flex flex-col flex-shrink-0 z-20 shadow-xs h-full"
+      className="w-full sm:w-80 md:w-96 border-l border-neutral-200 bg-white flex flex-col flex-shrink-0 z-30 shadow-xl sm:shadow-xs h-full absolute sm:relative inset-y-0 right-0"
     >
       {/* THREAD VIEW */}
       {rightPanel === 'thread' && <ThreadView />}
+
+      {/* ACTIVITY FEED & MENTIONS VIEW */}
+      {rightPanel === 'activity_feed' && (
+        <ActivityFeedDrawer onClose={() => setRightPanel('none')} />
+      )}
 
       {/* CHANNEL DETAILS & MEMBERS VIEW */}
       {rightPanel === 'channel_details' && (
         <div className="h-full flex flex-col">
           {/* Header */}
-          <div className="h-14 px-4 border-b border-[#E8E8E8] flex items-center justify-between">
+          <div className="h-14 px-4 border-b border-neutral-200 flex items-center justify-between bg-neutral-50/50">
             <div className="flex items-center gap-2">
-              <h3 className="font-black text-[#1D1C1D] text-base">
+              <h3 className="font-black text-neutral-900 text-base">
                 About #{activeChannel?.name}
               </h3>
             </div>
@@ -64,7 +71,7 @@ export const RightDrawer: React.FC = () => {
               id="close-channel-details-btn"
               type="button"
               onClick={() => setRightPanel('none')}
-              className="p-1.5 hover:bg-gray-100 rounded text-gray-500 hover:text-gray-900 cursor-pointer"
+              className="p-1.5 hover:bg-neutral-200 rounded-lg text-neutral-500 hover:text-neutral-900 cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
@@ -72,20 +79,20 @@ export const RightDrawer: React.FC = () => {
 
           <div className="flex-1 overflow-y-auto p-4 space-y-5">
             {/* Topic & Description */}
-            <div className="p-3.5 bg-[#F8F8F8] rounded-xl border border-[#E8E8E8] space-y-1.5">
-              <div className="text-[11px] font-bold uppercase tracking-wider text-gray-500">
+            <div className="p-3.5 bg-neutral-50 rounded-xl border border-neutral-200 space-y-1.5">
+              <div className="text-[11px] font-bold uppercase tracking-wider text-neutral-500">
                 Topic
               </div>
-              <p className="text-xs text-[#1D1C1D] leading-relaxed">
+              <p className="text-xs text-neutral-800 leading-relaxed">
                 {activeChannel?.topic || 'No topic set for this channel.'}
               </p>
             </div>
 
             {/* Members Directory in this Workspace */}
             <div>
-              <div className="text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-3 flex items-center justify-between">
+              <div className="text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-3 flex items-center justify-between">
                 <span>Members ({peerUsers.size})</span>
-                <Users className="w-3.5 h-3.5 text-gray-400" />
+                <Users className="w-3.5 h-3.5 text-neutral-400" />
               </div>
 
               <div className="space-y-1">
@@ -93,7 +100,7 @@ export const RightDrawer: React.FC = () => {
                   <div
                     key={user.pubkey}
                     onClick={() => openUserProfile(user)}
-                    className="flex items-center gap-3 p-2 hover:bg-[#F8F8F8] rounded-lg cursor-pointer transition"
+                    className="flex items-center gap-3 p-2 hover:bg-neutral-50 rounded-lg cursor-pointer transition"
                   >
                     <div className="relative">
                       {user.avatarUrl ? (
@@ -113,16 +120,16 @@ export const RightDrawer: React.FC = () => {
                       )}
                       <span
                         className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-white ${
-                          user.isOnline ? 'bg-[#2BAC76]' : 'bg-gray-300'
+                          user.isOnline ? 'bg-emerald-500' : 'bg-neutral-300'
                         }`}
                       />
                     </div>
 
                     <div className="flex-1 min-w-0">
-                      <div className="text-xs font-bold text-[#1D1C1D] truncate">
+                      <div className="text-xs font-bold text-neutral-900 truncate">
                         {user.displayName}
                       </div>
-                      <div className="text-[11px] text-gray-500 truncate">
+                      <div className="text-[11px] text-neutral-500 truncate">
                         {user.handle} {user.status ? `• ${user.status}` : ''}
                       </div>
                     </div>
@@ -137,10 +144,10 @@ export const RightDrawer: React.FC = () => {
       {/* PINNED MESSAGES VIEW */}
       {rightPanel === 'pinned' && (
         <div className="h-full flex flex-col">
-          <div className="h-14 px-4 border-b border-[#E8E8E8] flex items-center justify-between">
+          <div className="h-14 px-4 border-b border-neutral-200 flex items-center justify-between bg-neutral-50/50">
             <div className="flex items-center gap-2">
               <Pin className="w-4 h-4 text-amber-600" />
-              <h3 className="font-black text-[#1D1C1D] text-base">
+              <h3 className="font-black text-neutral-900 text-base">
                 Pinned Messages ({pinnedMessages.length})
               </h3>
             </div>
@@ -148,7 +155,7 @@ export const RightDrawer: React.FC = () => {
               id="close-pinned-btn"
               type="button"
               onClick={() => setRightPanel('none')}
-              className="p-1.5 hover:bg-gray-100 rounded text-gray-500 hover:text-gray-900 cursor-pointer"
+              className="p-1.5 hover:bg-neutral-200 rounded-lg text-neutral-500 hover:text-neutral-900 cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
@@ -156,14 +163,14 @@ export const RightDrawer: React.FC = () => {
 
           <div className="flex-1 overflow-y-auto p-3 space-y-3">
             {pinnedMessages.length === 0 ? (
-              <div className="text-center py-12 text-gray-400 text-xs">
+              <div className="text-center py-12 text-neutral-400 text-xs">
                 No pinned messages in this channel yet. Hover over any message to pin it.
               </div>
             ) : (
               pinnedMessages.map((msg) => (
                 <div
                   key={msg.id}
-                  className="bg-[#F8F8F8] border border-[#E8E8E8] rounded-lg overflow-hidden"
+                  className="bg-neutral-50 border border-neutral-200 rounded-lg overflow-hidden"
                 >
                   <MessageItem message={msg} />
                 </div>
@@ -176,13 +183,13 @@ export const RightDrawer: React.FC = () => {
       {/* USER PROFILE INSPECTOR VIEW */}
       {rightPanel === 'user_profile' && inspectUser && (
         <div className="h-full flex flex-col">
-          <div className="h-14 px-4 border-b border-[#E8E8E8] flex items-center justify-between">
-            <h3 className="font-black text-[#1D1C1D] text-base">Profile</h3>
+          <div className="h-14 px-4 border-b border-neutral-200 flex items-center justify-between bg-neutral-50/50">
+            <h3 className="font-black text-neutral-900 text-base">Profile</h3>
             <button
               id="close-user-profile-btn"
               type="button"
               onClick={() => setRightPanel('none')}
-              className="p-1.5 hover:bg-gray-100 rounded text-gray-500 hover:text-gray-900 cursor-pointer"
+              className="p-1.5 hover:bg-neutral-200 rounded-lg text-neutral-500 hover:text-neutral-900 cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
@@ -193,15 +200,15 @@ export const RightDrawer: React.FC = () => {
               <img
                 src={inspectUser.avatarUrl}
                 alt={inspectUser.displayName}
-                className="w-24 h-24 rounded-2xl border-2 border-[#E8E8E8] shadow-md mb-3 object-cover"
+                className="w-20 h-20 rounded-2xl border-2 border-neutral-200 shadow-md mb-3 object-cover"
                 referrerPolicy="no-referrer"
               />
-              <h4 className="text-lg font-black text-[#1D1C1D]">
+              <h4 className="text-base font-black text-neutral-900">
                 {inspectUser.displayName}
               </h4>
-              <span className="text-xs text-gray-500">{inspectUser.handle}</span>
+              <span className="text-xs text-neutral-500 font-mono">{inspectUser.handle}</span>
               {inspectUser.status && (
-                <span className="mt-2 text-xs px-3 py-1 bg-gray-100 text-gray-700 rounded-full">
+                <span className="mt-2 text-xs px-3 py-1 bg-neutral-100 text-neutral-700 rounded-full">
                   {inspectUser.status}
                 </span>
               )}
@@ -216,7 +223,7 @@ export const RightDrawer: React.FC = () => {
                   openDirectMessage(inspectUser.pubkey);
                   setRightPanel('none');
                 }}
-                className="flex-1 py-2 bg-[#2BAC76] hover:bg-[#249666] text-white text-xs font-bold rounded-lg transition flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
+                className="flex-1 py-2 bg-[#007a5a] hover:bg-[#148567] text-white text-xs font-bold rounded-lg transition flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
               >
                 <MessageSquare className="w-4 h-4" />
                 <span>Direct Message</span>
@@ -227,7 +234,7 @@ export const RightDrawer: React.FC = () => {
                   id="profile-call-btn"
                   type="button"
                   onClick={() => startOrJoinHuddle(activeChannel.id)}
-                  className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-bold rounded-lg transition flex items-center justify-center cursor-pointer"
+                  className="px-3 py-2 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 text-xs font-bold rounded-lg transition flex items-center justify-center cursor-pointer"
                   title="Start call"
                 >
                   <Phone className="w-4 h-4" />
@@ -236,22 +243,22 @@ export const RightDrawer: React.FC = () => {
             </div>
 
             {/* Cryptographic Public Key Fingerprint */}
-            <div className="p-4 bg-[#F8F8F8] rounded-xl border border-[#E8E8E8] space-y-2">
-              <div className="flex items-center justify-between text-xs font-bold text-gray-700">
+            <div className="p-4 bg-neutral-50 rounded-xl border border-neutral-200 space-y-2">
+              <div className="flex items-center justify-between text-xs font-bold text-neutral-700">
                 <span className="flex items-center gap-1">
-                  <Shield className="w-3.5 h-3.5 text-[#2BAC76]" />
+                  <Shield className="w-3.5 h-3.5 text-[#007a5a]" />
                   Public Key Fingerprint
                 </span>
                 <button
                   type="button"
                   onClick={() => handleCopyKey(inspectUser.pubkey)}
-                  className="text-xs text-[#1164A3] hover:underline flex items-center gap-1 cursor-pointer"
+                  className="text-xs text-[#1264A3] hover:underline flex items-center gap-1 cursor-pointer font-semibold"
                 >
-                  {copiedKey ? <Check className="w-3 h-3 text-green-600" /> : <Copy className="w-3 h-3" />}
+                  {copiedKey ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
                   <span>{copiedKey ? 'Copied' : 'Copy'}</span>
                 </button>
               </div>
-              <pre className="text-[11px] font-mono bg-white p-2.5 border border-[#E8E8E8] rounded text-gray-700 break-all">
+              <pre className="text-[11px] font-mono bg-white p-2.5 border border-neutral-200 rounded text-neutral-700 break-all">
                 {inspectUser.pubkey}
               </pre>
             </div>

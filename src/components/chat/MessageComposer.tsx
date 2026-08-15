@@ -1,4 +1,5 @@
 import {
+  AtSign,
   Bold,
   Code,
   FileCode,
@@ -13,10 +14,12 @@ import {
   Smile,
   Square,
   Strikethrough,
+  Users,
   X,
 } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
 import { useWorkspace } from '../../context/WorkspaceContext';
+import { getMentionSuggestions, MentionSuggestion } from '../../lib/mentions';
 import { formatBytes } from '../../lib/storage';
 import { Attachment } from '../../types';
 import { ReactionPicker } from './ReactionPicker';
@@ -38,6 +41,8 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
     setTyping,
     uploadAttachment,
     typingUsers,
+    peerUsers,
+    identity,
   } = useWorkspace();
 
   const [content, setContent] = useState('');
@@ -45,6 +50,12 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
   const [isUploading, setIsUploading] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+
+  // Mention Autocomplete state
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const [mentionIndex, setMentionIndex] = useState<number>(0);
+  const [mentionCursorPos, setMentionCursorPos] = useState<number>(0);
+  const [suggestions, setSuggestions] = useState<MentionSuggestion[]>([]);
 
   // Audio recording note state
   const [isRecording, setIsRecording] = useState(false);
@@ -73,9 +84,47 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
     }
   }, [content]);
 
-  // Handle typing debounce
+  // Compute mention suggestions when mentionQuery changes
+  useEffect(() => {
+    if (mentionQuery !== null) {
+      const users = Array.from(peerUsers.values());
+      if (identity && !users.some((u) => u.pubkey === identity.pubkey)) {
+        users.push(identity);
+      }
+      const list = getMentionSuggestions(mentionQuery, users);
+      setSuggestions(list);
+      setMentionIndex(0);
+    } else {
+      setSuggestions([]);
+    }
+  }, [mentionQuery, peerUsers, identity]);
+
+  // Check cursor position for @mention token
+  const checkMentionTrigger = (text: string, cursorPos: number) => {
+    const textBeforeCursor = text.slice(0, cursorPos);
+    const lastAtIdx = textBeforeCursor.lastIndexOf('@');
+
+    if (lastAtIdx !== -1) {
+      const charBeforeAt = lastAtIdx > 0 ? textBeforeCursor[lastAtIdx - 1] : ' ';
+      // Check if preceded by whitespace or beginning of text
+      if (/\s/.test(charBeforeAt) || lastAtIdx === 0) {
+        const query = textBeforeCursor.slice(lastAtIdx + 1);
+        if (!/\s/.test(query)) {
+          setMentionQuery(query);
+          setMentionCursorPos(lastAtIdx);
+          return;
+        }
+      }
+    }
+    setMentionQuery(null);
+  };
+
+  // Handle typing debounce & mention detection
   const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setContent(e.target.value);
+    const text = e.target.value;
+    const pos = e.target.selectionStart;
+    setContent(text);
+    checkMentionTrigger(text, pos);
 
     // Emit typing indicator
     setTyping(true);
@@ -85,8 +134,51 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
     }, 2000);
   };
 
-  // Keyboard shortcut: Enter to send, Shift+Enter for multiline
+  const handleSelectMention = (item: MentionSuggestion) => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const startPos = mentionCursorPos;
+    const endPos = textarea.selectionStart;
+
+    const insertToken = item.type === 'special' ? `${item.handle} ` : `${item.handle} `;
+    const newContent = content.slice(0, startPos) + insertToken + content.slice(endPos);
+
+    setContent(newContent);
+    setMentionQuery(null);
+
+    setTimeout(() => {
+      textarea.focus();
+      const newPos = startPos + insertToken.length;
+      textarea.setSelectionRange(newPos, newPos);
+    }, 10);
+  };
+
+  // Keyboard shortcut: Enter to send, Shift+Enter for multiline, Arrows for mention autocomplete
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (mentionQuery !== null && suggestions.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setMentionIndex((prev) => (prev + 1) % suggestions.length);
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setMentionIndex((prev) => (prev - 1 + suggestions.length) % suggestions.length);
+        return;
+      }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        handleSelectMention(suggestions[mentionIndex]);
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setMentionQuery(null);
+        return;
+      }
+    }
+
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
@@ -104,6 +196,7 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
     setContent('');
     setAttachments([]);
     setTyping(false);
+    setMentionQuery(null);
 
     try {
       await sendMessage(textToSend, currentAttachments, threadParentId);
@@ -231,15 +324,89 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
   };
 
   return (
-    <div className="p-4 border-t border-[#E8E8E8] bg-white flex-shrink-0">
+    <div className="p-3 sm:p-4 border-t border-neutral-200 bg-white flex-shrink-0 relative">
       {/* Typing indicator banner */}
       {typingUsers.length > 0 && (
-        <div className="text-[12px] text-gray-500 mb-1.5 flex items-center gap-1.5 animate-pulse">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#2BAC76] inline-block"></span>
+        <div className="text-[11px] text-neutral-500 mb-1.5 flex items-center gap-1.5 animate-pulse">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#007a5a] inline-block"></span>
           <span>
             {typingUsers.map((t) => t.user.displayName).join(', ')}{' '}
             {typingUsers.length === 1 ? 'is' : 'are'} typing...
           </span>
+        </div>
+      )}
+
+      {/* Mention Suggestions Dropdown Popover */}
+      {mentionQuery !== null && suggestions.length > 0 && (
+        <div
+          id="mention-autocomplete-menu"
+          className="absolute bottom-full left-4 mb-2 w-72 bg-white rounded-xl shadow-2xl border border-neutral-200 overflow-hidden z-40 max-h-60 overflow-y-auto animate-in fade-in zoom-in-95 duration-100"
+        >
+          <div className="p-2 border-b border-neutral-100 bg-neutral-50/80 flex items-center justify-between text-[11px] font-bold text-neutral-600">
+            <span className="flex items-center gap-1">
+              <AtSign className="w-3 h-3 text-[#1264A3]" /> Mentions
+            </span>
+            <span className="text-[10px] text-neutral-400">↑↓ to navigate, ↵ to select</span>
+          </div>
+          <div className="p-1 space-y-0.5">
+            {suggestions.map((item, idx) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => handleSelectMention(item)}
+                onMouseEnter={() => setMentionIndex(idx)}
+                className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-left transition ${
+                  idx === mentionIndex ? 'bg-[#1264A3] text-white' : 'hover:bg-neutral-100 text-neutral-800'
+                }`}
+              >
+                {item.type === 'special' ? (
+                  <div
+                    className={`w-6 h-6 rounded-md flex items-center justify-center font-bold text-xs ${
+                      idx === mentionIndex ? 'bg-white/20 text-white' : 'bg-neutral-100 text-neutral-700'
+                    }`}
+                  >
+                    <Users className="w-3.5 h-3.5" />
+                  </div>
+                ) : item.avatarUrl ? (
+                  <img
+                    src={item.avatarUrl}
+                    alt={item.name}
+                    className="w-6 h-6 rounded-md object-cover border border-neutral-200"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <div
+                    className={`w-6 h-6 rounded-md flex items-center justify-center font-bold text-xs ${
+                      idx === mentionIndex ? 'bg-white/20 text-white' : 'bg-neutral-200 text-neutral-700'
+                    }`}
+                  >
+                    {item.name.slice(0, 2).toUpperCase()}
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="text-xs font-bold truncate">{item.name}</span>
+                    <span
+                      className={`text-[10px] font-mono ${
+                        idx === mentionIndex ? 'text-white/80' : 'text-neutral-500'
+                      }`}
+                    >
+                      {item.handle}
+                    </span>
+                  </div>
+                  {item.description && (
+                    <div
+                      className={`text-[10px] truncate ${
+                        idx === mentionIndex ? 'text-white/70' : 'text-neutral-400'
+                      }`}
+                    >
+                      {item.description}
+                    </div>
+                  )}
+                </div>
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
@@ -248,25 +415,25 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        className={`border-2 rounded-xl flex flex-col bg-white overflow-hidden transition-all ${
+        className={`border rounded-xl flex flex-col bg-white overflow-hidden transition-all ${
           isDragging
-            ? 'border-[#1164A3] ring-2 ring-blue-100 bg-blue-50/20'
-            : 'border-[#E8E8E8] focus-within:border-gray-400'
+            ? 'border-[#1264A3] ring-2 ring-blue-100 bg-blue-50/20'
+            : 'border-neutral-300 focus-within:border-neutral-500 focus-within:shadow-xs'
         }`}
       >
         {/* Attachment chips preview */}
         {attachments.length > 0 && (
-          <div className="flex flex-wrap gap-2 p-2 bg-[#F8F8F8] border-b border-[#E8E8E8]">
+          <div className="flex flex-wrap gap-2 p-2 bg-neutral-50 border-b border-neutral-200">
             {attachments.map((att, idx) => (
               <div
                 key={att.id}
-                className="flex items-center gap-2 px-2.5 py-1 bg-white border border-[#E8E8E8] rounded-md text-xs shadow-2xs"
+                className="flex items-center gap-2 px-2.5 py-1 bg-white border border-neutral-200 rounded-md text-xs shadow-2xs"
               >
-                <Paperclip className="w-3 h-3 text-gray-400" />
-                <span className="font-medium text-[#1D1C1D] truncate max-w-[150px]">
+                <Paperclip className="w-3 h-3 text-neutral-400" />
+                <span className="font-medium text-neutral-900 truncate max-w-[150px]">
                   {att.fileName}
                 </span>
-                <span className="text-gray-400 text-[10px]">
+                <span className="text-neutral-400 text-[10px]">
                   {formatBytes(att.fileSize)}
                 </span>
                 <button
@@ -274,7 +441,7 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
                   onClick={() =>
                     setAttachments((prev) => prev.filter((_, i) => i !== idx))
                   }
-                  className="p-0.5 hover:bg-gray-100 rounded text-gray-400 hover:text-gray-700 cursor-pointer"
+                  className="p-0.5 hover:bg-neutral-100 rounded text-neutral-400 hover:text-neutral-700 cursor-pointer"
                 >
                   <X className="w-3 h-3" />
                 </button>
@@ -311,14 +478,14 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
             onChange={handleContentChange}
             onKeyDown={handleKeyDown}
             placeholder={targetPlaceholder}
-            className="w-full bg-transparent resize-none outline-none text-sm text-[#1D1C1D] placeholder:text-gray-400 max-h-48 min-h-[36px]"
+            className="w-full bg-transparent resize-none outline-none text-sm text-neutral-900 placeholder:text-neutral-400 max-h-48 min-h-[36px]"
           />
         </div>
 
         {/* Bottom Toolbar & Action Bar */}
-        <div className="h-10 bg-[#F8F8F8] border-t border-[#E8E8E8] rounded-b-lg flex items-center justify-between px-2">
+        <div className="min-h-10 bg-neutral-50/90 border-t border-neutral-200 flex flex-wrap items-center justify-between px-2 py-1 gap-1">
           {/* Formatting Controls */}
-          <div className="flex items-center space-x-1 text-gray-500">
+          <div className="flex items-center flex-wrap gap-0.5 text-neutral-600">
             {/* File upload hidden input & trigger */}
             <input
               ref={fileInputRef}
@@ -332,19 +499,40 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={isUploading}
-              className="p-1 hover:bg-gray-200 rounded text-gray-500 transition cursor-pointer"
+              className="p-1.5 hover:bg-neutral-200 rounded-lg text-neutral-600 transition cursor-pointer"
               title="Attach files (or drag & drop)"
             >
               <Paperclip className="w-4 h-4" />
             </button>
 
-            <div className="h-4 w-[1px] bg-gray-300 mx-1" />
+            <button
+              id="composer-mention-btn"
+              type="button"
+              onClick={() => {
+                const textarea = textareaRef.current;
+                if (!textarea) return;
+                const pos = textarea.selectionStart;
+                const newText = content.slice(0, pos) + '@' + content.slice(pos);
+                setContent(newText);
+                setTimeout(() => {
+                  textarea.focus();
+                  textarea.setSelectionRange(pos + 1, pos + 1);
+                  checkMentionTrigger(newText, pos + 1);
+                }, 10);
+              }}
+              className="p-1.5 hover:bg-neutral-200 rounded-lg text-neutral-600 text-xs font-bold"
+              title="Mention someone (@)"
+            >
+              <AtSign className="w-4 h-4 text-[#1264A3]" />
+            </button>
+
+            <div className="h-4 w-[1px] bg-neutral-300 mx-1 hidden sm:block" />
 
             <button
               id="format-bold-btn"
               type="button"
               onClick={() => wrapSelection('**', '**', 'bold text')}
-              className="p-1 hover:bg-gray-200 rounded text-gray-600 font-bold text-xs"
+              className="p-1.5 hover:bg-neutral-200 rounded-lg text-neutral-600 font-bold text-xs"
               title="Bold"
             >
               <Bold className="w-3.5 h-3.5" />
@@ -353,7 +541,7 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
               id="format-italic-btn"
               type="button"
               onClick={() => wrapSelection('_', '_', 'italic text')}
-              className="p-1 hover:bg-gray-200 rounded text-gray-600 italic text-xs"
+              className="p-1.5 hover:bg-neutral-200 rounded-lg text-neutral-600 italic text-xs"
               title="Italic"
             >
               <Italic className="w-3.5 h-3.5" />
@@ -362,7 +550,7 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
               id="format-strike-btn"
               type="button"
               onClick={() => wrapSelection('~', '~', 'strike text')}
-              className="p-1 hover:bg-gray-200 rounded text-gray-600"
+              className="p-1.5 hover:bg-neutral-200 rounded-lg text-neutral-600 hidden sm:inline-flex"
               title="Strikethrough"
             >
               <Strikethrough className="w-3.5 h-3.5" />
@@ -371,7 +559,7 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
               id="format-link-btn"
               type="button"
               onClick={() => wrapSelection('[', '](https://)', 'link title')}
-              className="p-1 hover:bg-gray-200 rounded text-gray-600"
+              className="p-1.5 hover:bg-neutral-200 rounded-lg text-neutral-600 hidden sm:inline-flex"
               title="Link"
             >
               <LinkIcon className="w-3.5 h-3.5" />
@@ -380,16 +568,25 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
               id="format-code-btn"
               type="button"
               onClick={() => wrapSelection('`', '`', 'code')}
-              className="p-1 hover:bg-gray-200 rounded text-gray-600"
+              className="p-1.5 hover:bg-neutral-200 rounded-lg text-neutral-600"
               title="Inline code"
             >
               <Code className="w-3.5 h-3.5" />
             </button>
             <button
+              id="format-codeblock-btn"
+              type="button"
+              onClick={() => wrapSelection('```ts\n', '\n```', '// your code')}
+              className="p-1.5 hover:bg-neutral-200 rounded-lg text-neutral-600 hidden sm:inline-flex"
+              title="Code Block"
+            >
+              <FileCode className="w-3.5 h-3.5" />
+            </button>
+            <button
               id="format-list-btn"
               type="button"
               onClick={() => insertLinePrefix('- ')}
-              className="p-1 hover:bg-gray-200 rounded text-gray-600"
+              className="p-1.5 hover:bg-neutral-200 rounded-lg text-neutral-600 hidden sm:inline-flex"
               title="Bulleted list"
             >
               <List className="w-3.5 h-3.5" />
@@ -398,7 +595,7 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
               id="format-quote-btn"
               type="button"
               onClick={() => insertLinePrefix('> ')}
-              className="p-1 hover:bg-gray-200 rounded text-gray-600"
+              className="p-1.5 hover:bg-neutral-200 rounded-lg text-neutral-600 hidden sm:inline-flex"
               title="Quote"
             >
               <Quote className="w-3.5 h-3.5" />
@@ -406,14 +603,14 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
           </div>
 
           {/* Right send & voice actions */}
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-1 sm:space-x-2 ml-auto">
             {/* Emoji popover */}
             <div className="relative">
               <button
                 id="composer-emoji-btn"
                 type="button"
                 onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                className="p-1 hover:bg-gray-200 rounded text-gray-500 hover:text-gray-900 transition cursor-pointer"
+                className="p-1.5 hover:bg-neutral-200 rounded-lg text-neutral-600 hover:text-neutral-900 transition cursor-pointer"
                 title="Add emoji"
               >
                 <Smile className="w-4 h-4" />
@@ -434,10 +631,10 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
               id="composer-mic-btn"
               type="button"
               onClick={isRecording ? stopRecording : startRecording}
-              className={`p-1 rounded transition cursor-pointer ${
+              className={`p-1.5 rounded-lg transition cursor-pointer ${
                 isRecording
                   ? 'bg-red-100 text-red-600'
-                  : 'hover:bg-gray-200 text-gray-500 hover:text-gray-900'
+                  : 'hover:bg-neutral-200 text-neutral-600 hover:text-neutral-900'
               }`}
               title={isRecording ? 'Stop recording' : 'Record voice note'}
             >
@@ -450,10 +647,10 @@ export const MessageComposer: React.FC<MessageComposerProps> = ({
               type="button"
               onClick={handleSend}
               disabled={!content.trim() && attachments.length === 0}
-              className={`p-1.5 rounded transition cursor-pointer flex items-center justify-center ${
+              className={`p-2 rounded-lg transition cursor-pointer flex items-center justify-center ${
                 content.trim() || attachments.length > 0
-                  ? 'bg-[#2BAC76] text-white hover:bg-[#249666]'
-                  : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                  ? 'bg-[#007a5a] text-white hover:bg-[#148567] shadow-xs'
+                  : 'bg-neutral-200 text-neutral-400 cursor-not-allowed'
               }`}
               title="Send message (Enter)"
             >

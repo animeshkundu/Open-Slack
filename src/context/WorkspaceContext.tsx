@@ -9,6 +9,13 @@ import {
   signMessage,
 } from '../lib/crypto';
 import { FileTransferProgress } from '../lib/fileTransfer';
+import { extractMentions, isUserMentioned } from '../lib/mentions';
+import {
+  isDNDActive,
+  requestNotificationPermission,
+  shouldNotify,
+  showBrowserNotification,
+} from '../lib/notifications';
 import { DEFAULT_RELAYS, p2pNetwork } from '../lib/p2p';
 import { playSound } from '../lib/sound';
 import {
@@ -19,30 +26,46 @@ import {
   storeLocalFile,
 } from '../lib/storage';
 import {
+  AppNotification,
   Attachment,
   Channel,
   HuddleParticipant,
   HuddleState,
+  JoinRequest,
   Message,
   RightPanelView,
   StoredPrivateKeyPair,
   UserIdentity,
+  UserPreferences,
   Workspace,
+  WorkspaceSettings,
 } from '../types';
 
+export type MobileViewType = 'sidebar' | 'chat' | 'activity' | 'thread' | 'profile' | 'settings' | 'landing' | 'dms' | 'you';
+
 interface WorkspaceContextValue {
-  // Identity
+  // Identity & Preferences
   identity: UserIdentity | null;
   keys: StoredPrivateKeyPair | null;
+  preferences: UserPreferences;
   updateProfile: (updates: Partial<UserIdentity>) => void;
+  updatePreferences: (updates: Partial<UserPreferences>) => void;
+  setDND: (minutes: number | null) => void;
 
   // Workspaces
   workspaces: Workspace[];
   activeWorkspace: Workspace | null;
-  createWorkspace: (name: string, passphrase?: string) => Promise<Workspace>;
+  createWorkspace: (name: string, passphrase?: string, settings?: WorkspaceSettings) => Promise<Workspace>;
   joinWorkspace: (workspace: Workspace) => void;
   switchWorkspace: (workspaceId: string) => void;
   leaveWorkspace: (workspaceId: string) => void;
+  updateWorkspaceSettings: (settings: WorkspaceSettings) => void;
+
+  // Join Requests (Approval Flow)
+  joinRequests: JoinRequest[];
+  submitJoinRequest: (userName: string, userEmail: string, userRole?: string) => Promise<JoinRequest>;
+  approveJoinRequest: (requestId: string) => void;
+  rejectJoinRequest: (requestId: string) => void;
 
   // Channels
   channels: Channel[];
@@ -60,6 +83,13 @@ interface WorkspaceContextValue {
   togglePinMessage: (messageId: string) => void;
   deleteMessage: (messageId: string) => void;
 
+  // Notifications & Activity Feed
+  notifications: AppNotification[];
+  unreadNotificationCount: number;
+  markNotificationAsRead: (id: string) => void;
+  markAllNotificationsAsRead: () => void;
+  clearNotifications: () => void;
+
   // Typing & Presence
   typingUsers: { channelId: string; pubkey: string; user: UserIdentity }[];
   setTyping: (isTyping: boolean) => void;
@@ -74,6 +104,12 @@ interface WorkspaceContextValue {
   closeThread: () => void;
   inspectUser: UserIdentity | null;
   openUserProfile: (user: UserIdentity) => void;
+
+  // Navigation & Views
+  showLandingPage: boolean;
+  setShowLandingPage: (show: boolean) => void;
+  mobileView: MobileViewType;
+  setMobileView: (view: MobileViewType) => void;
 
   // Search
   searchQuery: string;
@@ -101,6 +137,20 @@ interface WorkspaceContextValue {
 }
 
 const WorkspaceContext = createContext<WorkspaceContextValue | null>(null);
+
+const DEFAULT_PREFERENCES: UserPreferences = {
+  soundEnabled: true,
+  desktopNotifications: 'all',
+  dndUntil: null,
+  mutedChannelIds: [],
+  channelNotificationOverrides: {},
+};
+
+const DEFAULT_WORKSPACE_SETTINGS: WorkspaceSettings = {
+  requireApprovalForInvites: false,
+  defaultChannels: ['chan_general', 'chan_random'],
+  allowGuestInvites: true,
+};
 
 const DEFAULT_CHANNELS: Omit<Channel, 'creatorPubkey' | 'created'>[] = [
   {
@@ -130,6 +180,16 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [identity, setIdentity] = useState<UserIdentity | null>(null);
   const [keys, setKeys] = useState<StoredPrivateKeyPair | null>(null);
 
+  // User Preferences
+  const [preferences, setPreferences] = useState<UserPreferences>(() => {
+    try {
+      const stored = localStorage.getItem('quietslack_user_preferences');
+      return stored ? { ...DEFAULT_PREFERENCES, ...JSON.parse(stored) } : DEFAULT_PREFERENCES;
+    } catch {
+      return DEFAULT_PREFERENCES;
+    }
+  });
+
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<string>('');
 
@@ -143,11 +203,26 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [rawMessages, setRawMessages] = useState<Message[]>([]);
   const [rawReactions, setRawReactions] = useState<Record<string, Record<string, string[]>>>({});
   const [peerUsers, setPeerUsers] = useState<Map<string, UserIdentity>>(new Map());
+  const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([]);
+
+  // Notifications
+  const [notifications, setNotifications] = useState<AppNotification[]>(() => {
+    try {
+      const stored = localStorage.getItem('quietslack_notifications');
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
 
   // Right Panel & Sub-views
   const [rightPanel, setRightPanel] = useState<RightPanelView>('none');
   const [activeThreadParentId, setActiveThreadParentId] = useState<string | null>(null);
   const [inspectUser, setInspectUser] = useState<UserIdentity | null>(null);
+
+  // App Navigation & Responsive Views
+  const [showLandingPage, setShowLandingPage] = useState<boolean>(false);
+  const [mobileView, setMobileView] = useState<MobileViewType>('chat');
 
   // Search
   const [searchQuery, setSearchQuery] = useState('');
@@ -188,14 +263,24 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     getStorageQuotaEstimate().then(setStorageQuota);
     autoPruneStorageIfExceeded(90);
 
+    // Request notification permission smoothly
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
+      // Permission can be triggered or checked
+    }
+
     getOrCreateIdentity().then(({ identity: initIdentity, keys: initKeys }) => {
       setIdentity(initIdentity);
       setKeys(initKeys);
 
-      // Check URL for invite link hash (#invite=...)
+      // Check URL for invite link hash (#invite=... or #/join?...)
       handleInviteLinkFromUrl(initIdentity);
     });
   }, []);
+
+  // Save notifications to storage
+  useEffect(() => {
+    localStorage.setItem('quietslack_notifications', JSON.stringify(notifications.slice(0, 100)));
+  }, [notifications]);
 
   // Handle invite links in hash (e.g. #invite=...)
   const handleInviteLinkFromUrl = (user: UserIdentity) => {
@@ -234,26 +319,54 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       name: 'Decentralized HQ',
       passphrase: generateWorkspacePassphrase(),
       created: Date.now(),
+      createdAt: new Date().toISOString(),
       ownerPubkey: user.pubkey,
+      ownerId: user.pubkey,
+      settings: DEFAULT_WORKSPACE_SETTINGS,
       relays: DEFAULT_RELAYS,
     };
     saveAndJoinWorkspace(defaultWs, user);
   };
 
   const saveAndJoinWorkspace = (ws: Workspace, user: UserIdentity) => {
+    const enrichedWs: Workspace = {
+      ...ws,
+      ownerId: ws.ownerId || ws.ownerPubkey || user.pubkey,
+      settings: ws.settings || DEFAULT_WORKSPACE_SETTINGS,
+      createdAt: ws.createdAt || new Date(ws.created || Date.now()).toISOString(),
+    };
+
     setWorkspaces((prev) => {
-      const exists = prev.some((w) => w.id === ws.id);
-      const next = exists ? prev.map((w) => (w.id === ws.id ? ws : w)) : [...prev, ws];
+      const exists = prev.some((w) => w.id === enrichedWs.id);
+      const next = exists ? prev.map((w) => (w.id === enrichedWs.id ? enrichedWs : w)) : [...prev, enrichedWs];
       localStorage.setItem('quietslack_workspaces', JSON.stringify(next));
       return next;
     });
-    setActiveWorkspaceId(ws.id);
-    localStorage.setItem('quietslack_active_ws', ws.id);
+    setActiveWorkspaceId(enrichedWs.id);
+    localStorage.setItem('quietslack_active_ws', enrichedWs.id);
   };
 
   const activeWorkspace = useMemo(() => {
     return workspaces.find((w) => w.id === activeWorkspaceId) || workspaces[0] || null;
   }, [workspaces, activeWorkspaceId]);
+
+  // Update Preferences Handler
+  const updatePreferences = (updates: Partial<UserPreferences>) => {
+    setPreferences((prev) => {
+      const next = { ...prev, ...updates };
+      localStorage.setItem('quietslack_user_preferences', JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const setDND = (minutes: number | null) => {
+    if (minutes === null) {
+      updatePreferences({ dndUntil: null });
+    } else {
+      const dndDate = new Date(Date.now() + minutes * 60 * 1000);
+      updatePreferences({ dndUntil: dndDate.toISOString() });
+    }
+  };
 
   // 2. Initialize Y.Doc & IndexedDB persistence when Active Workspace changes
   useEffect(() => {
@@ -278,6 +391,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const yMessages = doc.getArray<Message>('messages');
     const yReactions = doc.getMap<Record<string, string[]>>('reactions');
     const yUsers = doc.getMap<UserIdentity>('users');
+    const yJoinRequests = doc.getArray<JoinRequest>('joinRequests');
 
     const updateStateFromYDoc = () => {
       // Channels
@@ -304,6 +418,9 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         userMap.set(identity.pubkey, identity);
       }
       setPeerUsers(userMap);
+
+      // Join Requests
+      setJoinRequests(yJoinRequests.toArray());
     };
 
     persistence.on('synced', () => {
@@ -315,6 +432,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           DEFAULT_CHANNELS.forEach((ch) => {
             yChannels.set(ch.id, {
               ...ch,
+              workspaceId: activeWorkspace.id,
               creatorPubkey: identity.pubkey,
               created: Date.now(),
             });
@@ -326,8 +444,10 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
               id: 'msg_welcome_seed',
               channelId: 'chan_general',
               authorPubkey: identity.pubkey,
-              content: `👋 **Welcome to QuietSlack**!\n\nThis workspace is **100% serverless, private, and peer-to-peer**.\n- 🔒 State is persisted locally via **IndexedDB** & synchronized with **Yjs CRDTs**.\n- 🌐 Peer discovery is performed over public **Nostr signaling relays** with WebRTC data channels.\n- 🎙️ Launch an instant **Audio/Video Huddle** anytime via the call button in the header!\n- 🔗 Invite teammates by clicking **Invite Teammates** in the sidebar.`,
+              content: `👋 **Welcome to Open-Slack**!\n\nThis workspace is **100% serverless, private, and peer-to-peer**.\n- 🔒 State is persisted locally via **IndexedDB** & synchronized with **Yjs CRDTs**.\n- 🌐 Peer discovery is performed over public **Nostr signaling relays** with WebRTC data channels.\n- 💬 Rich @mentions, threaded discussions, and unread notification alerts.\n- 🎙️ Launch an instant **Audio/Video Huddle** anytime via the call button in the header!\n- 🔗 Invite teammates by clicking **Invite Teammates** in the sidebar.`,
               timestamp: Date.now(),
+              createdAt: new Date().toISOString(),
+              mentions: ['@channel'],
               reactions: { '🎉': [identity.pubkey], '🚀': [identity.pubkey] },
             },
           ]);
@@ -343,10 +463,12 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     });
 
     // Observer on YDoc mutations
-    const observer = (_event: any, transaction: any) => {
+    const observer = (event: any, transaction: any) => {
       updateStateFromYDoc();
       if (transaction?.origin === 'p2p_network') {
-        playSound.received();
+        if (preferences.soundEnabled && !isDNDActive(preferences)) {
+          playSound.received();
+        }
       }
     };
 
@@ -354,6 +476,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     yMessages.observe(observer);
     yReactions.observe(observer);
     yUsers.observe(observer);
+    yJoinRequests.observe(observer);
 
     // 3. Connect to P2P Network
     p2pNetwork.joinWorkspace(
@@ -442,6 +565,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       yMessages.unobserve(observer);
       yReactions.unobserve(observer);
       yUsers.unobserve(observer);
+      yJoinRequests.unobserve(observer);
       p2pNetwork.leaveWorkspace();
       persistence.destroy();
       doc.destroy();
@@ -453,7 +577,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     return channels.find((c) => c.id === activeChannelId) || channels[0] || null;
   }, [channels, activeChannelId]);
 
-  // Merge messages with reactions and thread reply counts
+  // Merge messages with reactions, mentions, and thread reply counts
   const messages = useMemo(() => {
     const threadCounts = new Map<string, { count: number; lastTime: number }>();
     rawMessages.forEach((m) => {
@@ -473,12 +597,30 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         return {
           ...m,
           replyCount: threadInfo ? threadInfo.count : 0,
+          threadReplyCount: threadInfo ? threadInfo.count : 0,
           lastReplyTimestamp: threadInfo ? threadInfo.lastTime : undefined,
+          lastThreadReplyAt: threadInfo ? new Date(threadInfo.lastTime).toISOString() : undefined,
           reactions: rawReactions[m.id] || m.reactions || {},
         };
       })
       .sort((a, b) => a.timestamp - b.timestamp);
   }, [rawMessages, rawReactions, activeChannelId]);
+
+  // Calculate unread mentions per channel & overall
+  const channelsWithCounts = useMemo(() => {
+    if (!identity) return channels;
+    return channels.map((ch) => {
+      const channelMsgs = rawMessages.filter((m) => m.channelId === ch.id);
+      const mentionMsgs = channelMsgs.filter(
+        (m) => m.authorPubkey !== identity.pubkey && isUserMentioned(m, identity.pubkey, identity.handle)
+      );
+      return {
+        ...ch,
+        unreadCount: channelMsgs.length > 0 ? channelMsgs.length : 0,
+        mentionCount: mentionMsgs.length,
+      };
+    });
+  }, [channels, rawMessages, identity]);
 
   // Active Thread Parent message
   const activeThreadParent = useMemo(() => {
@@ -540,16 +682,24 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   // Workspace Actions
-  const createWorkspace = async (name: string, passphrase?: string): Promise<Workspace> => {
+  const createWorkspace = async (
+    name: string,
+    passphrase?: string,
+    settings?: WorkspaceSettings
+  ): Promise<Workspace> => {
     if (!identity) throw new Error('Identity not ready');
     const wsPass = passphrase || generateWorkspacePassphrase();
     const id = `ws_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     const newWs: Workspace = {
       id,
       name,
+      slug: name.toLowerCase().replace(/[^a-z0-9]/g, '-'),
       passphrase: wsPass,
       created: Date.now(),
+      createdAt: new Date().toISOString(),
       ownerPubkey: identity.pubkey,
+      ownerId: identity.pubkey,
+      settings: settings || DEFAULT_WORKSPACE_SETTINGS,
       relays: DEFAULT_RELAYS,
     };
 
@@ -578,6 +728,64 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     });
   };
 
+  const updateWorkspaceSettings = (newSettings: WorkspaceSettings) => {
+    if (!activeWorkspace) return;
+    const updatedWs = { ...activeWorkspace, settings: newSettings };
+    saveAndJoinWorkspace(updatedWs, identity!);
+  };
+
+  // Join Requests Workflow
+  const submitJoinRequest = async (userName: string, userEmail: string, userRole?: string): Promise<JoinRequest> => {
+    if (!activeWorkspace || !identity || !ydocRef.current) {
+      throw new Error('Workspace or identity not available');
+    }
+    const request: JoinRequest = {
+      id: `req_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      workspaceId: activeWorkspace.id,
+      userId: identity.pubkey,
+      userName,
+      userEmail,
+      userRole: userRole || 'Member',
+      status: 'PENDING',
+      createdAt: new Date().toISOString(),
+    };
+
+    const yJoinRequests = ydocRef.current.getArray<JoinRequest>('joinRequests');
+    ydocRef.current.transact(() => {
+      yJoinRequests.push([request]);
+    });
+
+    return request;
+  };
+
+  const approveJoinRequest = (requestId: string) => {
+    if (!ydocRef.current) return;
+    const yJoinRequests = ydocRef.current.getArray<JoinRequest>('joinRequests');
+    const reqs = yJoinRequests.toArray();
+    const idx = reqs.findIndex((r) => r.id === requestId);
+    if (idx !== -1) {
+      const updated: JoinRequest = { ...reqs[idx], status: 'APPROVED' };
+      ydocRef.current.transact(() => {
+        yJoinRequests.delete(idx, 1);
+        yJoinRequests.insert(idx, [updated]);
+      });
+    }
+  };
+
+  const rejectJoinRequest = (requestId: string) => {
+    if (!ydocRef.current) return;
+    const yJoinRequests = ydocRef.current.getArray<JoinRequest>('joinRequests');
+    const reqs = yJoinRequests.toArray();
+    const idx = reqs.findIndex((r) => r.id === requestId);
+    if (idx !== -1) {
+      const updated: JoinRequest = { ...reqs[idx], status: 'REJECTED' };
+      ydocRef.current.transact(() => {
+        yJoinRequests.delete(idx, 1);
+        yJoinRequests.insert(idx, [updated]);
+      });
+    }
+  };
+
   // Channel Actions
   const createChannel = async (name: string, topic?: string, isPrivate = false): Promise<Channel> => {
     if (!identity || !ydocRef.current) throw new Error('Not ready');
@@ -585,6 +793,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const id = `chan_${Date.now()}_${cleanName}`;
     const newChan: Channel = {
       id,
+      workspaceId: activeWorkspace?.id,
       name: cleanName,
       topic: topic || '',
       isPrivate,
@@ -598,6 +807,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     });
 
     setActiveChannelId(id);
+    setMobileView('chat');
     return newChan;
   };
 
@@ -608,6 +818,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     );
     if (existing) {
       setActiveChannelId(existing.id);
+      setMobileView('chat');
       return existing;
     }
 
@@ -615,6 +826,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const id = `dm_${[identity.pubkey, peerPubkey].sort().join('_').slice(0, 24)}`;
     const newDm: Channel = {
       id,
+      workspaceId: activeWorkspace?.id,
       name: peer?.displayName || `DM with ${peerPubkey.slice(0, 6)}`,
       topic: `Direct Message with ${peer?.displayName || peerPubkey.slice(0, 6)}`,
       isPrivate: true,
@@ -630,14 +842,33 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     });
 
     setActiveChannelId(id);
+    setMobileView('chat');
     return newDm;
   };
 
   const selectChannel = (channelId: string) => {
     setActiveChannelId(channelId);
+    setMobileView('chat');
     if (rightPanel === 'thread') {
       setRightPanel('none');
     }
+  };
+
+  // Notifications API
+  const unreadNotificationCount = useMemo(() => {
+    return notifications.filter((n) => !n.isRead).length;
+  }, [notifications]);
+
+  const markNotificationAsRead = (id: string) => {
+    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)));
+  };
+
+  const markAllNotificationsAsRead = () => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+  };
+
+  const clearNotifications = () => {
+    setNotifications([]);
   };
 
   // Send Message
@@ -652,6 +883,11 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       ? rawMessages.find((m) => m.id === threadParentId)?.channelId || activeChannelId
       : activeChannelId;
 
+    // Automatically parse and extract mentions
+    const userList = Array.from(peerUsers.values());
+    if (identity) userList.push(identity);
+    const mentions = extractMentions(content, userList);
+
     // Cryptographic signature
     const signaturePayload = `${msgId}:${targetChannel}:${identity.pubkey}:${content}:${Date.now()}`;
     const signature = await signMessage(signaturePayload, keys.signPrivateKey);
@@ -659,9 +895,12 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const message: Message = {
       id: msgId,
       channelId: targetChannel,
+      senderId: identity.pubkey,
       authorPubkey: identity.pubkey,
       content,
+      mentions: mentions.length > 0 ? mentions : undefined,
       timestamp: Date.now(),
+      createdAt: new Date().toISOString(),
       attachments: attachments && attachments.length > 0 ? attachments : undefined,
       signature,
       threadParentId,
@@ -673,7 +912,9 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       yMessages.push([message]);
     });
 
-    playSound.sent();
+    if (preferences.soundEnabled) {
+      playSound.sent();
+    }
     p2pNetwork.broadcastTyping(targetChannel, false);
 
     return message;
@@ -704,7 +945,9 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       yReactions.set(messageId, nextRecord);
     });
 
-    playSound.pop();
+    if (preferences.soundEnabled) {
+      playSound.pop();
+    }
   };
 
   // Toggle Pin
@@ -714,7 +957,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const msgs = yMessages.toArray();
     const idx = msgs.findIndex((m) => m.id === messageId);
     if (idx !== -1) {
-      const updated = { ...msgs[idx], pinned: !msgs[idx].pinned };
+      const updated = { ...msgs[idx], pinned: !msgs[idx].pinned, isPinned: !msgs[idx].pinned };
       ydocRef.current.transact(() => {
         yMessages.delete(idx, 1);
         yMessages.insert(idx, [updated]);
@@ -745,16 +988,21 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const openThread = (message: Message) => {
     setActiveThreadParentId(message.id);
     setRightPanel('thread');
+    setMobileView('thread');
   };
 
   const closeThread = () => {
     setActiveThreadParentId(null);
     setRightPanel('none');
+    if (mobileView === 'thread') {
+      setMobileView('chat');
+    }
   };
 
   const openUserProfile = (user: UserIdentity) => {
     setInspectUser(user);
     setRightPanel('user_profile');
+    setMobileView('profile');
   };
 
   // Huddles (Voice / Video)
@@ -797,9 +1045,9 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         participants,
       });
 
-      playSound.huddleJoin();
+      if (preferences.soundEnabled) playSound.huddleJoin();
     } catch (err: any) {
-      console.warn('Microphone permission not available, starting voice-ready interface:', err);
+      console.warn('Microphone permission note, starting voice-ready interface:', err);
       const isDenied = err?.name === 'NotAllowedError' || err?.name === 'PermissionDeniedError';
       if (isDenied) {
         setMediaPermissionError('Microphone permission was denied. You joined the Huddle in listen-only mode.');
@@ -825,7 +1073,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         isScreenSharing: false,
         participants,
       });
-      playSound.huddleJoin();
+      if (preferences.soundEnabled) playSound.huddleJoin();
     }
   };
 
@@ -844,7 +1092,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       isScreenSharing: false,
       participants: new Map(),
     });
-    playSound.huddleLeave();
+    if (preferences.soundEnabled) playSound.huddleLeave();
   };
 
   const toggleHuddleMute = () => {
@@ -956,45 +1204,87 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       isOnline: true,
     };
 
+    const myHandle = identity?.handle || '@user';
     const dummyTexts = [
-      `Hey everyone! Testing the **Yjs CRDT** real-time sync in #${activeChannel.name}. It works flawlessly! 🚀`,
+      `Hey ${myHandle}! Testing the **Yjs CRDT** real-time sync in #${activeChannel.name}. It works flawlessly! 🚀`,
       `Did anyone check the WebRTC ICE candidates? The mesh connectivity is super responsive.`,
       `Awesome! End-to-end encryption with zero servers feels so liberating 🛡️`,
       `Here is a quick code snippet:\n\`\`\`ts\nconst p2p = new P2PNetwork();\nawait p2p.joinWorkspace("qs-alpha");\n\`\`\``,
+      `Hey @channel - reminder that today's design review is at 4pm UTC!`,
     ];
     const dummyText = dummyTexts[Math.floor(Math.random() * dummyTexts.length)];
+    const mentions = extractMentions(dummyText, [dummyUser, ...(identity ? [identity] : [])]);
 
     const yUsers = ydocRef.current.getMap<UserIdentity>('users');
     const yMessages = ydocRef.current.getArray<Message>('messages');
 
+    const newMsg: Message = {
+      id: `msg_sim_${Date.now()}`,
+      channelId: activeChannel.id,
+      senderId: dummyPubkey,
+      authorPubkey: dummyPubkey,
+      content: dummyText,
+      mentions: mentions.length > 0 ? mentions : undefined,
+      timestamp: Date.now(),
+      createdAt: new Date().toISOString(),
+      reactions: { '👍': [dummyPubkey] },
+    };
+
     ydocRef.current.transact(() => {
       yUsers.set(dummyPubkey, dummyUser);
-      yMessages.push([
-        {
-          id: `msg_sim_${Date.now()}`,
-          channelId: activeChannel.id,
-          authorPubkey: dummyPubkey,
-          content: dummyText,
-          timestamp: Date.now(),
-          reactions: { '👍': [dummyPubkey] },
-        },
-      ]);
+      yMessages.push([newMsg]);
     });
 
-    playSound.received();
+    // Create Notification if applicable
+    if (identity && isUserMentioned(newMsg, identity.pubkey, identity.handle)) {
+      const newNotif: AppNotification = {
+        id: `notif_${Date.now()}`,
+        workspaceId: activeWorkspace?.id || '',
+        recipientId: identity.pubkey,
+        actorId: dummyPubkey,
+        type: 'mention',
+        channelId: activeChannel.id,
+        messageId: newMsg.id,
+        contentSnippet: newMsg.content.slice(0, 80),
+        isRead: false,
+        createdAt: new Date().toISOString(),
+      };
+      setNotifications((prev) => [newNotif, ...prev]);
+
+      if (shouldNotify(newMsg, identity.pubkey, identity.handle, preferences)) {
+        showBrowserNotification(`Mention from ${dummy.name}`, {
+          body: newMsg.content,
+          onClick: () => {
+            selectChannel(activeChannel.id);
+          },
+        });
+      }
+    }
+
+    if (preferences.soundEnabled && !isDNDActive(preferences)) {
+      playSound.received();
+    }
   };
 
   const value: WorkspaceContextValue = {
     identity,
     keys,
+    preferences,
     updateProfile,
+    updatePreferences,
+    setDND,
     workspaces,
     activeWorkspace,
     createWorkspace,
     joinWorkspace,
     switchWorkspace,
     leaveWorkspace,
-    channels,
+    updateWorkspaceSettings,
+    joinRequests,
+    submitJoinRequest,
+    approveJoinRequest,
+    rejectJoinRequest,
+    channels: channelsWithCounts,
     activeChannel,
     selectChannel,
     createChannel,
@@ -1006,6 +1296,11 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     toggleReaction,
     togglePinMessage,
     deleteMessage,
+    notifications,
+    unreadNotificationCount,
+    markNotificationAsRead,
+    markAllNotificationsAsRead,
+    clearNotifications,
     typingUsers,
     setTyping,
     peerUsers,
@@ -1017,6 +1312,10 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     closeThread,
     inspectUser,
     openUserProfile,
+    showLandingPage,
+    setShowLandingPage,
+    mobileView,
+    setMobileView,
     searchQuery,
     setSearchQuery,
     isSearchOpen,

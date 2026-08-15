@@ -85,7 +85,6 @@ export const InviteModal: React.FC<InviteModalProps> = ({ isOpen, onClose }) => 
             </label>
             <div className="flex items-center gap-2">
               <input
-                id="invite-link-copy-input"
                 type="text"
                 readOnly
                 value={inviteUrl}

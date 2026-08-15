@@ -1,5 +1,8 @@
 import {
+  Bell,
+  BellOff,
   Check,
+  Clock,
   Copy,
   Database,
   Download,
@@ -12,12 +15,15 @@ import {
   Shield,
   Upload,
   User,
+  Volume2,
+  VolumeX,
   X,
   Zap,
 } from 'lucide-react';
 import React, { useState } from 'react';
 import { useWorkspace } from '../../context/WorkspaceContext';
 import { generateAvatarSvg } from '../../lib/crypto';
+import { isDNDActive, requestNotificationPermission } from '../../lib/notifications';
 import { DEFAULT_RELAYS } from '../../lib/p2p';
 
 interface UserSettingsModalProps {
@@ -25,7 +31,7 @@ interface UserSettingsModalProps {
   onClose: () => void;
 }
 
-type TabType = 'profile' | 'crypto' | 'network' | 'storage';
+type TabType = 'profile' | 'notifications' | 'crypto' | 'network' | 'storage';
 
 export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
   isOpen,
@@ -34,10 +40,14 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
   const {
     identity,
     keys,
+    preferences,
     updateProfile,
+    updatePreferences,
+    setDND,
     connectedPeerCount,
     relayStatus,
     activeWorkspace,
+    channels,
     simulatePeerMessage,
   } = useWorkspace();
 
@@ -51,6 +61,8 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
   const [savedSuccess, setSavedSuccess] = useState(false);
 
   if (!isOpen || !identity) return null;
+
+  const dndActive = isDNDActive(preferences);
 
   const handleSaveProfile = (e: React.FormEvent) => {
     e.preventDefault();
@@ -77,7 +89,7 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
       identity,
       keys,
       exportedAt: new Date().toISOString(),
-      app: 'QuietSlack',
+      app: 'Open-Slack',
     };
     const blob = new Blob([JSON.stringify(backup, null, 2)], {
       type: 'application/json',
@@ -85,7 +97,7 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `quietslack_identity_backup_${identity.pubkey.slice(0, 8)}.json`;
+    a.download = `openslack_identity_backup_${identity.pubkey.slice(0, 8)}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -102,8 +114,8 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="p-5 border-b border-neutral-200 flex items-center justify-between bg-neutral-50/50">
-          <h3 className="text-lg font-black text-neutral-900">Preferences & Security</h3>
+        <div className="p-5 border-b border-neutral-200 flex items-center justify-between bg-neutral-50/60">
+          <h3 className="text-base font-black text-neutral-900">Preferences & Settings</h3>
           <button
             id="close-settings-modal"
             type="button"
@@ -129,6 +141,20 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
             >
               <User className="w-4 h-4" />
               <span>Profile & Status</span>
+            </button>
+
+            <button
+              id="tab-notifications-btn"
+              type="button"
+              onClick={() => setActiveTab('notifications')}
+              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition text-left ${
+                activeTab === 'notifications'
+                  ? 'bg-neutral-900 text-white'
+                  : 'text-neutral-600 hover:bg-neutral-200/60'
+              }`}
+            >
+              <Bell className="w-4 h-4" />
+              <span>Notifications & DND</span>
             </button>
 
             <button
@@ -247,12 +273,136 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
                   <button
                     id="save-profile-btn"
                     type="submit"
-                    className="ml-auto px-4 py-2 bg-[#007a5a] hover:bg-[#148567] text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5"
+                    className="ml-auto px-4 py-2 bg-[#007a5a] hover:bg-[#148567] text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-xs"
                   >
                     <Save className="w-3.5 h-3.5" /> Save Changes
                   </button>
                 </div>
               </form>
+            )}
+
+            {/* NOTIFICATIONS TAB */}
+            {activeTab === 'notifications' && (
+              <div className="space-y-6">
+                {/* Do Not Disturb (DND) */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs font-bold uppercase tracking-wider text-neutral-700 flex items-center gap-1.5">
+                      <Clock className="w-4 h-4 text-amber-600" /> Do Not Disturb (DND)
+                    </div>
+                    {dndActive && (
+                      <span className="px-2 py-0.5 bg-amber-100 text-amber-800 text-[10px] font-bold rounded-full">
+                        ACTIVE UNTIL {new Date(preferences.dndUntil!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    )}
+                  </div>
+
+                  <p className="text-xs text-neutral-500">
+                    Pause all sound effects and desktop notification banners.
+                  </p>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setDND(30)}
+                      className="px-3 py-2 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 rounded-lg text-xs font-semibold transition text-center"
+                    >
+                      30 minutes
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDND(60)}
+                      className="px-3 py-2 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 rounded-lg text-xs font-semibold transition text-center"
+                    >
+                      1 hour
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDND(120)}
+                      className="px-3 py-2 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 rounded-lg text-xs font-semibold transition text-center"
+                    >
+                      2 hours
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDND(null)}
+                      className={`px-3 py-2 rounded-lg text-xs font-semibold transition text-center ${
+                        dndActive
+                          ? 'bg-amber-600 hover:bg-amber-700 text-white font-bold'
+                          : 'bg-neutral-100 text-neutral-400'
+                      }`}
+                    >
+                      {dndActive ? 'Turn Off DND' : 'Clear DND'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Sound & Audio Effects */}
+                <div className="space-y-3 pt-3 border-t border-neutral-200">
+                  <div className="text-xs font-bold uppercase tracking-wider text-neutral-700 flex items-center gap-1.5">
+                    <Volume2 className="w-4 h-4 text-blue-600" /> Sound Effects
+                  </div>
+
+                  <div className="p-4 bg-neutral-50 rounded-xl border border-neutral-200 flex items-center justify-between">
+                    <div>
+                      <div className="text-xs font-bold text-neutral-900">
+                        Enable synthesized audio cues
+                      </div>
+                      <div className="text-[11px] text-neutral-500">
+                        Plays Slack-like chimes on send, receive, reactions, and huddles.
+                      </div>
+                    </div>
+
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={preferences.soundEnabled}
+                        onChange={(e) => updatePreferences({ soundEnabled: e.target.checked })}
+                        className="sr-only peer"
+                      />
+                      <div className="w-9 h-5 bg-neutral-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-neutral-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#007a5a]"></div>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Desktop Notifications Preference */}
+                <div className="space-y-3 pt-3 border-t border-neutral-200">
+                  <div className="text-xs font-bold uppercase tracking-wider text-neutral-700 flex items-center gap-1.5">
+                    <Bell className="w-4 h-4 text-purple-600" /> Web Notifications
+                  </div>
+
+                  <div className="space-y-2">
+                    {[
+                      { id: 'all', label: 'All new messages', desc: 'Notify on every message in your channels' },
+                      { id: 'mentions_only', label: 'Direct mentions and @mentions only', desc: 'Only alert when you are explicitly tagged' },
+                      { id: 'none', label: 'Nothing', desc: 'Never dispatch desktop banners' },
+                    ].map((opt) => (
+                      <label
+                        key={opt.id}
+                        onClick={() => requestNotificationPermission()}
+                        className={`p-3 rounded-xl border flex items-start gap-3 cursor-pointer transition ${
+                          preferences.desktopNotifications === opt.id
+                            ? 'bg-blue-50/50 border-blue-300'
+                            : 'bg-neutral-50 border-neutral-200 hover:bg-neutral-100/60'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="desktopNotifications"
+                          value={opt.id}
+                          checked={preferences.desktopNotifications === opt.id}
+                          onChange={() => updatePreferences({ desktopNotifications: opt.id as any })}
+                          className="mt-0.5 text-[#1264A3]"
+                        />
+                        <div>
+                          <div className="text-xs font-bold text-neutral-900">{opt.label}</div>
+                          <div className="text-[11px] text-neutral-500">{opt.desc}</div>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </div>
             )}
 
             {/* CRYPTO TAB */}
@@ -382,7 +532,7 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
                       simulatePeerMessage();
                       onClose();
                     }}
-                    className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition flex items-center justify-center gap-2 shadow-xs"
+                    className="w-full py-2.5 bg-[#1264A3] hover:bg-[#0b4c80] text-white rounded-lg text-xs font-bold transition flex items-center justify-center gap-2 shadow-xs"
                   >
                     <Zap className="w-4 h-4" />
                     <span>Simulate Incoming Peer Message (P2P Test)</span>
