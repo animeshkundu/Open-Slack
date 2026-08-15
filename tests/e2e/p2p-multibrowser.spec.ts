@@ -7,7 +7,7 @@ test.describe('Multi-Browser P2P Interaction & CRDT Synchronization', () => {
       permissions: ['microphone', 'camera'],
     });
     const pageA = await contextA.newPage();
-    await pageA.goto('http://localhost:3000/');
+    await pageA.goto('/');
     await expect(pageA.locator('#openslack-root-shell')).toBeVisible();
 
     // 2. Open Invite Modal on Peer A and copy invite hash payload

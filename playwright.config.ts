@@ -1,6 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
 
 const deployedBaseURL = process.env.PLAYWRIGHT_BASE_URL;
+const previewBuild = process.env.PLAYWRIGHT_PREVIEW === 'true';
+const localBaseURL = previewBuild ? 'http://localhost:4173' : 'http://localhost:3000';
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -13,7 +15,7 @@ export default defineConfig({
     timeout: 15000,
   },
   use: {
-    baseURL: deployedBaseURL ?? 'http://localhost:3000',
+    baseURL: deployedBaseURL ?? localBaseURL,
     trace: 'on-first-retry',
     permissions: ['camera', 'microphone'],
     launchOptions: {
@@ -34,8 +36,10 @@ export default defineConfig({
   webServer: deployedBaseURL
     ? undefined
     : {
-        command: 'npm run dev',
-        url: 'http://localhost:3000',
+        command: previewBuild
+          ? 'npm run preview -- --host 0.0.0.0 --port 4173'
+          : 'npm run dev',
+        url: localBaseURL,
         reuseExistingServer: !process.env.CI,
         timeout: 120000,
       },
