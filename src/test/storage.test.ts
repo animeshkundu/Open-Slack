@@ -2,15 +2,21 @@ import { describe, expect, it } from 'vitest';
 import {
   autoPruneStorageIfExceeded,
   clearAllStoredFiles,
+  compressBuffer,
   deleteStoredFile,
+  deleteUserIdentityFromIndexedDB,
+  decompressBuffer,
   formatBytes,
   getAllStoredFiles,
   getMediaDB,
   getStorageQuotaEstimate,
   getStoredFile,
+  getUserIdentityFromIndexedDB,
   requestStoragePersistence,
+  saveUserIdentityToIndexedDB,
   storeLocalFile,
 } from '../lib/storage';
+import { UserIdentity } from '../types';
 
 describe('Storage Module & Storage Quotas', () => {
   it('formats bytes into human readable units', () => {
@@ -93,5 +99,41 @@ describe('Storage Module & Storage Quotas', () => {
 
     const prunedOver = await autoPruneStorageIfExceeded(0); // force threshold
     expect(typeof prunedOver).toBe('number');
+  });
+
+  it('compresses repetitive data and decompresses it losslessly', async () => {
+    const input = new TextEncoder().encode('repeated content '.repeat(200));
+    const result = await compressBuffer(input);
+    expect(result.isCompressed).toBe(true);
+    const restored = await decompressBuffer(result.compressed);
+    expect(new Uint8Array(restored)).toEqual(input);
+
+    const tiny = await compressBuffer(new Uint8Array([1, 2, 3]));
+    expect(tiny.isCompressed).toBe(false);
+  });
+
+  it('persists and removes the current user identity in IndexedDB', async () => {
+    const identity: UserIdentity = {
+      pubkey: 'identity-pubkey',
+      enc_pubkey: 'identity-enc-pubkey',
+      displayName: 'Identity User',
+      handle: '@identity',
+      avatarUrl: '',
+      status: 'online',
+      lastSeen: Date.now(),
+      color: '#1264a3',
+      isOnline: true,
+    };
+    const keys = {
+      signPublicKey: 'sign-public',
+      signPrivateKey: 'sign-private',
+      encPublicKey: 'enc-public',
+      encPrivateKey: 'enc-private',
+    };
+
+    expect(await saveUserIdentityToIndexedDB(identity, keys)).toBe(true);
+    await expect(getUserIdentityFromIndexedDB()).resolves.toEqual({ identity, keys });
+    expect(await deleteUserIdentityFromIndexedDB()).toBe(true);
+    await expect(getUserIdentityFromIndexedDB()).resolves.toBeNull();
   });
 });

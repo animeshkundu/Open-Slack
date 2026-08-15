@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   extractMentions,
+  generateHandleFromName,
   getMentionSuggestions,
   isUserMentioned,
   SPECIAL_MENTIONS,
@@ -71,5 +72,27 @@ describe('Mentions Engine', () => {
 
     const emptySuggestions = getMentionSuggestions('', mockUsers);
     expect(emptySuggestions.length).toBe(SPECIAL_MENTIONS.length + mockUsers.length);
+  });
+
+  it('generates clean handles and resolves collisions deterministically', () => {
+    expect(generateHandleFromName('Alice')).toBe('@alice');
+    expect(generateHandleFromName('Alice Smith')).toBe('@alice.smith');
+    expect(generateHandleFromName('!!!')).toBe('@user');
+    expect(generateHandleFromName('Alice Smith', ['@alice.smith'])).toBe('@a.smith');
+    expect(
+      generateHandleFromName('Alice Smith', ['@alice.smith', '@a.smith'])
+    ).toBe('@ali.smith');
+    expect(
+      generateHandleFromName('Alice Smith', ['@alice.smith', '@a.smith', '@ali.smith'])
+    ).toBe('@alice.s');
+    expect(
+      generateHandleFromName('Alice Smith', [
+        '@alice.smith',
+        '@a.smith',
+        '@ali.smith',
+        '@alice.s',
+        '@alice.smith2',
+      ])
+    ).toBe('@alice.smith3');
   });
 });

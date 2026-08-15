@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   bufferToHex,
   decryptAESGCM,
+  deriveUniqueHandle,
   deriveECDHSharedSecret,
   deriveKeyFromPassphrase,
   encryptAESGCM,
@@ -137,5 +138,16 @@ describe('Crypto Module', () => {
     expect(pass1).toBeTruthy();
     expect(pass1).toContain('-');
     expect(pass1).not.toBe(pass2);
+  });
+
+  it('derives stable handles from names and public keys', () => {
+    expect(deriveUniqueHandle('Alice Smith', 'abc123')).toBe('@alice.smith.abc1');
+    expect(deriveUniqueHandle('Alice')).toBe('@alice');
+    expect(deriveUniqueHandle('!!!')).toBe('@user');
+  });
+
+  it('returns safe failure values for invalid signatures', async () => {
+    expect(await signMessage('message', 'not-json')).toBe('');
+    expect(await verifySignature('message', 'not-hex', 'not-json')).toBe(false);
   });
 });
