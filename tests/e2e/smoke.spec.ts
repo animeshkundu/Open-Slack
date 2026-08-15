@@ -33,7 +33,8 @@ test.describe('Open Slack Smoke & Core UI Suite', () => {
     }
 
     // Open Search modal via Ctrl+K trigger button
-    await page.locator('#header-search-bar-trigger').click();
+    const searchTrigger = page.locator('#header-search-bar-trigger:visible, #mobile-header-search-btn:visible').first();
+    await searchTrigger.click();
     await expect(page.locator('#search-modal-card')).toBeVisible();
     await expect(page.locator('#search-modal-input')).toBeVisible();
 
