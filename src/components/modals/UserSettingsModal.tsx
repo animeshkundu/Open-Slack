@@ -51,7 +51,6 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
     setDND,
     connectedPeerCount,
     relayStatus,
-    simulatePeerMessage,
   } = useWorkspace();
 
   const [activeTab, setActiveTab] = useState<TabType>('profile');
@@ -942,43 +941,40 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
               </div>
             )}
 
-            {/* 6. STORAGE & TESTS TAB */}
+            {/* 6. STORAGE & LOCAL DATA TAB */}
             {activeTab === 'storage' && (
               <div className="space-y-4">
-                <div className="p-4 bg-neutral-50 border border-neutral-200 rounded-lg space-y-2">
+                <div className="p-4 bg-neutral-50 border border-neutral-200 rounded-lg space-y-3">
                   <div className="flex items-center justify-between text-xs">
                     <span className="font-semibold text-neutral-700">
-                      Storage Engine:
+                      Storage Architecture:
                     </span>
                     <span className="font-mono font-bold text-neutral-900">
-                      IndexedDB + Yjs CRDT + OPFS
+                      IndexedDB + Yjs CRDT
                     </span>
                   </div>
                   <div className="flex items-center justify-between text-xs">
                     <span className="font-semibold text-neutral-700">
-                      Offline Mode:
+                      Offline Mode & Local Cache:
                     </span>
                     <span className="font-bold text-emerald-600">
-                      100% Fully Capable
+                      100% Client-Side & Private
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-semibold text-neutral-700">
+                      Zero Central Servers:
+                    </span>
+                    <span className="font-medium text-neutral-600">
+                      Data resides strictly in your browser and connected peers
                     </span>
                   </div>
                 </div>
 
-                <div className="pt-2">
-                  <button
-                    id="simulate-peer-action-btn"
-                    type="button"
-                    onClick={() => {
-                      simulatePeerMessage();
-                      onClose();
-                    }}
-                    className="w-full py-2.5 bg-[#1264A3] hover:bg-[#0b4c80] text-white rounded-lg text-xs font-bold transition flex items-center justify-center gap-2 shadow-xs cursor-pointer"
-                  >
-                    <Zap className="w-4 h-4" />
-                    <span>Simulate Incoming Peer Message (P2P Test)</span>
-                  </button>
-                  <p className="text-[11px] text-neutral-500 text-center mt-1.5">
-                    Spawns a mock peer CRDT transaction to test notifications and state merge.
+                <div className="p-4 bg-amber-50/50 border border-amber-200/60 rounded-lg text-xs text-neutral-700 space-y-1">
+                  <p className="font-bold text-amber-900">Local-First Storage Guarantee</p>
+                  <p className="text-[11px] text-neutral-600 leading-relaxed">
+                    Open Slack stores all workspace messages, encrypted keys, threads, and attachments directly inside your browser storage using standard WebCrypto and IndexedDB. No messages are ever uploaded to cloud servers.
                   </p>
                 </div>
               </div>

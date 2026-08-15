@@ -36,6 +36,17 @@ export const SearchModal: React.FC = () => {
     return searchWorkspaceMessages(messages, channelMap, peerUsers, searchQuery);
   }, [messages, channelMap, peerUsers, searchQuery]);
 
+  React.useEffect(() => {
+    if (!isSearchOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsSearchOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isSearchOpen, setIsSearchOpen]);
+
   if (!isSearchOpen) return null;
 
   const handleSelectResult = (channelId: string, messageId: string, threadParentId?: string) => {
@@ -83,6 +94,15 @@ export const SearchModal: React.FC = () => {
               <X className="w-4 h-4" />
             </button>
           )}
+          <button
+            id="close-search-modal-btn"
+            type="button"
+            onClick={() => setIsSearchOpen(false)}
+            className="p-1.5 hover:bg-neutral-200 rounded-lg text-neutral-500 hover:text-neutral-800 transition"
+            title="Close (Esc)"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
         {/* Quick Filter suggestions */}

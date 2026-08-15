@@ -1,4 +1,11 @@
-export type ThemeName = 'aubergine' | 'nocturne' | 'ocin' | 'banana' | 'custom';
+export type ThemeName =
+  | 'aubergine'
+  | 'nocturne'
+  | 'ocin'
+  | 'banana'
+  | 'forest'
+  | 'monument'
+  | 'custom';
 
 export interface ThemeConfig {
   name: ThemeName;
@@ -18,12 +25,12 @@ export const PRESET_THEMES: Record<Exclude<ThemeName, 'custom'>, ThemeConfig> = 
   aubergine: {
     name: 'aubergine',
     label: 'Aubergine (Classic)',
-    sidebarBg: '#3F0E40',
+    sidebarBg: '#4A154B',
     sidebarText: '#BCABB6',
     sidebarTextActive: '#FFFFFF',
-    sidebarHover: '#350d36',
+    sidebarHover: '#3F0E40',
     activeItemBg: '#1164A3',
-    accentColor: '#007A5A',
+    accentColor: '#ECB22E',
     railBg: '#19171D',
     canvasBg: '#FFFFFF',
     canvasText: '#1D1C1D',
@@ -35,8 +42,8 @@ export const PRESET_THEMES: Record<Exclude<ThemeName, 'custom'>, ThemeConfig> = 
     sidebarText: '#D1D2D3',
     sidebarTextActive: '#FFFFFF',
     sidebarHover: '#222529',
-    activeItemBg: '#2C3136',
-    accentColor: '#1D9BD1',
+    activeItemBg: '#1264A3',
+    accentColor: '#E01E5A',
     railBg: '#121417',
     canvasBg: '#1A1D21',
     canvasText: '#D1D2D3',
@@ -44,12 +51,12 @@ export const PRESET_THEMES: Record<Exclude<ThemeName, 'custom'>, ThemeConfig> = 
   ocin: {
     name: 'ocin',
     label: 'Ocin (Deep Ocean Blue)',
-    sidebarBg: '#1A365D',
+    sidebarBg: '#19212D',
     sidebarText: '#CBD5E1',
     sidebarTextActive: '#FFFFFF',
-    sidebarHover: '#1E293B',
-    activeItemBg: '#2B6CB0',
-    accentColor: '#63B3ED',
+    sidebarHover: '#131B24',
+    activeItemBg: '#2D9CDB',
+    accentColor: '#F2994A',
     railBg: '#0F172A',
     canvasBg: '#FFFFFF',
     canvasText: '#1D1C1D',
@@ -57,15 +64,41 @@ export const PRESET_THEMES: Record<Exclude<ThemeName, 'custom'>, ThemeConfig> = 
   banana: {
     name: 'banana',
     label: 'Banana (Warm Yellow)',
-    sidebarBg: '#F6C445',
+    sidebarBg: '#F8E71C',
     sidebarText: '#4A3414',
-    sidebarTextActive: '#1A1102',
+    sidebarTextActive: '#000000',
     sidebarHover: '#EBB432',
-    activeItemBg: '#DFA31E',
-    accentColor: '#1264A3',
+    activeItemBg: '#4A90E2',
+    accentColor: '#D0021B',
     railBg: '#2C1A04',
     canvasBg: '#FFFDF5',
     canvasText: '#2C1A04',
+  },
+  forest: {
+    name: 'forest',
+    label: 'Forest (Evergreen)',
+    sidebarBg: '#1E3A2F',
+    sidebarText: '#A3C9B8',
+    sidebarTextActive: '#FFFFFF',
+    sidebarHover: '#152921',
+    activeItemBg: '#27AE60',
+    accentColor: '#F2C94C',
+    railBg: '#11221B',
+    canvasBg: '#FFFFFF',
+    canvasText: '#1D1C1D',
+  },
+  monument: {
+    name: 'monument',
+    label: 'Monument (Slate & Crimson)',
+    sidebarBg: '#2B2D42',
+    sidebarText: '#8D99AE',
+    sidebarTextActive: '#EDF2F4',
+    sidebarHover: '#202232',
+    activeItemBg: '#8D99AE',
+    accentColor: '#EF233C',
+    railBg: '#1C1D2B',
+    canvasBg: '#FFFFFF',
+    canvasText: '#2B2D42',
   },
 };
 

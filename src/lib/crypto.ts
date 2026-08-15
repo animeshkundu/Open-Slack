@@ -1,8 +1,8 @@
 import { StoredPrivateKeyPair, UserIdentity } from '../types';
 
 const STORAGE_KEYS = {
-  USER_IDENTITY: 'quietslack_user_identity',
-  CRYPTO_KEYS: 'quietslack_crypto_keys',
+  USER_IDENTITY: 'openslack_user_identity',
+  CRYPTO_KEYS: 'openslack_crypto_keys',
 };
 
 // Utility to convert ArrayBuffer or Uint8Array to hex
@@ -112,7 +112,7 @@ export async function generateCryptoKeypairs(): Promise<{
     displayName: randomName,
     handle: `@${handle}`,
     avatarUrl,
-    status: 'Exploring QuietSlack 🚀',
+    status: 'Exploring Open Slack 🚀',
     lastSeen: Date.now(),
     color,
     isOnline: true,

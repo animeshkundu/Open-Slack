@@ -1,11 +1,11 @@
 import { expect, test } from '@playwright/test';
 
-test.describe('QuietSlack Smoke & Core UI Suite', () => {
+test.describe('Open Slack Smoke & Core UI Suite', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('./');
   });
 
-  test('loads QuietSlack interface with primary elements', async ({ page }) => {
+  test('loads Open Slack interface with primary elements', async ({ page }) => {
     // Root shell
     await expect(page.locator('#openslack-root-shell')).toBeVisible();
 

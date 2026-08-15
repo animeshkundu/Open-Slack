@@ -87,7 +87,7 @@ export class P2PNetworkManager {
   private initTabLeaderElection() {
     try {
       if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
-        this.tabBroadcastChannel = new BroadcastChannel('quietslack_tab_bus');
+        this.tabBroadcastChannel = new BroadcastChannel('openslack_tab_bus');
         this.tabBroadcastChannel.onmessage = (event) => {
           const { type, data } = event.data || {};
           if (type === 'YJS_UPDATE' && this.ydoc && data) {
@@ -104,7 +104,7 @@ export class P2PNetworkManager {
       }
 
       if (typeof navigator !== 'undefined' && navigator.locks) {
-        navigator.locks.request('quietslack_master_lock', async () => {
+        navigator.locks.request('openslack_master_lock', async () => {
           this.isMasterTab = true;
           console.log('[P2P] Elected as Master Tab');
           return new Promise<void>(() => {});
@@ -142,14 +142,14 @@ export class P2PNetworkManager {
     this.currentWorkspaceId = workspaceId;
     this.currentRelays = relays.length > 0 ? relays : DEFAULT_RELAYS;
 
-    const roomId = `qs_${workspaceId.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 32)}`;
+    const roomId = `os_${workspaceId.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 32)}`;
 
     try {
       this.setStatus('connecting');
 
       this.room = joinRoom(
         {
-          appId: 'quietslack-p2p-v1',
+          appId: 'openslack-p2p-v1',
           relayConfig: {
             urls: this.currentRelays,
           },

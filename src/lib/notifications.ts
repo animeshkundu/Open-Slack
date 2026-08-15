@@ -85,7 +85,7 @@ export function showBrowserNotification(
     const notif = new Notification(title, {
       body: options.body || '',
       icon: options.icon || '/favicon.ico',
-      tag: options.tag || 'quietslack_notification',
+      tag: options.tag || 'openslack_notification',
     });
 
     if (options.onClick) {

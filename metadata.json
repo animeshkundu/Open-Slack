@@ -1,6 +1,6 @@
 {
-  "name": "QuietSlack",
-  "description": "100% serverless, local-first, peer-to-peer workspace messaging platform with WebRTC mesh, Nostr signaling, Ed25519 cryptography, and Yjs CRDTs.",
+  "name": "Open Slack",
+  "description": "100% serverless, local-first, peer-to-peer workspace messaging platform with WebRTC mesh, Nostr signaling, WebCrypto AES-GCM encryption, and collaborative workspace sync.",
   "requestFramePermissions": [
     "camera",
     "microphone"

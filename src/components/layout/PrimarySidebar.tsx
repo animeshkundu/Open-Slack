@@ -39,7 +39,6 @@ export const PrimarySidebar: React.FC<PrimarySidebarProps> = ({
     peerUsers,
     identity,
     setIsSearchOpen,
-    simulatePeerMessage,
     startOrJoinHuddle,
     huddleState,
     joinRequests,
@@ -161,7 +160,7 @@ export const PrimarySidebar: React.FC<PrimarySidebarProps> = ({
       </div>
 
       {/* Sidebar Navigation Tree */}
-      <div className="flex-1 overflow-y-auto p-2 space-y-4 dark-scrollbar">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden p-2 space-y-4 dark-scrollbar">
         {/* Pending Approvals alert pill if any */}
         {pendingApprovalsCount > 0 && (
           <button
@@ -376,20 +375,6 @@ export const PrimarySidebar: React.FC<PrimarySidebarProps> = ({
               </button>
             </div>
           )}
-        </div>
-
-        {/* Quick Simulation / Demo helper */}
-        <div className="pt-2 px-1">
-          <button
-            id="simulate-peer-quick-btn"
-            type="button"
-            onClick={simulatePeerMessage}
-            className="w-full py-1.5 px-2.5 bg-white/5 hover:bg-white/10 text-white/80 hover:text-white text-xs font-semibold rounded-lg transition flex items-center justify-center gap-1.5 border border-white/10 cursor-pointer"
-            title="Simulate peer activity for demo/testing"
-          >
-            <Zap className="w-3.5 h-3.5 text-amber-400" />
-            <span>Simulate Peer Message</span>
-          </button>
         </div>
       </div>
 

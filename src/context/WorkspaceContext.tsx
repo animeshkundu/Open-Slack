@@ -184,7 +184,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   // User Preferences
   const [preferences, setPreferences] = useState<UserPreferences>(() => {
     try {
-      const stored = localStorage.getItem('quietslack_user_preferences');
+      const stored = localStorage.getItem('openslack_user_preferences') || localStorage.getItem('quietslack_user_preferences');
       return stored ? { ...DEFAULT_PREFERENCES, ...JSON.parse(stored) } : DEFAULT_PREFERENCES;
     } catch {
       return DEFAULT_PREFERENCES;
@@ -209,7 +209,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   // Notifications
   const [notifications, setNotifications] = useState<AppNotification[]>(() => {
     try {
-      const stored = localStorage.getItem('quietslack_notifications');
+      const stored = localStorage.getItem('openslack_notifications') || localStorage.getItem('quietslack_notifications');
       return stored ? JSON.parse(stored) : [];
     } catch {
       return [];
@@ -280,7 +280,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   // Save notifications to storage
   useEffect(() => {
-    localStorage.setItem('quietslack_notifications', JSON.stringify(notifications.slice(0, 100)));
+    localStorage.setItem('openslack_notifications', JSON.stringify(notifications.slice(0, 100)));
   }, [notifications]);
 
   // Apply visual theme to DOM
@@ -307,13 +307,13 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
 
     // Default workspace initialization if no invite
-    const storedWorkspaces = localStorage.getItem('quietslack_workspaces');
+    const storedWorkspaces = localStorage.getItem('openslack_workspaces') || localStorage.getItem('quietslack_workspaces');
     if (storedWorkspaces) {
       try {
         const parsed = JSON.parse(storedWorkspaces) as Workspace[];
         if (parsed.length > 0) {
           setWorkspaces(parsed);
-          const lastActive = localStorage.getItem('quietslack_active_ws') || parsed[0].id;
+          const lastActive = localStorage.getItem('openslack_active_ws') || localStorage.getItem('quietslack_active_ws') || parsed[0].id;
           setActiveWorkspaceId(lastActive);
           return;
         }
@@ -346,11 +346,11 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setWorkspaces((prev) => {
       const exists = prev.some((w) => w.id === enrichedWs.id);
       const next = exists ? prev.map((w) => (w.id === enrichedWs.id ? enrichedWs : w)) : [...prev, enrichedWs];
-      localStorage.setItem('quietslack_workspaces', JSON.stringify(next));
+      localStorage.setItem('openslack_workspaces', JSON.stringify(next));
       return next;
     });
     setActiveWorkspaceId(enrichedWs.id);
-    localStorage.setItem('quietslack_active_ws', enrichedWs.id);
+    localStorage.setItem('openslack_active_ws', enrichedWs.id);
   };
 
   const activeWorkspace = useMemo(() => {
@@ -361,7 +361,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const updatePreferences = (updates: Partial<UserPreferences>) => {
     setPreferences((prev) => {
       const next = { ...prev, ...updates };
-      localStorage.setItem('quietslack_user_preferences', JSON.stringify(next));
+      localStorage.setItem('openslack_user_preferences', JSON.stringify(next));
       return next;
     });
   };
@@ -387,7 +387,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
     p2pNetwork.leaveWorkspace();
 
-    const docName = `quietslack_doc_${activeWorkspace.id}`;
+    const docName = `openslack_doc_${activeWorkspace.id}`;
     const doc = new Y.Doc();
     ydocRef.current = doc;
 
@@ -721,13 +721,13 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const switchWorkspace = (workspaceId: string) => {
     setActiveWorkspaceId(workspaceId);
-    localStorage.setItem('quietslack_active_ws', workspaceId);
+    localStorage.setItem('openslack_active_ws', workspaceId);
   };
 
   const leaveWorkspace = (workspaceId: string) => {
     setWorkspaces((prev) => {
       const filtered = prev.filter((w) => w.id !== workspaceId);
-      localStorage.setItem('quietslack_workspaces', JSON.stringify(filtered));
+      localStorage.setItem('openslack_workspaces', JSON.stringify(filtered));
       if (activeWorkspaceId === workspaceId && filtered.length > 0) {
         setActiveWorkspaceId(filtered[0].id);
       }

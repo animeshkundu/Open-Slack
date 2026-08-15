@@ -15,8 +15,9 @@ export interface UserPreferences {
   dndUntil?: string | null; // ISO string for Do Not Disturb timer
   mutedChannelIds: string[];
   channelNotificationOverrides: Record<string, 'all' | 'mentions' | 'mute'>;
-  themeName?: 'aubergine' | 'nocturne' | 'ocin' | 'banana' | 'custom';
+  themeName?: 'aubergine' | 'nocturne' | 'ocin' | 'banana' | 'forest' | 'monument' | 'custom';
   customTheme?: ThemeDefinition;
+  displayDensity?: 'clean' | 'compact';
 }
 
 export interface UserStatus {

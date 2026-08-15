@@ -23,10 +23,10 @@ export const WorkspaceBar: React.FC<WorkspaceBarProps> = ({
   return (
     <div
       id="workspace-rail-bar"
-      className="w-[68px] h-full bg-[#19171D] flex flex-col items-center py-4 flex-shrink-0 select-none z-20 border-r border-white/10"
+      className="w-[68px] h-full bg-[#19171D] flex flex-col items-center py-4 flex-shrink-0 select-none z-20 border-r border-white/10 overflow-hidden"
     >
       {/* Workspace Icons List */}
-      <div className="flex-1 w-full flex flex-col items-center space-y-4 overflow-y-auto dark-scrollbar">
+      <div className="flex-1 w-full flex flex-col items-center space-y-4 overflow-y-auto overflow-x-hidden no-scrollbar">
         {workspaces.map((ws) => {
           const isActive = ws.id === activeWorkspace?.id;
           const initials = ws.name

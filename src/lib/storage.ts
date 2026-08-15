@@ -1,7 +1,7 @@
 import { Attachment } from '../types';
 import { sha256 } from './crypto';
 
-const DB_NAME = 'quietslack_media_store';
+const DB_NAME = 'openslack_media_store';
 const STORE_NAME = 'media_files';
 const DB_VERSION = 1;
 
