@@ -25,7 +25,7 @@ export const MobileNavBar: React.FC = () => {
   return (
     <nav
       id="mobile-bottom-nav-bar"
-      className="md:hidden h-14 pb-[env(safe-area-inset-bottom)] bg-white border-t border-neutral-200 flex items-center justify-around px-2 z-30 flex-shrink-0"
+      className="md:hidden h-14 box-content pb-[env(safe-area-inset-bottom)] bg-white border-t border-neutral-200 flex items-center justify-around px-2 z-30 flex-shrink-0"
     >
       {/* Home (Sidebar / Channels) */}
       <button
