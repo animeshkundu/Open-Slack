@@ -11,6 +11,9 @@ Interactive controls should use real buttons or links, retain visible focus beha
 - **Desktop (`xl` and above / >= 1280px):** 4-column in-flow layout containing the workspace rail, fixed channel sidebar, message canvas (`flex-1 min-w-[380px]`), and optional right drawer (`w-96`).
 - **Tablet / Resized Desktop (768px to 1279px):** Workspace rail and sidebar are preserved while the right drawer opens as a floating slide-over overlay (`fixed md:absolute right-0 top-0 bottom-0 z-40 w-full sm:w-[420px] shadow-2xl`) with a backdrop, guaranteeing the main chat canvas never compresses below readable dimensions.
 - **Phone (below `md` / < 768px):** Single-view paradigm with full-width sidebar, chat canvas, or drawer view, backed by the bottom navigation bar (`MobileNavBar`) and top navigation back buttons.
+  - **Activity** is a first-class bottom-tab page (`mobileView === 'activity'`, `ActivityFeedDrawer variant="page"`) — the tab bar stays visible and tappable, matching Slack mobile.
+  - Right drawers on phone stop above the tab bar (`bottom-[calc(3.5rem+env(safe-area-inset-bottom))]`) so Threads / channel details never cover `MobileNavBar`.
+  - Sidebar **Invite people** sits under Channels & DMs (Slack placement). DM compose searches workspace members; empty state CTAs route to workspace invite rather than treating invite as a peer directory.
 
 Viewport-locked app surfaces use `100dvh`, `min-h-0`, and explicit nested overflow. The landing page remains normal document flow with vertical page scrolling and horizontal overflow clipped. Modal cards cap their height against the dynamic viewport and scroll their own content.
 

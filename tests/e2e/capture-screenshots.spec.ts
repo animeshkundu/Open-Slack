@@ -1,20 +1,6 @@
-import { expect, test, Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import * as fs from 'fs';
-import * as path from 'path';
-
-async function ensureOnboardingCompleted(page: Page) {
-  const onboardingInput = page.locator('#first-time-name-input');
-  try {
-    const isVisible = await onboardingInput.isVisible({ timeout: 3000 }).catch(() => false);
-    if (isVisible) {
-      await onboardingInput.fill('Alice Reviewer');
-      await page.locator('#first-time-submit-btn').click();
-      await expect(page.locator('#first-time-onboarding-overlay')).not.toBeVisible({ timeout: 5000 });
-    }
-  } catch {
-    // Proceed if onboarding was not displayed or already completed
-  }
-}
+import { ensureOnboardingCompleted, openWorkspace } from './helpers';
 
 test.describe('Pixel-Perfect Visual Screenshots Suite Across 3 Device Types', () => {
   const responsiveViewports = [
@@ -32,8 +18,7 @@ test.describe('Pixel-Perfect Visual Screenshots Suite Across 3 Device Types', ()
   test('captures full landing page across desktop and mobile', async ({ page }) => {
     // 1. Landing Page Desktop
     await page.setViewportSize({ width: 1440, height: 900 });
-    await page.goto('./');
-    await ensureOnboardingCompleted(page);
+    await openWorkspace(page);
     
     // Switch to landing page if in app view
     const wsMenuBtn = page.locator('#workspace-header-menu-btn');
@@ -52,9 +37,7 @@ test.describe('Pixel-Perfect Visual Screenshots Suite Across 3 Device Types', ()
   test('captures the responsive workspace shell in desktop, tablet, and mobile modes', async ({ page }) => {
     for (const viewport of responsiveViewports) {
       await page.setViewportSize({ width: viewport.width, height: viewport.height });
-      await page.goto('./');
-      await ensureOnboardingCompleted(page);
-      await expect(page.locator('#openslack-root-shell')).toBeVisible({ timeout: 10000 });
+      await openWorkspace(page);
       await page.screenshot({
         path: `screenshots/responsive-${viewport.name}-workspace.png`,
         fullPage: false,
@@ -73,9 +56,7 @@ test.describe('Pixel-Perfect Visual Screenshots Suite Across 3 Device Types', ()
   test('captures threads, drawer panels, and modals across desktop, tablet, and mobile', async ({ page }) => {
     // 1. Desktop 1440px
     await page.setViewportSize({ width: 1440, height: 900 });
-    await page.goto('./');
-    await ensureOnboardingCompleted(page);
-    await expect(page.locator('#openslack-root-shell')).toBeVisible({ timeout: 10000 });
+    await openWorkspace(page);
 
     // Main Chat View
     await page.screenshot({ path: 'screenshots/03-main-chat-view-desktop.png' });
@@ -100,9 +81,7 @@ test.describe('Pixel-Perfect Visual Screenshots Suite Across 3 Device Types', ()
 
     // 2. Tablet 1024px & Resized 850px Split-Desktop Mode
     await page.setViewportSize({ width: 1024, height: 768 });
-    await page.goto('./');
-    await ensureOnboardingCompleted(page);
-    await expect(page.locator('#openslack-root-shell')).toBeVisible({ timeout: 10000 });
+    await openWorkspace(page);
     await page.screenshot({ path: 'screenshots/07-tablet-main-chat.png' });
 
     // Open Threads on Tablet: verify slide-over backdrop and non-squished chat
@@ -117,9 +96,7 @@ test.describe('Pixel-Perfect Visual Screenshots Suite Across 3 Device Types', ()
 
     // 3. Mobile 390px
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto('./');
-    await ensureOnboardingCompleted(page);
-    await expect(page.locator('#openslack-root-shell')).toBeVisible({ timeout: 10000 });
+    await openWorkspace(page);
 
     // Mobile Chat
     await page.screenshot({ path: 'screenshots/10-mobile-chat-view.png' });
@@ -129,10 +106,32 @@ test.describe('Pixel-Perfect Visual Screenshots Suite Across 3 Device Types', ()
     await expect(page.locator('#primary-sidebar-container')).toBeVisible({ timeout: 5000 });
     await page.screenshot({ path: 'screenshots/11-mobile-sidebar-view.png' });
 
-    // Mobile Threads
+    // Mobile Activity tab — bottom nav must remain in frame
+    await page.locator('#mobile-nav-activity-btn').click();
+    await expect(page.locator('#mobile-activity-screen')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('#mobile-nav-bar')).toBeVisible();
+    await page.screenshot({ path: 'screenshots/12-mobile-activity-with-bottom-nav.png' });
+
+    // Mobile DMs tab + compose modal
+    await page.locator('#mobile-nav-dms-btn').click();
+    await expect(page.locator('#primary-sidebar-container')).toBeVisible({ timeout: 5000 });
+    await page.screenshot({ path: 'screenshots/13-mobile-dms-sidebar.png' });
+    await page.locator('#add-dm-inline-btn').click();
+    await expect(page.locator('#dm-modal-card')).toBeVisible({ timeout: 5000 });
+    await page.screenshot({ path: 'screenshots/14-mobile-dm-modal.png' });
+    await page.locator('#close-dm-modal').click();
+
+    // Invite people (Slack sidebar CTA)
+    await page.locator('#sidebar-invite-teammates-btn').click();
+    await expect(page.locator('#invite-modal-card')).toBeVisible({ timeout: 5000 });
+    await page.screenshot({ path: 'screenshots/15-mobile-invite-people.png' });
+    await page.locator('#close-invite-modal-btn').click();
+
+    // Mobile Threads (drawer sits above bottom nav)
     await page.locator('#quick-threads-btn').click();
     await expect(page.locator('#right-drawer-panel')).toBeVisible({ timeout: 5000 });
-    await page.screenshot({ path: 'screenshots/12-mobile-threads-view.png' });
+    await expect(page.locator('#mobile-nav-bar')).toBeVisible();
+    await page.screenshot({ path: 'screenshots/16-mobile-threads-view.png' });
     await page.locator('#close-all-threads-btn').click();
   });
 });

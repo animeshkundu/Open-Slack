@@ -14,9 +14,14 @@ import { useWorkspace } from '../../context/WorkspaceContext';
 
 interface ActivityFeedDrawerProps {
   onClose: () => void;
+  /** `page` = mobile bottom-tab surface (keep nav, hide drawer chrome) */
+  variant?: 'drawer' | 'page';
 }
 
-export const ActivityFeedDrawer: React.FC<ActivityFeedDrawerProps> = ({ onClose }) => {
+export const ActivityFeedDrawer: React.FC<ActivityFeedDrawerProps> = ({
+  onClose,
+  variant = 'drawer',
+}) => {
   const {
     notifications,
     markNotificationAsRead,
@@ -26,7 +31,10 @@ export const ActivityFeedDrawer: React.FC<ActivityFeedDrawerProps> = ({ onClose 
     peerUsers,
     channels,
     setRightPanel,
+    setMobileView,
   } = useWorkspace();
+
+  const isPage = variant === 'page';
 
   const handleNotificationClick = (notif: (typeof notifications)[0]) => {
     markNotificationAsRead(notif.id);
@@ -34,25 +42,33 @@ export const ActivityFeedDrawer: React.FC<ActivityFeedDrawerProps> = ({ onClose 
       selectChannel(notif.channelId);
     }
     setRightPanel('none');
+    setMobileView('chat');
   };
 
   return (
-    <div id="activity-feed-drawer" className="h-full flex flex-col bg-white">
+    <div
+      id="activity-feed-drawer"
+      data-testid="activity-feed-drawer"
+      data-variant={variant}
+      className="h-full min-h-0 flex flex-col bg-white"
+    >
       {/* Header */}
-      <div className="p-4 border-b border-neutral-200 flex items-center justify-between bg-neutral-50/70">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
+      <div className="p-4 border-b border-neutral-200 flex items-center justify-between bg-neutral-50/70 flex-shrink-0">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center font-bold flex-shrink-0">
             <Bell className="w-4 h-4" />
           </div>
-          <div>
-            <h3 className="text-sm font-black text-neutral-900">Activity & Mentions</h3>
+          <div className="min-w-0">
+            <h3 className="text-sm font-black text-neutral-900">
+              {isPage ? 'Activity' : 'Activity & Mentions'}
+            </h3>
             <p className="text-[11px] text-neutral-500">
               {notifications.length} notification{notifications.length === 1 ? '' : 's'}
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 flex-shrink-0">
           {notifications.length > 0 && (
             <>
               <button
@@ -75,14 +91,16 @@ export const ActivityFeedDrawer: React.FC<ActivityFeedDrawerProps> = ({ onClose 
               </button>
             </>
           )}
-          <button
-            id="close-activity-drawer-btn"
-            type="button"
-            onClick={onClose}
-            className="p-1.5 hover:bg-neutral-200 text-neutral-500 hover:text-neutral-900 rounded-lg transition"
-          >
-            <X className="w-4 h-4" />
-          </button>
+          {!isPage && (
+            <button
+              id="close-activity-drawer-btn"
+              type="button"
+              onClick={onClose}
+              className="p-1.5 hover:bg-neutral-200 text-neutral-500 hover:text-neutral-900 rounded-lg transition"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </div>
 

@@ -4,6 +4,10 @@ This is a concise, human-readable record of meaningful repository evolution. Det
 
 ## 2026-08-15
 
+- Fixed DM / group-chat persistence: conversations now use opaque channel IDs and member-set matching so starting a new chat never overwrites an existing one; leave is a soft member removal that preserves peer history.
+- Fixed mobile Activity screen swallowing the bottom tab bar — Activity is a true bottom-tab page surface, and phone right drawers sit above `MobileNavBar` (Slack mobile parity).
+- Aligned sidebar invite CTA with Slack labeling (`Invite people`) and linked the empty DM compose state to workspace invite (DMs search members; invites add people to the workspace).
+- Expanded unit coverage for multi-DM persistence and Playwright coverage for mobile Activity + bottom nav, multi-DM sidebar retention, and multi-device visual screenshots.
 - Refactored sidebar Direct Messages list to exclusively display active direct messages and group chats, matching Slack's organization model and removing confusing online peer lists from the left rail.
 - Fixed Group Chat Channel Details pane and Main Header to accurately compute channel-scoped member counts and participant rosters from `activeChannel.members`.
 - Added interactive "Leave Group Chat" and "Close Direct Message" capabilities in the Channel Info right drawer and sidebar quick actions with automatic channel fallback.

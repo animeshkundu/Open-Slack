@@ -202,7 +202,18 @@ export const PrimarySidebar: React.FC<PrimarySidebarProps> = ({
           <button
             id="quick-activity-btn"
             type="button"
-            onClick={() => setRightPanel(rightPanel === 'activity_feed' ? 'none' : 'activity_feed')}
+            onClick={() => {
+              // On phone, Activity is a bottom-tab surface — never cover MobileNavBar
+              // with the full-viewport right drawer.
+              const isPhone =
+                typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches;
+              if (isPhone) {
+                setRightPanel('none');
+                setMobileView('activity');
+                return;
+              }
+              setRightPanel(rightPanel === 'activity_feed' ? 'none' : 'activity_feed');
+            }}
             className={`w-full flex items-center justify-between px-3 py-1.5 rounded-md text-xs transition cursor-pointer ${
               rightPanel === 'activity_feed'
                 ? 'bg-black/30 text-white font-bold'
@@ -223,7 +234,16 @@ export const PrimarySidebar: React.FC<PrimarySidebarProps> = ({
           <button
             id="quick-threads-btn"
             type="button"
-            onClick={() => setRightPanel(rightPanel === 'thread' ? 'none' : 'thread')}
+            onClick={() => {
+              const isPhone =
+                typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches;
+              if (isPhone) {
+                setRightPanel('thread');
+                setMobileView('thread');
+                return;
+              }
+              setRightPanel(rightPanel === 'thread' ? 'none' : 'thread');
+            }}
             className={`w-full flex items-center justify-between px-3 py-1.5 rounded-md text-xs transition cursor-pointer ${
               rightPanel === 'thread'
                 ? 'bg-black/30 text-white font-bold'
@@ -462,16 +482,19 @@ export const PrimarySidebar: React.FC<PrimarySidebarProps> = ({
           )}
         </div>
 
-        {/* Slack-Style Invite Teammates Workspace Action */}
+        {/* Slack-style workspace invite — sits under Channels/DMs like Slack's sidebar CTA */}
         <div className="pt-2 border-t border-white/10">
           <button
             id="sidebar-invite-teammates-btn"
             type="button"
             onClick={onOpenInvite}
-            className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-md text-xs opacity-80 hover:opacity-100 hover:bg-black/15 hover:text-white transition cursor-pointer"
+            className="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-md text-xs font-semibold opacity-90 hover:opacity-100 hover:bg-black/15 hover:text-white transition cursor-pointer"
+            title="Invite people to this workspace"
           >
-            <UserPlus className="w-3.5 h-3.5 opacity-75" />
-            <span>Invite teammates</span>
+            <span className="w-5 h-5 rounded-md bg-white/10 flex items-center justify-center flex-shrink-0">
+              <UserPlus className="w-3.5 h-3.5 opacity-90" />
+            </span>
+            <span>Invite people</span>
           </button>
         </div>
       </div>

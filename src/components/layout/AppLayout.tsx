@@ -100,16 +100,20 @@ export const AppLayout: React.FC = () => {
           />
         </div>
 
-        {/* 2b. Mobile Activity Feed Screen (< 768px) */}
+        {/* 2b. Mobile Activity Feed Screen (< 768px) — bottom tab keeps MobileNavBar visible */}
         <div
           id="mobile-activity-screen"
+          data-testid="mobile-activity-screen"
           className={`${
             mobileView === 'activity' && rightPanel === 'none'
-              ? 'flex flex-1 w-full bg-white h-full md:hidden flex-col overflow-hidden min-h-0'
+              ? 'flex flex-1 w-full bg-white md:hidden flex-col overflow-hidden min-h-0'
               : 'hidden'
           }`}
         >
-          <ActivityFeedDrawer onClose={() => setMobileView('sidebar')} />
+          <ActivityFeedDrawer
+            variant="page"
+            onClose={() => setMobileView('sidebar')}
+          />
         </div>
 
         {/* 3. Main Center Canvas: Header + Message Stream + Rich Composer */}
@@ -210,6 +214,7 @@ export const AppLayout: React.FC = () => {
       <DirectMessageModal
         isOpen={isDMOpen}
         onClose={() => setIsDMOpen(false)}
+        onOpenInvite={() => setIsInviteOpen(true)}
       />
       <PendingApprovalsModal
         isOpen={isPendingApprovalsOpen}

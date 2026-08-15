@@ -79,17 +79,20 @@ export const RightDrawer: React.FC = () => {
 
   return (
     <>
-      {/* Backdrop for screens < xl (tablet, resized desktop) */}
+      {/* Backdrop for screens < xl (tablet, resized desktop).
+          On phone, stop above the bottom tab bar so MobileNavBar stays tappable. */}
       <div
         id="right-drawer-backdrop"
         onClick={() => setRightPanel('none')}
-        className="fixed inset-0 bg-black/25 z-30 xl:hidden transition-opacity"
+        className="fixed inset-x-0 top-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom,0px))] md:bottom-0 bg-black/25 z-30 xl:hidden transition-opacity"
       />
 
-      {/* Main Drawer Container */}
+      {/* Main Drawer Container
+          On phone, keep the panel above the bottom tab bar so Activity/Threads
+          and contextual drawers never swallow MobileNavBar (Slack tab parity). */}
       <div
         id="right-drawer-panel"
-        className="fixed md:absolute xl:relative right-0 top-0 bottom-0 z-40 xl:z-10 w-full sm:w-[420px] xl:w-96 border-l border-neutral-200 bg-white flex flex-col flex-shrink-0 shadow-2xl xl:shadow-none h-full overflow-hidden animate-in slide-in-from-right-2 duration-150"
+        className="fixed md:absolute xl:relative right-0 top-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom,0px))] md:bottom-0 z-40 xl:z-10 w-full sm:w-[420px] xl:w-96 border-l border-neutral-200 bg-white flex flex-col flex-shrink-0 shadow-2xl xl:shadow-none overflow-hidden animate-in slide-in-from-right-2 duration-150"
       >
         {/* THREAD VIEW */}
         {rightPanel === 'thread' && <ThreadView />}
