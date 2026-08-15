@@ -1,8 +1,10 @@
 import { expect, test } from '@playwright/test';
+import { ensureOnboardingCompleted } from './helpers';
 
 test.describe('Landing Page & Responsiveness Suite', () => {
   test('landing page is scrollable and displays all core marketing & architecture sections', async ({ page }) => {
     await page.goto('./');
+    await ensureOnboardingCompleted(page);
     
     // Switch to landing page if in app view
     const landingBtn = page.locator('#ws-menu-landing-page-btn');
@@ -16,7 +18,7 @@ test.describe('Landing Page & Responsiveness Suite', () => {
     await expect(landingContainer).toBeVisible();
 
     // Verify Hero Section
-    await expect(page.locator('#hero-launch-app-btn')).toBeVisible();
+    await expect(page.locator('#hero-create-workspace-btn')).toBeVisible();
     await expect(page.getByText('Explore Technical Docs')).toBeVisible();
 
     // Verify Interactive Showcase section exists
@@ -39,16 +41,19 @@ test.describe('Landing Page & Responsiveness Suite', () => {
     expect(landingScrollMetrics.scrollHeight).toBeGreaterThan(landingScrollMetrics.viewportHeight);
     expect(landingScrollMetrics.scrollWidth).toBeLessThanOrEqual(landingScrollMetrics.viewportWidth);
 
-    // Launch app from landing page
-    await page.locator('#hero-launch-app-btn').click();
-    await expect(page.locator('#openslack-root-shell')).toBeVisible();
+    // Open and dismiss the workspace setup flow from the landing page
+    await page.locator('#hero-create-workspace-btn').click();
+    await expect(page.getByTestId('onboarding-modal-card')).toBeVisible();
+    await page.locator('#close-onboarding-modal').click();
+    await expect(page.getByTestId('onboarding-modal-card')).not.toBeVisible();
+    await expect(page.locator('#open-slack-landing-page')).toBeVisible();
   });
 
   test('responsive layout adapts smoothly to Mobile (375px), Tablet (768px), and Desktop (1440px)', async ({ page }) => {
     // Desktop Viewport
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto('./');
-    await expect(page.locator('#openslack-root-shell')).toBeVisible();
+    await ensureOnboardingCompleted(page);
     await expect(page.locator('#workspace-rail-bar')).toBeVisible();
     await expect(page.locator('#primary-sidebar-container')).toBeVisible();
     await expect
@@ -64,7 +69,7 @@ test.describe('Landing Page & Responsiveness Suite', () => {
     // Mobile Viewport
     await page.setViewportSize({ width: 375, height: 667 });
     await expect(page.locator('#openslack-root-shell')).toBeVisible();
-    await expect(page.locator('#mobile-bottom-nav-bar')).toBeVisible();
+    await expect(page.locator('#mobile-nav-bar')).toBeVisible();
     await expect
       .poll(() =>
         page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)
@@ -73,8 +78,9 @@ test.describe('Landing Page & Responsiveness Suite', () => {
 
     await page.locator('#mobile-nav-home-btn').click();
     await expect(page.locator('#primary-sidebar-container')).toBeVisible();
-    await page.locator('#mobile-nav-chat-btn').click();
-    await page.locator('#channel-details-btn').click();
+    await page.locator('#mobile-nav-channels-btn').click();
+    await page.locator('#header-more-actions-btn').click();
+    await page.locator('#more-menu-details-btn').click();
     await expect(page.locator('#right-drawer-panel')).toBeVisible();
     await expect
       .poll(() =>

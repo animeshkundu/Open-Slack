@@ -1,14 +1,9 @@
 import { expect, test } from '@playwright/test';
+import { openWorkspace } from './helpers';
 
 test.describe('Leave Channels/DMs and Slack Toast Notifications Suite', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('./');
-    const onboardingName = page.locator('#first-time-name-input');
-    if (await onboardingName.isVisible({ timeout: 1500 }).catch(() => false)) {
-      await onboardingName.fill('Test Automator');
-      await page.locator('#first-time-submit-btn').click();
-    }
-    await expect(page.locator('#openslack-root-shell')).toBeVisible();
+    await openWorkspace(page, 'Test Automator');
   });
 
   test('creates a private channel and successfully leaves it', async ({ page }) => {
@@ -21,7 +16,8 @@ test.describe('Leave Channels/DMs and Slack Toast Notifications Suite', () => {
     // 2. Fill details and toggle Private
     await page.locator('#channel-name-input').fill(channelName);
     await page.locator('#channel-topic-input').fill('Confidential workspace discussions');
-    await page.locator('#channel-private-toggle-btn').click();
+    // Toggle is a visually hidden checkbox — click the peer track div / label
+    await page.locator('label:has(#channel-private-toggle)').click();
     await page.locator('#submit-create-channel-btn').click();
 
     // 3. Verify channel created and active
@@ -42,62 +38,68 @@ test.describe('Leave Channels/DMs and Slack Toast Notifications Suite', () => {
   test('starts a direct message and successfully leaves / closes it', async ({ page }) => {
     // 1. Open DM Modal
     await page.locator('#add-dm-inline-btn').click();
-    await expect(page.locator('#direct-message-modal-card')).toBeVisible();
+    await expect(page.locator('#dm-modal-card')).toBeVisible();
 
-    // 2. Select peer or custom member
-    const firstPeer = page.locator('[id^="dm-peer-"]').first();
+    // 2. Select peer or start via manual pubkey (solo browser has no peers)
+    const firstPeer = page.locator('[id^="dm-user-"]').first();
     if (await firstPeer.isVisible()) {
       await firstPeer.click();
       await page.locator('#start-dm-btn').click();
-
-      await expect(page.locator('#direct-message-modal-card')).not.toBeVisible();
-      // Verify DM header
-      await expect(page.locator('#main-channel-header')).toBeVisible();
-
-      // Find DM leave button in sidebar
-      const dmLeaveBtn = page.locator('[id^="leave-dm-btn-"]').first();
-      if (await dmLeaveBtn.isVisible()) {
-        await dmLeaveBtn.click({ force: true });
-        // Fallback to general
-        await expect(page.locator('#main-channel-header')).toContainText('general');
-      }
     } else {
-      // Close DM modal if empty test env
-      await page.locator('#close-dm-modal-btn').click();
-      await expect(page.locator('#direct-message-modal-card')).not.toBeVisible();
+      await page.locator('#dm-modal-card input[placeholder*="public key"]').fill(
+        'b1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4'
+      );
+      await page.locator('#dm-modal-card button:has-text("Start DM")').click();
     }
+
+    await expect(page.locator('#dm-modal-card')).not.toBeVisible();
+    await expect(page.locator('#main-channel-header')).toBeVisible();
+    await expect(page.locator('[id^="sidebar-dm-"]').first()).toBeVisible();
+
+    // 3. Close / leave the DM and fall back to general
+    const dmLeaveBtn = page.locator('[id^="leave-dm-btn-"]').first();
+    await dmLeaveBtn.click({ force: true });
+    await expect(page.locator('#main-channel-header')).toContainText('general');
+  });
+
+  test('starting multiple DMs keeps every conversation in the sidebar', async ({ page }) => {
+    const peers = [
+      'aa111111111111111111111111111111',
+      'bb222222222222222222222222222222',
+      'cc333333333333333333333333333333',
+    ];
+
+    for (const peer of peers) {
+      await page.locator('#add-dm-inline-btn').click();
+      await expect(page.locator('#dm-modal-card')).toBeVisible();
+      await page.locator('#dm-modal-card input[placeholder*="public key"]').fill(peer);
+      await page.locator('#dm-modal-card button:has-text("Start DM")').click();
+      await expect(page.locator('#dm-modal-card')).not.toBeVisible();
+      await expect(page.locator('#main-channel-header')).toBeVisible();
+    }
+
+    // All three DMs remain listed — starting a new one must not replace prior chats
+    await expect(page.locator('[id^="sidebar-dm-"]')).toHaveCount(3);
   });
 
   test('verifies direct message and channel info pane with leave action', async ({ page }) => {
-    // 1. Open DM Modal
+    // 1. Open DM Modal and start a conversation via pubkey
     await page.locator('#add-dm-inline-btn').click();
-    await expect(page.locator('#direct-message-modal-card')).toBeVisible();
+    await expect(page.locator('#dm-modal-card')).toBeVisible();
+    await page.locator('#dm-modal-card input[placeholder*="public key"]').fill(
+      'ee444444444444444444444444444444'
+    );
+    await page.locator('#dm-modal-card button:has-text("Start DM")').click();
+    await expect(page.locator('#dm-modal-card')).not.toBeVisible();
+    await expect(page.locator('#main-channel-header')).toBeVisible();
 
-    // 2. Select peer or custom member
-    const firstPeer = page.locator('[id^="dm-peer-"]').first();
-    if (await firstPeer.isVisible()) {
-      await firstPeer.click();
-      await page.locator('#start-dm-btn').click();
+    // Open Channel/DM Details in Right Drawer
+    await page.locator('#channel-details-btn').click();
+    await expect(page.locator('#right-drawer-panel')).toBeVisible();
+    await expect(page.getByText(/Members \(\d+\)/)).toBeVisible();
 
-      await expect(page.locator('#direct-message-modal-card')).not.toBeVisible();
-      // Verify DM header
-      await expect(page.locator('#main-channel-header')).toBeVisible();
-
-      // Open Channel/DM Details in Right Drawer
-      await page.locator('#channel-details-btn').click();
-      await expect(page.locator('#right-drawer-panel')).toBeVisible();
-      await expect(page.getByText(/Members \(\d+\)/)).toBeVisible();
-
-      // Leave conversation via drawer
-      const leaveDrawerBtn = page.locator('#leave-conversation-drawer-btn');
-      if (await leaveDrawerBtn.isVisible()) {
-        await leaveDrawerBtn.click();
-        await expect(page.locator('#main-channel-header')).toContainText('general');
-      }
-    } else {
-      // Close DM modal if empty test env
-      await page.locator('#close-dm-modal-btn').click();
-      await expect(page.locator('#direct-message-modal-card')).not.toBeVisible();
-    }
+    // Leave conversation via drawer
+    await page.locator('#leave-conversation-drawer-btn').click();
+    await expect(page.locator('#main-channel-header')).toContainText('general');
   });
 });

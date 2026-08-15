@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { isDNDActive, shouldNotify, showBrowserNotification } from '../lib/notifications';
+import {
+  isDNDActive,
+  requestNotificationPermission,
+  shouldNotify,
+  showBrowserNotification,
+} from '../lib/notifications';
 import { Message, UserPreferences } from '../types';
 
 describe('Notifications & DND Logic', () => {
@@ -122,5 +127,35 @@ describe('Notifications & DND Logic', () => {
 
     expect(showBrowserNotification('Blocked')).toBeNull();
     expect(NotificationMock).not.toHaveBeenCalled();
+  });
+
+  it('requests notification permission when the API is available', async () => {
+    const requestPermission = vi.fn().mockResolvedValue('granted');
+    Object.defineProperty(window, 'Notification', {
+      configurable: true,
+      value: Object.assign(vi.fn(), { permission: 'default', requestPermission }),
+    });
+
+    await expect(requestNotificationPermission()).resolves.toBe('granted');
+    expect(requestPermission).toHaveBeenCalledOnce();
+  });
+
+  it('handles notification API failures safely', async () => {
+    class ThrowingNotification {
+      static permission = 'granted';
+      static requestPermission = vi.fn().mockRejectedValue(new Error('denied'));
+
+      constructor() {
+        throw new Error('unsupported');
+      }
+    }
+
+    Object.defineProperty(window, 'Notification', {
+      configurable: true,
+      value: ThrowingNotification,
+    });
+
+    await expect(requestNotificationPermission()).resolves.toBe('denied');
+    expect(showBrowserNotification('Broken')).toBeNull();
   });
 });

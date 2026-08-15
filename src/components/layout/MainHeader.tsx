@@ -142,6 +142,16 @@ export const MainHeader: React.FC<MainHeaderProps> = ({ onOpenInvite }) => {
   const unreadNotifs = notifications.filter((n) => !n.isRead).length;
 
   const togglePanel = (panel: 'channel_details' | 'pinned' | 'activity_feed') => {
+    const isPhone =
+      typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches;
+
+    // Activity is a primary mobile tab — route there so the bottom bar stays visible
+    if (panel === 'activity_feed' && isPhone) {
+      setRightPanel('none');
+      setMobileView('activity');
+      return;
+    }
+
     if (rightPanel === panel) {
       setRightPanel('none');
     } else {

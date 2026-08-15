@@ -5,11 +5,13 @@ import { useWorkspace } from '../../context/WorkspaceContext';
 interface DirectMessageModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onOpenInvite?: () => void;
 }
 
 export const DirectMessageModal: React.FC<DirectMessageModalProps> = ({
   isOpen,
   onClose,
+  onOpenInvite,
 }) => {
   const { peerUsers, identity, openDirectMessage } = useWorkspace();
   const [searchTerm, setSearchTerm] = useState('');
@@ -190,8 +192,28 @@ export const DirectMessageModal: React.FC<DirectMessageModalProps> = ({
               );
             })
           ) : (
-            <div className="text-center py-6 text-xs text-neutral-400">
-              No discovered teammates yet. Invite peers or enter a public key below.
+            <div className="text-center py-6 px-4 space-y-3">
+              <div className="text-xs text-neutral-500 leading-relaxed">
+                No workspace members online yet. In Slack, DMs search people already in the
+                workspace — invite teammates first, then start a conversation.
+              </div>
+              {onOpenInvite && (
+                <button
+                  id="dm-modal-invite-cta"
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onOpenInvite();
+                  }}
+                  className="inline-flex items-center justify-center gap-1.5 px-3 py-2 bg-[#4A154B] hover:bg-[#611f69] text-white rounded-lg text-xs font-bold transition cursor-pointer"
+                >
+                  <User className="w-3.5 h-3.5" />
+                  Invite people to workspace
+                </button>
+              )}
+              <p className="text-[11px] text-neutral-400">
+                Or paste a peer public key fingerprint below.
+              </p>
             </div>
           )}
         </div>

@@ -1,9 +1,10 @@
 import { expect, test } from '@playwright/test';
+import { ensureOnboardingCompleted } from './helpers';
 
 test.describe('Secondary workspace flows', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('./');
-    await expect(page.locator('#openslack-root-shell')).toBeVisible();
+    await ensureOnboardingCompleted(page);
   });
 
   test('creates a channel and makes it the active conversation', async ({ page }) => {
@@ -24,7 +25,7 @@ test.describe('Secondary workspace flows', () => {
     await page.locator('#workspace-header-menu-btn').click();
     await page.locator('#ws-menu-invite-btn').click();
     await expect(page.locator('#invite-modal-card')).toBeVisible();
-    await expect(page.locator('#invite-link-input')).toHaveValue(/\/#invite=.+$/);
+    await expect(page.locator('#invite-link-input')).toHaveValue(/\/app#invite=.+$/);
     await page.locator('#close-invite-modal-btn').click();
 
     await page.locator('#workspace-header-menu-btn').click();
@@ -50,7 +51,11 @@ test.describe('Secondary workspace flows', () => {
     await page.locator('#workspace-header-menu-btn').click();
     await page.locator('#ws-menu-landing-page-btn').click();
     await expect(page.locator('#open-slack-landing-page')).toBeVisible();
-    await page.locator('#hero-launch-app-btn').click();
+    await page.locator('#hero-create-workspace-btn').click();
+    await expect(page.getByTestId('onboarding-modal-card')).toBeVisible();
+    await page.locator('#landing-user-name-input').fill('Landing Flow Tester');
+    await page.locator('#step1-next-btn').click();
+    await page.locator('#submit-create-workspace-btn').click();
     await expect(page.locator('#openslack-root-shell')).toBeVisible();
   });
 });

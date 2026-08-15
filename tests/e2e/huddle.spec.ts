@@ -1,9 +1,10 @@
 import { expect, test } from '@playwright/test';
+import { ensureOnboardingCompleted } from './helpers';
 
 test.describe('Huddle Audio/Video Call Flow', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('./');
-    await expect(page.locator('#openslack-root-shell')).toBeVisible();
+    await ensureOnboardingCompleted(page);
   });
 
   test('can start, minimize to floating dock, toggle audio/video, and leave huddle', async ({ page }) => {

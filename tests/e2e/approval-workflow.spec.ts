@@ -1,9 +1,10 @@
 import { expect, test } from '@playwright/test';
+import { ensureOnboardingCompleted } from './helpers';
 
 test.describe('Workspace Invites & Admin Approval Workflow Suite', () => {
   test('creates a workspace requiring approval, submits request, and processes review modal', async ({ page }) => {
     await page.goto('./');
-    await expect(page.locator('#openslack-root-shell')).toBeVisible();
+    await ensureOnboardingCompleted(page);
 
     // 1. Open Workspace Bar / Create Modal
     await page.locator('#workspace-header-menu-btn').click();

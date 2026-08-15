@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { ensureOnboardingCompleted } from './helpers';
 
 test.describe('Multi-Browser P2P Interaction & CRDT Synchronization', () => {
   test('synchronizes messages and presence across two isolated browser contexts', async ({ browser }) => {
@@ -8,7 +9,7 @@ test.describe('Multi-Browser P2P Interaction & CRDT Synchronization', () => {
     });
     const pageA = await contextA.newPage();
     await pageA.goto('./');
-    await expect(pageA.locator('#openslack-root-shell')).toBeVisible();
+    await ensureOnboardingCompleted(pageA, 'Peer A');
 
     // 2. Open Invite Modal on Peer A and copy invite hash payload
     await pageA.locator('#workspace-header-menu-btn').click();
@@ -27,7 +28,7 @@ test.describe('Multi-Browser P2P Interaction & CRDT Synchronization', () => {
     });
     const pageB = await contextB.newPage();
     await pageB.goto(inviteUrl);
-    await expect(pageB.locator('#openslack-root-shell')).toBeVisible();
+    await ensureOnboardingCompleted(pageB, 'Peer B');
 
     // 4. Peer A sends a real-time message
     const msgFromA = `P2P Multi-Browser sync verification: ${Date.now()}`;

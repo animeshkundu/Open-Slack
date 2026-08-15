@@ -2,6 +2,13 @@ import React, { createContext, useContext, useEffect, useMemo, useRef, useState 
 import { IndexeddbPersistence } from 'y-indexeddb';
 import * as Y from 'yjs';
 import {
+  buildDmTitle,
+  createDmChannelId,
+  findExistingDmChannel,
+  normalizeMemberSet,
+  sameMemberSet,
+} from '../lib/channels';
+import {
   generateWorkspacePassphrase,
   getOrCreateIdentity,
   saveIdentity,
@@ -999,22 +1006,50 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   const openDirectMessage = async (peerPubkeys: string | string[]): Promise<Channel> => {
     if (!identity || !ydocRef.current) throw new Error('Not ready');
-    const pubkeyList = Array.isArray(peerPubkeys) ? peerPubkeys : [peerPubkeys];
+    const pubkeyList = normalizeMemberSet(
+      (Array.isArray(peerPubkeys) ? peerPubkeys : [peerPubkeys]).filter(
+        (pk) => pk && pk !== identity.pubkey
+      )
+    );
     if (pubkeyList.length === 0) throw new Error('No peers selected');
 
-    const allMembers = Array.from(new Set([identity.pubkey, ...pubkeyList]));
+    const allMembers = normalizeMemberSet([identity.pubkey, ...pubkeyList]);
+    const yChannels = ydocRef.current.getMap<Channel>('channels');
 
-    // Check if an identical DM channel already exists
-    const existing = channels.find((c) => {
-      if (!c.isDirectMessage || !c.members) return false;
-      if (c.members.length !== allMembers.length) return false;
-      return allMembers.every((m) => c.members?.includes(m));
-    });
-
+    // Reuse an existing DM/group DM for the same peer set (including ones the user left)
+    // so starting a conversation never clobbers a different chat's Yjs map entry.
+    const existing = findExistingDmChannel(channels, identity.pubkey, pubkeyList);
     if (existing) {
+      const mergedMembers = normalizeMemberSet([...(existing.members || []), identity.pubkey]);
+      const peerNames = pubkeyList.map((pk) => {
+        const p = peerUsers.get(pk);
+        return p?.displayName || `User ${pk.slice(0, 6)}`;
+      });
+      const restored: Channel = {
+        ...existing,
+        members: mergedMembers,
+        name: buildDmTitle(peerNames),
+        topic:
+          existing.topic ||
+          `Direct Message between ${[identity.displayName, ...peerNames].join(', ')}`,
+      };
+
+      if (
+        !sameMemberSet(existing.members, restored.members) ||
+        existing.name !== restored.name
+      ) {
+        ydocRef.current.transact(() => {
+          yChannels.set(existing.id, restored);
+        });
+      }
+
       setActiveChannelId(existing.id);
+      if (activeWorkspace) {
+        localStorage.setItem(`openslack_active_channel_${activeWorkspace.id}`, existing.id);
+      }
       setMobileView('chat');
-      return existing;
+      setRightPanel('none');
+      return restored;
     }
 
     const peerNames = pubkeyList.map((pk) => {
@@ -1022,8 +1057,9 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       return p?.displayName || `User ${pk.slice(0, 6)}`;
     });
 
-    const dmTitle = peerNames.join(', ');
-    const id = `dm_${[...allMembers].sort().join('_')}`;
+    const dmTitle = buildDmTitle(peerNames);
+    // Opaque id — never derive from member pubkeys (leave + recreate must not overwrite)
+    const id = createDmChannelId();
     const newDm: Channel = {
       id,
       workspaceId: activeWorkspace?.id,
@@ -1036,7 +1072,6 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       creatorPubkey: identity.pubkey,
     };
 
-    const yChannels = ydocRef.current.getMap<Channel>('channels');
     ydocRef.current.transact(() => {
       yChannels.set(id, newDm);
     });
@@ -1046,6 +1081,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       localStorage.setItem(`openslack_active_channel_${activeWorkspace.id}`, id);
     }
     setMobileView('chat');
+    setRightPanel('none');
     return newDm;
   };
 
@@ -1066,31 +1102,38 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const chan = yChannels.get(channelId);
     if (!chan) return;
 
-    if (chan.members && chan.members.length > 0) {
-      const updatedMembers = chan.members.filter((m) => m !== identity.pubkey);
-      if (updatedMembers.length <= 1 && chan.isDirectMessage) {
+    if (chan.isDirectMessage) {
+      // Soft-leave: remove only the local user from the member roster.
+      // Never delete the shared DM document — that would wipe history for peers
+      // and let a later recreate clobber another conversation.
+      const updatedMembers = (chan.members || []).filter((m) => m !== identity.pubkey);
+      if (updatedMembers.length === 0) {
         ydocRef.current.transact(() => {
           yChannels.delete(channelId);
         });
       } else {
-        const remainingPeerNames = updatedMembers
-          .filter((pk) => pk !== identity.pubkey)
-          .map((pk) => {
-            const p = peerUsers.get(pk);
-            return p?.displayName || `User ${pk.slice(0, 6)}`;
-          });
-        const updatedName =
-          chan.isDirectMessage && remainingPeerNames.length > 0
-            ? remainingPeerNames.join(', ')
-            : chan.name;
-
+        const remainingPeerNames = updatedMembers.map((pk) => {
+          const p = peerUsers.get(pk);
+          return p?.displayName || `User ${pk.slice(0, 6)}`;
+        });
         const updatedChan: Channel = {
           ...chan,
           members: updatedMembers,
-          name: updatedName,
+          name: buildDmTitle(remainingPeerNames),
         };
         ydocRef.current.transact(() => {
           yChannels.set(channelId, updatedChan);
+        });
+      }
+    } else if (chan.members && chan.members.length > 0) {
+      const updatedMembers = chan.members.filter((m) => m !== identity.pubkey);
+      if (updatedMembers.length === 0) {
+        ydocRef.current.transact(() => {
+          yChannels.delete(channelId);
+        });
+      } else {
+        ydocRef.current.transact(() => {
+          yChannels.set(channelId, { ...chan, members: updatedMembers });
         });
       }
     } else if (chan.isPrivate) {
@@ -1099,9 +1142,19 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       });
     }
 
-    setActiveChannelId('chan_general');
-    if (activeWorkspace) {
-      localStorage.setItem(`openslack_active_channel_${activeWorkspace.id}`, 'chan_general');
+    // Fall back to another visible conversation when leaving the active one
+    if (activeChannelId === channelId) {
+      const fallback =
+        channels.find(
+          (c) =>
+            c.id !== channelId &&
+            !c.isDirectMessage &&
+            (!c.isPrivate || !c.members || c.members.includes(identity.pubkey))
+        )?.id || 'chan_general';
+      setActiveChannelId(fallback);
+      if (activeWorkspace) {
+        localStorage.setItem(`openslack_active_channel_${activeWorkspace.id}`, fallback);
+      }
     }
   };
 

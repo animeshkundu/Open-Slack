@@ -30,7 +30,7 @@ export const MobileNavBar: React.FC<MobileNavBarProps> = ({ onOpenSettings }) =>
     <nav
       id="mobile-nav-bar"
       data-testid="mobile-nav-bar"
-      className="md:hidden h-14 box-content pb-[env(safe-area-inset-bottom)] bg-white border-t border-neutral-200 flex items-center justify-around px-2 z-30 flex-shrink-0"
+      className="md:hidden h-14 box-content pb-[env(safe-area-inset-bottom)] bg-white border-t border-neutral-200 flex items-center justify-around px-2 z-40 flex-shrink-0 relative"
     >
       {/* Home (Sidebar / Channels) */}
       <button
