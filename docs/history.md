@@ -4,6 +4,12 @@ This is a concise, human-readable record of meaningful repository evolution. Det
 
 ## 2026-08-15
 
+- Fixed landing page onboarding default and header layout responsiveness:
+  - Ensured first-time visitors who have not provided a custom display name land on the Landing Page by default, while returning users resume directly on their last active workspace and channel.
+  - Resolved `MainHeader` flex item overflow on tablet and small desktop screens by raising the center search bar trigger breakpoint to `2xl`, keeping Huddle buttons, action icons, and channel metadata perfectly aligned without overlapping backgrounds or borders.
+  - Captured a full screenshot suite across Desktop (1440x900), Tablet (1024x768), and Mobile (390x844) viewports for all screens, modals, drawers, and responsive views (`screenshots/`).
+  - Verified 100% green compilation, zero linter errors (`npm run lint`), and 25/25 passing Playwright E2E browser tests across all suites.
+
 - Implemented Multi-Device Pairing, Call Signaling, and Privacy Gatekeeping Architecture:
   - Built `DeviceSubIdentity` schema and `encodeDeviceSyncPayload` / `decodeDeviceSyncPayload` multi-device sync logic, enabling zero-prompt device pairing via QR code or direct link in User Settings > Linked Devices.
   - Implemented `MultiDeviceCallManager` managing call offer forking across registered device sub-identities, simultaneous ringing, first-answerer resolution (`CALL_RESOLVED`), and call handoff (`CALL_TRANSFER`).

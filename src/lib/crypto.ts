@@ -135,6 +135,7 @@ export async function generateCryptoKeypairs(): Promise<{
     lastSeen: Date.now(),
     color,
     isOnline: true,
+    hasCustomName: false,
   };
 
   const keys: StoredPrivateKeyPair = {
@@ -190,7 +191,6 @@ export async function getOrCreateIdentity(): Promise<{
 
   // 3. Generate initial keys & identity
   const generated = await generateCryptoKeypairs();
-  generated.identity.hasCustomName = true;
   saveIdentity(generated.identity, generated.keys);
   return generated;
 }

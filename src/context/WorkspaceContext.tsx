@@ -270,7 +270,19 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (typeof window === 'undefined') return false;
     const hash = window.location.hash;
     const search = new URLSearchParams(window.location.search);
-    return hash === '#landing' || search.get('landing') === 'true';
+    if (hash === '#landing' || search.get('landing') === 'true') return true;
+    if (hash.startsWith('#invite=') || hash.startsWith('#/join/')) return false;
+
+    // First-time visitor who has never submitted their display name lands on Landing Page
+    const storedIdentity = localStorage.getItem('openslack_user_identity') || localStorage.getItem('quietslack_user_identity');
+    if (!storedIdentity) return true;
+    try {
+      const parsed = JSON.parse(storedIdentity);
+      if (!parsed.hasCustomName || !parsed.displayName) return true;
+    } catch {
+      return true;
+    }
+    return false;
   });
   const [mobileView, setMobileView] = useState<MobileViewType>('chat');
 

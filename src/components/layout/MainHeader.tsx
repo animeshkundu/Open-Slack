@@ -281,8 +281,8 @@ export const MainHeader: React.FC<MainHeaderProps> = ({ onOpenInvite }) => {
           </div>
         </div>
 
-        {/* Center: Global Search Bar Trigger (Visible on wide screens, collapses gracefully) */}
-        <div className="flex-1 max-w-xs xl:max-w-md mx-2 lg:mx-4 hidden lg:block min-w-0">
+        {/* Center: Global Search Bar Trigger (Visible on wide screens, collapses gracefully to search button) */}
+        <div className="flex-1 max-w-xs xl:max-w-md mx-2 2xl:mx-4 hidden 2xl:block min-w-0">
           <button
             id="header-search-bar-trigger"
             type="button"
@@ -301,12 +301,12 @@ export const MainHeader: React.FC<MainHeaderProps> = ({ onOpenInvite }) => {
 
         {/* Right: Actions, Huddle Pill, and Slack-Style Overflow Menu */}
         <div className="flex items-center gap-1 sm:gap-1.5 flex-shrink-0 ml-auto">
-          {/* Compact Search Trigger for screens < lg */}
+          {/* Compact Search Trigger for screens < 2xl */}
           <button
             id="mobile-header-search-btn"
             type="button"
             onClick={() => setIsSearchOpen(true)}
-            className="lg:hidden p-2 rounded-lg hover:bg-neutral-100 text-neutral-600 hover:text-neutral-900 transition cursor-pointer flex-shrink-0"
+            className="2xl:hidden p-2 rounded-lg hover:bg-neutral-100 text-neutral-600 hover:text-neutral-900 transition cursor-pointer flex-shrink-0"
             title="Search workspace (Ctrl+K)"
           >
             <Search className="w-4 h-4" />
