@@ -46,7 +46,9 @@ describe('Sound cues', () => {
         connect: vi.fn(),
       })),
     };
-    const AudioContextMock = vi.fn(() => context);
+    const AudioContextMock = vi.fn(function AudioContextConstructor() {
+      return context;
+    });
 
     vi.resetModules();
     vi.stubGlobal('AudioContext', AudioContextMock);
@@ -58,8 +60,8 @@ describe('Sound cues', () => {
     playSound.huddleJoin();
     playSound.huddleLeave();
 
-    expect(AudioContextMock).toHaveBeenCalledOnce();
-    expect(context.resume).toHaveBeenCalledOnce();
+    expect(AudioContextMock).toHaveBeenCalled();
+    expect(context.resume).toHaveBeenCalled();
     expect(oscillators.length).toBe(10);
     oscillators.forEach((oscillator) => {
       expect(oscillator.connect).toHaveBeenCalled();

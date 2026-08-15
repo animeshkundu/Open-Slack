@@ -85,7 +85,9 @@ describe('Notifications & DND Logic', () => {
   it('creates a browser notification and focuses the app on click', () => {
     const close = vi.fn();
     const notification = { onclick: null as (() => void) | null, close };
-    const NotificationMock = vi.fn(() => notification);
+    const NotificationMock = vi.fn(function NotificationConstructor() {
+      return notification;
+    });
     Object.defineProperty(window, 'Notification', {
       configurable: true,
       value: Object.assign(NotificationMock, { permission: 'granted' }),
