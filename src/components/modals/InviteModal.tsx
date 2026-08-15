@@ -88,6 +88,7 @@ export const InviteModal: React.FC<InviteModalProps> = ({ isOpen, onClose }) => 
                 type="text"
                 readOnly
                 value={inviteUrl}
+                id="invite-link-input"
                 className="flex-1 px-3.5 py-2 bg-neutral-50 border border-neutral-300 rounded-lg text-xs font-mono text-neutral-700 select-all outline-none"
               />
               <button

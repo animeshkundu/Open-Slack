@@ -7,18 +7,19 @@ test.describe('Multi-Browser P2P Interaction & CRDT Synchronization', () => {
       permissions: ['microphone', 'camera'],
     });
     const pageA = await contextA.newPage();
-    await pageA.goto('http://localhost:3000/');
-    await expect(pageA.locator('#quietslack-root-shell')).toBeVisible();
+    await pageA.goto('/');
+    await expect(pageA.locator('#openslack-root-shell')).toBeVisible();
 
     // 2. Open Invite Modal on Peer A and copy invite hash payload
-    await pageA.locator('#sidebar-invite-btn').click();
-    await expect(pageA.locator('#invite-modal-dialog')).toBeVisible();
+    await pageA.locator('#workspace-header-menu-btn').click();
+    await pageA.locator('#ws-menu-invite-btn').click();
+    await expect(pageA.locator('#invite-modal-card')).toBeVisible();
 
-    const inviteLinkInput = pageA.locator('#invite-link-copy-input');
+    const inviteLinkInput = pageA.locator('#invite-link-input');
     const inviteUrl = await inviteLinkInput.inputValue();
     expect(inviteUrl).toContain('#invite=');
 
-    await pageA.locator('#invite-modal-close-btn').click();
+    await pageA.locator('#close-invite-modal-btn').click();
 
     // 3. Create Peer B Context in isolated incognito session
     const contextB = await browser.newContext({
@@ -26,12 +27,12 @@ test.describe('Multi-Browser P2P Interaction & CRDT Synchronization', () => {
     });
     const pageB = await contextB.newPage();
     await pageB.goto(inviteUrl);
-    await expect(pageB.locator('#quietslack-root-shell')).toBeVisible();
+    await expect(pageB.locator('#openslack-root-shell')).toBeVisible();
 
     // 4. Peer A sends a real-time message
     const msgFromA = `P2P Multi-Browser sync verification: ${Date.now()}`;
-    await pageA.locator('#message-textarea-input').fill(msgFromA);
-    await pageA.locator('#send-message-button').click();
+    await pageA.locator('#message-composer-textarea').fill(msgFromA);
+    await pageA.locator('#composer-send-btn').click();
 
     // Verify Peer A shows message
     await expect(pageA.getByText(msgFromA)).toBeVisible({ timeout: 5000 });
@@ -40,7 +41,7 @@ test.describe('Multi-Browser P2P Interaction & CRDT Synchronization', () => {
     const huddleBtnB = pageB.locator('#channel-huddle-btn');
     if (await huddleBtnB.isVisible()) {
       await huddleBtnB.click();
-      await expect(pageB.locator('#huddle-active-overlay')).toBeVisible();
+      await expect(pageB.locator('#huddle-floating-dock')).toBeVisible();
       await pageB.locator('#huddle-leave-btn').click();
     }
 

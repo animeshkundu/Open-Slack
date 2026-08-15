@@ -52,7 +52,7 @@
 
 ### Prerequisites
 
-- Node.js 18+ or 20+
+- Node.js 22+
 - npm or yarn
 
 ### Installation & Development
@@ -83,6 +83,12 @@ npm run test:unit
 # Check type safety
 npm run typecheck
 ```
+
+### Deployment
+
+Every push to `main` runs the CI checks, builds the minified production bundle, and deploys it to GitHub Pages. The deployment workflow also runs Playwright tests against the live Pages URL after deployment.
+
+To enable Pages for a fork, set **Settings → Pages → Build and deployment → Source** to **GitHub Actions**.
 
 ---
 

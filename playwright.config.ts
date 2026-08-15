@@ -1,5 +1,9 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const deployedBaseURL = process.env.PLAYWRIGHT_BASE_URL;
+const previewBuild = process.env.PLAYWRIGHT_PREVIEW === 'true';
+const localBaseURL = previewBuild ? 'http://localhost:4173' : 'http://localhost:3000';
+
 export default defineConfig({
   testDir: './tests/e2e',
   fullyParallel: true,
@@ -7,8 +11,11 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
   reporter: 'html',
+  expect: {
+    timeout: 15000,
+  },
   use: {
-    baseURL: 'http://localhost:3000',
+    baseURL: deployedBaseURL ?? localBaseURL,
     trace: 'on-first-retry',
     permissions: ['camera', 'microphone'],
     launchOptions: {
@@ -26,10 +33,14 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
-  webServer: {
-    command: 'npm run dev',
-    url: 'http://localhost:3000',
-    reuseExistingServer: !process.env.CI,
-    timeout: 120000,
-  },
+  webServer: deployedBaseURL
+    ? undefined
+    : {
+        command: previewBuild
+          ? 'npm run preview -- --host 0.0.0.0 --port 4173'
+          : 'npm run dev',
+        url: localBaseURL,
+        reuseExistingServer: !process.env.CI,
+        timeout: 120000,
+      },
 });

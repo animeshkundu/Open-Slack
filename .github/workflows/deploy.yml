@@ -16,6 +16,8 @@ concurrency:
 
 jobs:
   build-and-deploy:
+    outputs:
+      page_url: ${{ steps.deployment.outputs.page_url }}
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -27,11 +29,11 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci || npm install
+        run: npm ci
 
       - name: Typecheck
         run: npm run lint
@@ -47,6 +49,19 @@ jobs:
       - name: Copy index.html to 404.html for SPA subpath routing
         run: cp dist/index.html dist/404.html
 
+      - name: Verify build output
+        run: |
+          test -s dist/index.html
+          test -s dist/404.html
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run E2E tests
+        env:
+          PLAYWRIGHT_PREVIEW: 'true'
+        run: npm run test:e2e
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
@@ -55,3 +70,60 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deploy-playwright-report
+          path: playwright-report/
+          if-no-files-found: ignore
+
+  verify-deployment:
+    name: Verify deployed site
+    needs: build-and-deploy
+    runs-on: ubuntu-latest
+    env:
+      PLAYWRIGHT_BASE_URL: ${{ needs.build-and-deploy.outputs.page_url }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Wait for GitHub Pages
+        run: |
+          if [ -z "${PLAYWRIGHT_BASE_URL:-}" ]; then
+            echo "GitHub Pages deployment did not provide a page URL."
+            exit 1
+          fi
+          for attempt in $(seq 1 30); do
+            echo "Waiting for GitHub Pages (attempt $attempt/30)..."
+            if curl --fail --silent --location "$PLAYWRIGHT_BASE_URL" > /dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "GitHub Pages was not reachable after 5 minutes: $PLAYWRIGHT_BASE_URL"
+          exit 1
+
+      - name: Run deployed smoke tests
+        run: npm run test:e2e -- tests/e2e/smoke.spec.ts
+
+      - name: Upload deployed Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployed-playwright-report
+          path: playwright-report/
+          if-no-files-found: ignore
