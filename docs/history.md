@@ -4,6 +4,7 @@ This is a concise, human-readable record of meaningful repository evolution. Det
 
 ## 2026-08-15
 
+- Restored green CI coverage by adding unit coverage for identity handles, notification permissions, compressed storage and IndexedDB identity persistence, plus P2P relay and Yjs broadcast paths; all configured Vitest thresholds now pass.
 - Hardened legacy Playwright app-entry suites to complete first-time identity onboarding before interacting with the workspace shell, preventing the modal from intercepting test actions.
 - Refreshed stale responsive and landing-page E2E selectors for the current onboarding, mobile navigation, invite URL, and Activity surface contracts; Activity page and drawer identifiers are now unique.
 - Fixed DM / group-chat persistence: conversations now use opaque channel IDs and member-set matching so starting a new chat never overwrites an existing one; leave is a soft member removal that preserves peer history.
