@@ -1,9 +1,10 @@
 import { expect, test } from '@playwright/test';
+import { ensureOnboardingCompleted } from './helpers';
 
 test.describe('Secondary workspace flows', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('./');
-    await expect(page.locator('#openslack-root-shell')).toBeVisible();
+    await ensureOnboardingCompleted(page);
   });
 
   test('creates a channel and makes it the active conversation', async ({ page }) => {
