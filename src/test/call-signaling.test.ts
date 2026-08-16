@@ -58,6 +58,8 @@ describe('Multi-Device Sync and Call Signaling Logic', () => {
 
     expect(decoded.keys.signPrivateKey).toContain('"d":"sign-d"');
     expect(decoded.keys.encPrivateKey).toContain('"d":"enc-d"');
+    expect(decoded.keys.signPublicKey).not.toContain('"d"');
+    expect(decoded.keys.encPublicKey).not.toContain('"d"');
     expect(decoded.identity.avatarUrl).toBe('');
   });
 

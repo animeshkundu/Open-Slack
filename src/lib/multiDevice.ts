@@ -34,9 +34,9 @@ function expandPairedKeys(keys: any): StoredPrivateKeyPair {
     JSON.stringify({ kty: 'EC', crv: 'P-256', x: key.x, y: key.y, ...(key.d ? { d: key.d } : {}) });
 
   return {
-    signPublicKey: toKey(keys.s),
+    signPublicKey: toKey({ x: keys.s.x, y: keys.s.y }),
     signPrivateKey: toKey(keys.s),
-    encPublicKey: toKey(keys.e),
+    encPublicKey: toKey({ x: keys.e.x, y: keys.e.y }),
     encPrivateKey: toKey(keys.e),
   };
 }
