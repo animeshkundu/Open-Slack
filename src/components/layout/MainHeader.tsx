@@ -174,7 +174,7 @@ export const MainHeader: React.FC<MainHeaderProps> = ({ onOpenInvite }) => {
   };
 
   return (
-    <div className="flex flex-col flex-shrink-0 z-10 select-none">
+    <div className="flex flex-col flex-shrink-0 z-30 relative select-none">
       {/* Offline Alert Banner */}
       {isOffline && (
         <div
