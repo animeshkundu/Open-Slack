@@ -167,6 +167,10 @@ const DEFAULT_PREFERENCES: UserPreferences = {
   mutedChannelIds: [],
   channelNotificationOverrides: {},
   permissionsRequested: false,
+  cameraAllowed: false,
+  microphoneAllowed: false,
+  screenShareAllowed: false,
+  notificationsAllowed: false,
 };
 
 const DEFAULT_WORKSPACE_SETTINGS: WorkspaceSettings = {

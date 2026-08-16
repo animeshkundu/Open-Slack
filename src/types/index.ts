@@ -21,6 +21,10 @@ export interface UserPreferences {
   batterySaver?: 'auto' | 'always' | 'never';
   notificationBannerDismissed?: boolean;
   permissionsRequested?: boolean;
+  cameraAllowed?: boolean;
+  microphoneAllowed?: boolean;
+  screenShareAllowed?: boolean;
+  notificationsAllowed?: boolean;
 }
 
 export interface UserStatus {

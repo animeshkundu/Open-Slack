@@ -1,4 +1,4 @@
-import { Bell, Camera, Check, Mic, Monitor, ShieldCheck, X } from 'lucide-react';
+import { Bell, Camera, Mic, Monitor, X } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import React, { useEffect, useState } from 'react';
 import { useWorkspace } from '../../context/WorkspaceContext';
@@ -9,82 +9,71 @@ interface PermissionsModalProps {
   onClose: () => void;
 }
 
-interface PermissionItem {
-  id: string;
-  name: string;
-  description: string;
-  icon: React.ReactNode;
-  status: 'idle' | 'requesting' | 'granted' | 'denied';
-}
-
 export const PermissionsModal: React.FC<PermissionsModalProps> = ({ isOpen, onClose }) => {
-  const { updatePreferences, triggerToast } = useWorkspace();
-  const [permissions, setPermissions] = useState<PermissionItem[]>([
-    {
-      id: 'camera',
-      name: 'Camera',
-      description: 'Used for video huddles and profile photos.',
-      icon: <Camera className="w-5 h-5" />,
-      status: 'idle',
-    },
-    {
-      id: 'microphone',
-      name: 'Microphone',
-      description: 'Used for voice huddles and audio messages.',
-      icon: <Mic className="w-5 h-5" />,
-      status: 'idle',
-    },
-    {
-      id: 'desktop_sharing',
-      name: 'Desktop Sharing',
-      description: 'Allows you to share your screen with teammates.',
-      icon: <Monitor className="w-5 h-5" />,
-      status: 'idle',
-    },
-    {
-      id: 'notifications',
-      name: 'Notifications',
-      description: 'Desktop alerts for mentions, messages, and calls.',
-      icon: <Bell className="w-5 h-5" />,
-      status: 'idle',
-    },
-  ]);
+  const { preferences, updatePreferences, triggerToast } = useWorkspace();
 
-  // Check initial statuses if possible
+  // Permission states for toggles
+  const [permissionsState, setPermissionsState] = useState({
+    camera: false,
+    microphone: false,
+    desktop_sharing: false,
+    notifications: false,
+  });
+
+  const [loadingMap, setLoadingMap] = useState<Record<string, boolean>>({});
+
+  // Sync state from browser API and preferences on mount / open
   useEffect(() => {
     if (isOpen) {
       const checkInitialStatus = async () => {
-        if (!navigator.permissions) return;
-        
-        try {
-          const cam = await navigator.permissions.query({ name: 'camera' as any }).catch(() => null);
-          const mic = await navigator.permissions.query({ name: 'microphone' as any }).catch(() => null);
-          const notif = await navigator.permissions.query({ name: 'notifications' as any }).catch(() => null);
+        const initialState = {
+          camera: !!preferences.cameraAllowed,
+          microphone: !!preferences.microphoneAllowed,
+          desktop_sharing: !!preferences.screenShareAllowed,
+          notifications: !!preferences.notificationsAllowed,
+        };
 
-          setPermissions(prev => prev.map(p => {
-            if (p.id === 'camera' && cam?.state === 'granted') return { ...p, status: 'granted' };
-            if (p.id === 'microphone' && mic?.state === 'granted') return { ...p, status: 'granted' };
-            if (p.id === 'notifications' && (notif?.state === 'granted' || Notification.permission === 'granted')) return { ...p, status: 'granted' };
-            return p;
-          }));
-        } catch (err) {
-          console.warn('Permission query error:', err);
+        if (navigator.permissions) {
+          try {
+            const cam = await navigator.permissions.query({ name: 'camera' as any }).catch(() => null);
+            const mic = await navigator.permissions.query({ name: 'microphone' as any }).catch(() => null);
+            const notif = await navigator.permissions.query({ name: 'notifications' as any }).catch(() => null);
+
+            if (cam) initialState.camera = cam.state === 'granted' || !!preferences.cameraAllowed;
+            if (mic) initialState.microphone = mic.state === 'granted' || !!preferences.microphoneAllowed;
+            if (notif) initialState.notifications = (notif.state === 'granted' || Notification.permission === 'granted') || !!preferences.notificationsAllowed;
+          } catch (err) {
+            console.warn('Permission query API error:', err);
+          }
         }
+        setPermissionsState(initialState);
       };
+      
       checkInitialStatus();
     }
-  }, [isOpen]);
+  }, [isOpen, preferences]);
 
-  const handleRequest = async (id: string) => {
-    setPermissions(prev => prev.map(p => p.id === id ? { ...p, status: 'requesting' } : p));
-    
+  // Request browser permission
+  const handleToggleChange = async (id: keyof typeof permissionsState) => {
+    const isCurrentlyOn = permissionsState[id];
+
+    if (isCurrentlyOn) {
+      // Toggle off -> simply update state (user withdrawing consent in UI)
+      setPermissionsState(prev => ({ ...prev, [id]: false }));
+      return;
+    }
+
+    // Toggle on -> Trigger corresponding prompt
+    setLoadingMap(prev => ({ ...prev, [id]: true }));
     let granted = false;
+
     try {
-      if (id === 'camera' || id === 'microphone') {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: id === 'camera',
-          audio: id === 'microphone'
-        });
+      if (id === 'camera') {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        stream.getTracks().forEach(t => t.stop());
+        granted = true;
+      } else if (id === 'microphone') {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         stream.getTracks().forEach(t => t.stop());
         granted = true;
       } else if (id === 'desktop_sharing') {
@@ -96,19 +85,36 @@ export const PermissionsModal: React.FC<PermissionsModalProps> = ({ isOpen, onCl
         granted = res === 'granted';
       }
     } catch (err) {
-      console.warn(`Permission ${id} denied:`, err);
+      console.warn(`Permission request for ${id} denied or cancelled:`, err);
+      triggerToast({
+        authorName: 'System',
+        channelName: 'Permissions',
+        content: `Permission for ${id.replace('_', ' ')} could not be enabled. Please check browser settings.`,
+        type: 'system',
+      });
+    } finally {
+      setLoadingMap(prev => ({ ...prev, [id]: false }));
     }
 
-    setPermissions(prev => prev.map(p => p.id === id ? { ...p, status: granted ? 'granted' : 'denied' } : p));
+    setPermissionsState(prev => ({ ...prev, [id]: granted }));
   };
 
-  const handleFinish = () => {
-    updatePreferences({ permissionsRequested: true });
+  const handleApply = () => {
+    // Save selections globally across devices via preference synchronization
+    updatePreferences({
+      permissionsRequested: true,
+      cameraAllowed: permissionsState.camera,
+      microphoneAllowed: permissionsState.microphone,
+      screenShareAllowed: permissionsState.desktop_sharing,
+      notificationsAllowed: permissionsState.notifications,
+    });
+
     onClose();
+
     triggerToast({
       authorName: 'System',
       channelName: 'Permissions',
-      content: 'Preferences saved. You can always update these in your browser settings.',
+      content: 'Access preferences applied and synced successfully!',
       type: 'system',
     });
   };
@@ -119,89 +125,121 @@ export const PermissionsModal: React.FC<PermissionsModalProps> = ({ isOpen, onCl
     <AnimatePresence>
       <div
         id="permissions-modal-overlay"
-        className="fixed inset-0 z-[100] bg-neutral-950/70 backdrop-blur-sm flex items-center justify-center p-4"
+        className="fixed inset-0 z-[100] bg-neutral-950/60 backdrop-blur-sm flex items-center justify-center p-4"
       >
         <motion.div
           id="permissions-modal-card"
-          initial={{ opacity: 0, scale: 0.95, y: 20 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          className="w-full max-w-md bg-white rounded-2xl shadow-2xl border border-neutral-200 overflow-hidden flex flex-col"
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.95 }}
+          transition={{ duration: 0.15, ease: 'easeOut' }}
+          className="w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col p-6 text-neutral-800"
         >
           {/* Header */}
-          <div className="p-6 bg-gradient-to-br from-[#4A154B] to-[#611f69] text-white text-center relative">
-            <div className="w-12 h-12 rounded-xl bg-white/10 backdrop-blur-sm border border-white/20 flex items-center justify-center mx-auto mb-3">
-              <ShieldCheck className="w-6 h-6 text-emerald-300" />
-            </div>
-            <h2 className="text-xl font-black">App Permissions</h2>
-            <p className="text-purple-100 text-xs mt-1.5 max-w-[280px] mx-auto leading-relaxed">
-              Open-Slack requires access to the following to enable the full peer-to-peer experience.
-            </p>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold tracking-tight text-neutral-900">Access request</h2>
             <button
               onClick={onClose}
-              className="absolute top-4 right-4 p-1 rounded-lg hover:bg-white/10 text-white/70 hover:text-white transition cursor-pointer"
+              className="p-1 rounded-full hover:bg-neutral-100 text-neutral-500 hover:text-neutral-800 transition cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
 
+          {/* Subheading */}
+          <p className="text-sm text-neutral-600 mb-6 font-medium leading-normal">
+            The app requests access to the following permissions:
+          </p>
+
           {/* List of Permissions */}
-          <div className="p-4 space-y-2.5 bg-neutral-50/50">
-            {permissions.map((p) => (
-              <div
-                key={p.id}
-                className="flex items-center gap-3.5 p-3.5 bg-white rounded-xl border border-neutral-200 shadow-sm"
+          <div className="space-y-3.5 mb-8">
+            {/* Camera row */}
+            <div className="flex items-center justify-between p-4 bg-white rounded-xl border border-neutral-200">
+              <span className="text-sm font-semibold text-neutral-800">Camera</span>
+              <button
+                type="button"
+                onClick={() => handleToggleChange('camera')}
+                disabled={loadingMap['camera']}
+                className={`relative w-11 h-6 rounded-full transition-colors duration-200 ease-in-out focus:outline-none flex items-center p-1 cursor-pointer ${
+                  permissionsState.camera ? 'bg-neutral-900' : 'bg-neutral-200'
+                }`}
               >
-                <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 border ${
-                  p.status === 'granted' 
-                    ? 'bg-emerald-50 border-emerald-100 text-emerald-600'
-                    : 'bg-neutral-100 border-neutral-200 text-neutral-500'
-                }`}>
-                  {p.icon}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-bold text-neutral-900">{p.name}</div>
-                  <div className="text-[11px] text-neutral-500 truncate">{p.description}</div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => handleRequest(p.id)}
-                  disabled={p.status === 'granted' || p.status === 'requesting'}
-                  className={`px-3 py-1.5 rounded-lg text-[11px] font-black transition ${
-                    p.status === 'granted'
-                      ? 'bg-emerald-100 text-emerald-700'
-                      : p.status === 'requesting'
-                      ? 'bg-neutral-100 text-neutral-400'
-                      : 'bg-neutral-900 text-white hover:bg-black cursor-pointer'
+                <div
+                  className={`w-4 h-4 rounded-full bg-white shadow-md transform transition-transform duration-200 ease-in-out ${
+                    permissionsState.camera ? 'translate-x-5' : 'translate-x-0'
                   }`}
-                >
-                  {p.status === 'granted' ? (
-                    <span className="flex items-center gap-1">
-                      <Check className="w-3 h-3" /> Granted
-                    </span>
-                  ) : p.status === 'requesting' ? (
-                    'Waiting...'
-                  ) : (
-                    'Allow'
-                  )}
-                </button>
-              </div>
-            ))}
+                />
+              </button>
+            </div>
+
+            {/* Microphone row */}
+            <div className="flex items-center justify-between p-4 bg-white rounded-xl border border-neutral-200">
+              <span className="text-sm font-semibold text-neutral-800">Microphone</span>
+              <button
+                type="button"
+                onClick={() => handleToggleChange('microphone')}
+                disabled={loadingMap['microphone']}
+                className={`relative w-11 h-6 rounded-full transition-colors duration-200 ease-in-out focus:outline-none flex items-center p-1 cursor-pointer ${
+                  permissionsState.microphone ? 'bg-neutral-900' : 'bg-neutral-200'
+                }`}
+              >
+                <div
+                  className={`w-4 h-4 rounded-full bg-white shadow-md transform transition-transform duration-200 ease-in-out ${
+                    permissionsState.microphone ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+
+            {/* Screensharing row */}
+            <div className="flex items-center justify-between p-4 bg-white rounded-xl border border-neutral-200">
+              <span className="text-sm font-semibold text-neutral-800">Desktop Sharing</span>
+              <button
+                type="button"
+                onClick={() => handleToggleChange('desktop_sharing')}
+                disabled={loadingMap['desktop_sharing']}
+                className={`relative w-11 h-6 rounded-full transition-colors duration-200 ease-in-out focus:outline-none flex items-center p-1 cursor-pointer ${
+                  permissionsState.desktop_sharing ? 'bg-neutral-900' : 'bg-neutral-200'
+                }`}
+              >
+                <div
+                  className={`w-4 h-4 rounded-full bg-white shadow-md transform transition-transform duration-200 ease-in-out ${
+                    permissionsState.desktop_sharing ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+
+            {/* Notifications row */}
+            <div className="flex items-center justify-between p-4 bg-white rounded-xl border border-neutral-200">
+              <span className="text-sm font-semibold text-neutral-800">Notifications</span>
+              <button
+                type="button"
+                onClick={() => handleToggleChange('notifications')}
+                disabled={loadingMap['notifications']}
+                className={`relative w-11 h-6 rounded-full transition-colors duration-200 ease-in-out focus:outline-none flex items-center p-1 cursor-pointer ${
+                  permissionsState.notifications ? 'bg-neutral-900' : 'bg-neutral-200'
+                }`}
+              >
+                <div
+                  className={`w-4 h-4 rounded-full bg-white shadow-md transform transition-transform duration-200 ease-in-out ${
+                    permissionsState.notifications ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
           </div>
 
-          {/* Footer Action */}
-          <div className="p-6 border-t border-neutral-100 bg-white">
+          {/* Action Button */}
+          <div className="flex justify-end">
             <button
-              id="permissions-finish-btn"
+              id="permissions-apply-btn"
               type="button"
-              onClick={handleFinish}
-              className="w-full py-3.5 bg-[#4A154B] hover:bg-[#611f69] text-white rounded-xl text-sm font-bold transition shadow-sm cursor-pointer"
+              onClick={handleApply}
+              className="px-6 py-2.5 bg-white border border-neutral-300 hover:bg-neutral-50 font-bold rounded-xl text-xs transition duration-150 ease-in-out shadow-xs text-neutral-800 cursor-pointer"
             >
-              Done & Continue
+              Apply
             </button>
-            <p className="text-[10px] text-neutral-400 text-center mt-3">
-              You can change these later in your browser or OS settings.
-            </p>
           </div>
         </motion.div>
       </div>
