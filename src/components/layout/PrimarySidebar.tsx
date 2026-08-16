@@ -21,7 +21,7 @@ import {
   Users,
   X,
 } from 'lucide-react';
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useWorkspace } from '../../context/WorkspaceContext';
 
 interface PrimarySidebarProps {
@@ -67,6 +67,20 @@ export const PrimarySidebar: React.FC<PrimarySidebarProps> = ({
   const [showWorkspaceMenu, setShowWorkspaceMenu] = useState(false);
   const [channelsCollapsed, setChannelsCollapsed] = useState(false);
   const [dmsCollapsed, setDmsCollapsed] = useState(false);
+  const workspaceMenuRef = useRef<HTMLDivElement | null>(null);
+
+  // Close workspace menu on click outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (workspaceMenuRef.current && !workspaceMenuRef.current.contains(e.target as Node)) {
+        setShowWorkspaceMenu(false);
+      }
+    };
+    if (showWorkspaceMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showWorkspaceMenu]);
 
   const publicChannels = channels.filter(
     (c) => !c.isDirectMessage && (!c.isPrivate || !c.members || !identity || c.members.includes(identity.pubkey))
@@ -89,7 +103,7 @@ export const PrimarySidebar: React.FC<PrimarySidebarProps> = ({
       }}
     >
       {/* Workspace Header Dropdown */}
-      <div className="relative border-b border-black/20 flex items-center justify-between">
+      <div ref={workspaceMenuRef} className="relative border-b border-black/20 flex items-center justify-between">
         <button
           id="workspace-header-menu-btn"
           type="button"

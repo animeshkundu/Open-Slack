@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 interface ReactionPickerProps {
   onSelect: (emoji: string) => void;
@@ -26,13 +26,25 @@ const EMOJI_CATEGORIES = [
 
 export const ReactionPicker: React.FC<ReactionPickerProps> = ({ onSelect, onClose }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const pickerRef = useRef<HTMLDivElement | null>(null);
 
   const filteredEmojis = searchTerm.trim()
     ? EMOJI_CATEGORIES.flatMap((c) => c.emojis)
     : null;
 
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
+        onClose();
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [onClose]);
+
   return (
     <div
+      ref={pickerRef}
       id="reaction-picker-popover"
       className="absolute bottom-full mb-2 right-0 z-50 w-72 bg-white rounded-lg shadow-2xl border border-neutral-200 p-3 text-neutral-800 animate-in fade-in zoom-in-95 duration-100"
       onClick={(e) => e.stopPropagation()}

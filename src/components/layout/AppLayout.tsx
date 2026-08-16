@@ -59,14 +59,6 @@ export const AppLayout: React.FC = () => {
   const [isWorkspaceSettingsOpen, setIsWorkspaceSettingsOpen] = useState(false);
   const [isPermissionsOpen, setIsPermissionsOpen] = useState(false);
 
-  // Auto-show permissions modal if not requested yet and user has profile
-  useEffect(() => {
-    if (identity?.hasCustomName && !preferences.permissionsRequested && !showLandingPage) {
-      const timer = setTimeout(() => setIsPermissionsOpen(true), 1500);
-      return () => clearTimeout(timer);
-    }
-  }, [identity?.hasCustomName, preferences.permissionsRequested, showLandingPage]);
-
   // Global Keyboard Shortcuts (Cmd+K / Ctrl+K for search, Cmd+Shift+D / Ctrl+Shift+D for toggle sidebar)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {

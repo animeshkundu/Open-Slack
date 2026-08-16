@@ -17,16 +17,19 @@ const localBaseURL = previewBuild
 
 export default defineConfig({
   testDir: './tests/e2e',
+  timeout: 15000,
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: 3,
   reporter: 'html',
   expect: {
-    timeout: 15000,
+    timeout: 5000,
   },
   use: {
     baseURL: deployedBaseURL ?? localBaseURL,
+    actionTimeout: 5000,
+    navigationTimeout: 10000,
     trace: 'on-first-retry',
     permissions: ['camera', 'microphone'],
     launchOptions: {
