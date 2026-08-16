@@ -1485,7 +1485,6 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setMediaPermissionError(null);
 
     try {
-      p2pNetwork.startHuddle(channelId);
       if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
         throw new Error('Media devices not supported in this environment');
       }
@@ -1495,6 +1494,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         video: false,
       });
       localMediaStreamRef.current = stream;
+      p2pNetwork.startHuddle(channelId);
       p2pNetwork.addMediaStream(stream);
 
       const participants = new Map<string, HuddleParticipant>();
@@ -1522,6 +1522,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
       if (preferences.soundEnabled) playSound.huddleJoin();
     } catch (err: any) {
+      p2pNetwork.leaveHuddle();
       console.warn('Microphone permission note, starting voice-ready interface:', err);
       const isDenied = err?.name === 'NotAllowedError' || err?.name === 'PermissionDeniedError';
       if (isDenied) {

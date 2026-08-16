@@ -137,6 +137,12 @@ export function decodeDeviceSyncPayload(encodedStr: string): DeviceSyncPayload {
   try {
     const jsonStr = decodeURIComponent(escape(atob(encodedStr.trim())));
     const raw = JSON.parse(jsonStr);
+    const rawIdentity = raw.identity || {
+      pubkey: raw.masterPubkey || raw.mp || '',
+      masterPubkey: raw.masterPubkey || raw.mp || '',
+      handle: raw.handle || raw.h || '@user',
+      displayName: raw.displayName || raw.dn || 'User',
+    };
 
     const payload: DeviceSyncPayload = {
       version: raw.version || raw.v || 1,
@@ -144,17 +150,12 @@ export function decodeDeviceSyncPayload(encodedStr: string): DeviceSyncPayload {
       deviceId: raw.deviceId || raw.did || 'device',
       deviceName: raw.deviceName || raw.dn || 'Device',
       identity: {
-        avatarUrl: '',
-        status: '',
-        lastSeen: Date.now(),
-        color: '#1264A3',
-        hasCustomName: true,
-        ...(raw.identity || {
-          pubkey: raw.masterPubkey || raw.mp || '',
-          masterPubkey: raw.masterPubkey || raw.mp || '',
-          handle: raw.handle || raw.h || '@user',
-          displayName: raw.displayName || raw.dn || 'User',
-        }),
+        ...rawIdentity,
+        avatarUrl: rawIdentity.avatarUrl || '',
+        status: rawIdentity.status || '',
+        lastSeen: rawIdentity.lastSeen || Date.now(),
+        color: rawIdentity.color || '#1264A3',
+        hasCustomName: rawIdentity.hasCustomName ?? true,
       },
       keys: raw.keys
         ? expandPairedKeys(raw.keys)
