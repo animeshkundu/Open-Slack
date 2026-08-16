@@ -25,6 +25,7 @@ Before marking any task complete:
    - Run linter: `npm run lint`
    - Run type checks and build: `npm run build`
    - Run unit & component tests: `npm test`
+   - Run coverage check: `npm run test:coverage`
    - Run E2E tests: `npm run test:e2e`
 4. **Update Documentation**: Update the relevant files in `docs/` (see Documentation Contract below).
 5. **Clean Diffs**: Ensure no secrets, debug logs, or unrelated file modifications exist.
@@ -65,6 +66,9 @@ npm run build
 
 # Unit & Integration Tests
 npm test
+
+# Test Coverage
+npm run test:coverage
 
 # End-to-End Browser Tests
 npm run test:e2e

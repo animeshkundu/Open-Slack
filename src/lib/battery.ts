@@ -173,7 +173,11 @@ export class BatteryOptimizationManager {
 
   public subscribe(listener: BatteryListener): () => void {
     this.listeners.add(listener);
-    listener(this.getState());
+    try {
+      listener(this.getState());
+    } catch (err) {
+      console.warn('[BatteryManager] Listener error:', err);
+    }
     return () => this.listeners.delete(listener);
   }
 
