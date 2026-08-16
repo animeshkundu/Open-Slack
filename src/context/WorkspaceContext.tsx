@@ -243,6 +243,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [rawMessages, setRawMessages] = useState<Message[]>([]);
   const [rawReactions, setRawReactions] = useState<Record<string, Record<string, string[]>>>({});
   const [peerUsers, setPeerUsers] = useState<Map<string, UserIdentity>>(new Map());
+  const peerUsersRef = useRef<Map<string, UserIdentity>>(new Map());
   const [joinRequests, setJoinRequests] = useState<JoinRequest[]>([]);
 
   // Notifications & In-App Toasts
@@ -255,6 +256,10 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   });
   const [toasts, setToasts] = useState<ToastNotification[]>([]);
+
+  useEffect(() => {
+    peerUsersRef.current = peerUsers;
+  }, [peerUsers]);
 
   const dismissToast = (id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
@@ -341,6 +346,9 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     participants: new Map(),
   });
   const localMediaStreamRef = useRef<MediaStream | null>(null);
+  const cameraTrackRef = useRef<MediaStreamTrack | null>(null);
+  const screenShareTrackRef = useRef<MediaStreamTrack | null>(null);
+  const peerIdToPubkeyRef = useRef<Map<string, string>>(new Map());
 
   // 1. Initialize User Identity & Persistence on Mount
   useEffect(() => {
@@ -737,13 +745,16 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         },
         onPeerLeave: (peerId) => {
           setConnectedPeerCount(p2pNetwork.connectedPeers.size);
+          const pubkey = peerIdToPubkeyRef.current.get(peerId) || peerId;
+          peerIdToPubkeyRef.current.delete(peerId);
           setHuddleState((prev) => {
             const nextMap = new Map(prev.participants);
-            nextMap.delete(peerId);
+            nextMap.delete(pubkey);
             return { ...prev, participants: nextMap };
           });
         },
         onPresenceUpdate: (peerId, remoteUser) => {
+          peerIdToPubkeyRef.current.set(peerId, remoteUser.pubkey);
           setPeerUsers((prev) => {
             const next = new Map(prev);
             next.set(remoteUser.pubkey, { ...remoteUser, isOnline: true });
@@ -774,21 +785,37 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             return next;
           });
         },
-        onPeerStream: (stream, peerId) => {
+        onPeerHuddleLeave: (peerId, channelId) => {
+          const pubkey = peerIdToPubkeyRef.current.get(peerId) || peerId;
           setHuddleState((prev) => {
+            if (prev.channelId !== channelId) return prev;
             const nextMap = new Map(prev.participants);
-            const existing = nextMap.get(peerId);
+            nextMap.delete(pubkey);
+            return { ...prev, participants: nextMap };
+          });
+        },
+        onPeerStream: (stream, peerId, channelId) => {
+          setHuddleState((prev) => {
+            if (!prev.isActive || prev.channelId !== channelId) return prev;
+            const pubkey = peerIdToPubkeyRef.current.get(peerId) || peerId;
+            const nextMap = new Map(prev.participants);
+            const existing = nextMap.get(pubkey);
             if (existing) {
-              nextMap.set(peerId, { ...existing, stream, isVideoOn: stream.getVideoTracks().length > 0 });
+              nextMap.set(pubkey, {
+                ...existing,
+                stream,
+                isVideoOn: stream.getVideoTracks().length > 0,
+                isScreenSharing: stream.getVideoTracks().length > 1,
+              });
             } else {
-              const user = peerUsers.get(peerId);
-              nextMap.set(peerId, {
-                pubkey: peerId,
-                displayName: user?.displayName || `Peer (${peerId.slice(0, 5)})`,
+              const user = peerUsersRef.current.get(pubkey);
+              nextMap.set(pubkey, {
+                pubkey,
+                displayName: user?.displayName || `Teammate (${peerId.slice(0, 5)})`,
                 avatarUrl: user?.avatarUrl || '',
                 isMuted: false,
                 isVideoOn: stream.getVideoTracks().length > 0,
-                isScreenSharing: false,
+                isScreenSharing: stream.getVideoTracks().length > 1,
                 stream,
               });
             }
@@ -1430,6 +1457,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setMediaPermissionError(null);
 
     try {
+      p2pNetwork.startHuddle(channelId);
       if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
         throw new Error('Media devices not supported in this environment');
       }
@@ -1497,10 +1525,13 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const leaveHuddle = () => {
+    p2pNetwork.leaveHuddle();
     if (localMediaStreamRef.current) {
       localMediaStreamRef.current.getTracks().forEach((t) => t.stop());
       localMediaStreamRef.current = null;
     }
+    cameraTrackRef.current = null;
+    screenShareTrackRef.current = null;
     p2pNetwork.removeMediaStream();
     setHuddleState({
       channelId: null,
@@ -1538,6 +1569,8 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         const videoTrack = videoStream.getVideoTracks()[0];
         if (localMediaStreamRef.current && videoTrack) {
           localMediaStreamRef.current.addTrack(videoTrack);
+          cameraTrackRef.current = videoTrack;
+          p2pNetwork.refreshMediaStream();
         }
         setHuddleState((prev) => ({ ...prev, isVideoOn: true }));
       } catch (err: any) {
@@ -1548,10 +1581,12 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       }
     } else {
       if (localMediaStreamRef.current) {
-        localMediaStreamRef.current.getVideoTracks().forEach((t) => {
-          t.stop();
-          localMediaStreamRef.current?.removeTrack(t);
-        });
+        cameraTrackRef.current?.stop();
+        if (cameraTrackRef.current) {
+          localMediaStreamRef.current.removeTrack(cameraTrackRef.current);
+          cameraTrackRef.current = null;
+          p2pNetwork.refreshMediaStream();
+        }
       }
       setHuddleState((prev) => ({ ...prev, isVideoOn: false }));
     }
@@ -1567,10 +1602,17 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
         const screenTrack = screenStream.getVideoTracks()[0];
         screenTrack.onended = () => {
+          if (localMediaStreamRef.current && screenShareTrackRef.current === screenTrack) {
+            localMediaStreamRef.current.removeTrack(screenTrack);
+            screenShareTrackRef.current = null;
+            p2pNetwork.refreshMediaStream();
+          }
           setHuddleState((prev) => ({ ...prev, isScreenSharing: false }));
         };
         if (localMediaStreamRef.current) {
           localMediaStreamRef.current.addTrack(screenTrack);
+          screenShareTrackRef.current = screenTrack;
+          p2pNetwork.refreshMediaStream();
         }
         setHuddleState((prev) => ({ ...prev, isScreenSharing: true }));
       } catch (err: any) {
@@ -1580,6 +1622,12 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         }
       }
     } else {
+      if (localMediaStreamRef.current && screenShareTrackRef.current) {
+        screenShareTrackRef.current.stop();
+        localMediaStreamRef.current.removeTrack(screenShareTrackRef.current);
+        screenShareTrackRef.current = null;
+        p2pNetwork.refreshMediaStream();
+      }
       setHuddleState((prev) => ({ ...prev, isScreenSharing: false }));
     }
   };

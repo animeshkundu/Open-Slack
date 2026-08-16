@@ -103,7 +103,8 @@ export interface P2PEvents {
   onPresenceUpdate?: (peerId: string, user: UserIdentity) => void;
   onTypingUpdate?: (channelId: string, userPubkey: string, isTyping: boolean) => void;
   onHuddleStateUpdate?: (channelId: string, participants: HuddleParticipant[]) => void;
-  onPeerStream?: (stream: MediaStream, peerId: string) => void;
+  onPeerHuddleLeave?: (peerId: string, channelId: string) => void;
+  onPeerStream?: (stream: MediaStream, peerId: string, channelId: string) => void;
   onFileReceived?: (attachment: Attachment, senderPeerId: string) => void;
   onFileProgress?: (progress: FileTransferProgress) => void;
   onConnectionStatusChange?: (status: 'connecting' | 'connected' | 'reconnecting' | 'disconnected') => void;
@@ -124,8 +125,12 @@ export class P2PNetworkManager {
   private sendTyping: ((payload: any, options?: { target?: string }) => Promise<void>) | null = null;
   private sendFileHeader: ((header: FileChunkHeader, options?: { target?: string }) => Promise<void>) | null = null;
   private sendFileChunk: ((chunk: FileChunkData, options?: { target?: string }) => Promise<void>) | null = null;
+  private sendHuddle: ((payload: { type: 'join' | 'leave'; channelId: string }, options?: { target?: string }) => Promise<void>) | null = null;
 
   private activeStream: MediaStream | null = null;
+  private activeHuddleChannelId: string | null = null;
+  private peerHuddleChannels = new Map<string, string>();
+  private pendingPeerStreams = new Map<string, MediaStream>();
   private presenceInterval: number | null = null;
   private antiEntropyInterval: number | null = null;
   private reconnectTimeout: number | null = null;
@@ -282,6 +287,7 @@ export class P2PNetworkManager {
       const typeAction = this.room.makeAction<any>('type');
       const fileHeaderAction = this.room.makeAction<any>('file_hdr');
       const fileChunkAction = this.room.makeAction<any>('file_chk');
+      const huddleAction = this.room.makeAction<{ type: 'join' | 'leave'; channelId: string }>('huddle');
 
       this.sendSyncVector = (data, opts) => vectorAction.send(data, opts);
       this.sendDeltaUpdate = (data, opts) => deltaAction.send(data, opts);
@@ -289,6 +295,7 @@ export class P2PNetworkManager {
       this.sendTyping = (data, opts) => typeAction.send(data, opts);
       this.sendFileHeader = (hdr, opts) => fileHeaderAction.send(hdr, opts);
       this.sendFileChunk = (chk, opts) => fileChunkAction.send(chk, opts);
+      this.sendHuddle = (payload, opts) => huddleAction.send(payload, opts);
 
       // 2. State Vector Sync (Anti-Entropy)
       vectorAction.onMessage = (remoteVector, ctx) => {
@@ -342,6 +349,24 @@ export class P2PNetworkManager {
         }
       };
 
+      huddleAction.onMessage = (payload, ctx) => {
+        if (!payload?.channelId) return;
+
+        if (payload.type === 'leave') {
+          this.peerHuddleChannels.delete(ctx.peerId);
+          this.pendingPeerStreams.delete(ctx.peerId);
+          this.events.onPeerHuddleLeave?.(ctx.peerId, payload.channelId);
+          return;
+        }
+
+        this.peerHuddleChannels.set(ctx.peerId, payload.channelId);
+        const pendingStream = this.pendingPeerStreams.get(ctx.peerId);
+        if (pendingStream) {
+          this.pendingPeerStreams.delete(ctx.peerId);
+          this.events.onPeerStream?.(pendingStream, ctx.peerId, payload.channelId);
+        }
+      };
+
       // 7. Peer Lifecycle Callbacks
       this.room.onPeerJoin = (peerId: string) => {
         console.log(`[P2P] Peer joined: ${peerId}`);
@@ -359,6 +384,10 @@ export class P2PNetworkManager {
           this.sendPresence(this.localIdentity, { target: peerId });
         }
 
+        if (this.activeHuddleChannelId && this.sendHuddle) {
+          this.sendHuddle({ type: 'join', channelId: this.activeHuddleChannelId }, { target: peerId });
+        }
+
         // If local huddle stream is active, attach stream
         if (this.activeStream && this.room) {
           try {
@@ -372,13 +401,20 @@ export class P2PNetworkManager {
       this.room.onPeerLeave = (peerId: string) => {
         console.log(`[P2P] Peer left: ${peerId}`);
         this.connectedPeers.delete(peerId);
+        this.peerHuddleChannels.delete(peerId);
+        this.pendingPeerStreams.delete(peerId);
         this.events.onPeerLeave?.(peerId);
       };
 
       // 8. Stream Handling for Huddles
       this.room.onPeerStream = (stream: MediaStream, peerId: string) => {
         console.log(`[P2P] Received media stream from peer: ${peerId}`);
-        this.events.onPeerStream?.(stream, peerId);
+        const channelId = this.peerHuddleChannels.get(peerId);
+        if (channelId) {
+          this.events.onPeerStream?.(stream, peerId, channelId);
+        } else {
+          this.pendingPeerStreams.set(peerId, stream);
+        }
       };
 
       // 9. Start periodic Heartbeat & Anti-Entropy
@@ -512,6 +548,28 @@ export class P2PNetworkManager {
     }
   }
 
+  public refreshMediaStream() {
+    if (!this.activeStream || !this.room) return;
+    try {
+      this.room.removeStream(this.activeStream);
+      this.room.addStream(this.activeStream);
+    } catch (err) {
+      console.warn('[P2P] Error refreshing media stream:', err);
+    }
+  }
+
+  public startHuddle(channelId: string) {
+    this.activeHuddleChannelId = channelId;
+    this.sendHuddle?.({ type: 'join', channelId });
+  }
+
+  public leaveHuddle() {
+    if (this.activeHuddleChannelId) {
+      this.sendHuddle?.({ type: 'leave', channelId: this.activeHuddleChannelId });
+    }
+    this.activeHuddleChannelId = null;
+  }
+
   public removeMediaStream() {
     if (this.activeStream && this.room) {
       try {
@@ -524,6 +582,7 @@ export class P2PNetworkManager {
   }
 
   public leaveWorkspace() {
+    this.leaveHuddle();
     if (this.reconnectTimeout) {
       clearTimeout(this.reconnectTimeout);
       this.reconnectTimeout = null;
@@ -546,6 +605,8 @@ export class P2PNetworkManager {
       this.room = null;
     }
     this.connectedPeers.clear();
+    this.peerHuddleChannels.clear();
+    this.pendingPeerStreams.clear();
     this.relayStatus = 'disconnected';
   }
 }

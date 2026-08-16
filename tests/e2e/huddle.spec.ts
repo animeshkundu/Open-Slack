@@ -16,16 +16,18 @@ test.describe('Huddle Audio/Video Call Flow', () => {
     await expect(dock).toBeVisible({ timeout: 15000 });
 
     // Toggle Mic mute/unmute
-    const micBtn = page.locator('#huddle-mic-toggle-btn');
-    if (await micBtn.isVisible()) {
-      await micBtn.click();
-    }
+    const micBtn = page.locator('#huddle-mute-btn');
+    await expect(micBtn).toBeVisible();
+    await micBtn.click();
+    await expect(micBtn).toHaveClass(/bg-red-500/);
+    await micBtn.click();
+    await expect(micBtn).not.toHaveClass(/bg-red-500/);
 
     // Toggle Camera
-    const camBtn = page.locator('#huddle-cam-toggle-btn');
-    if (await camBtn.isVisible()) {
-      await camBtn.click();
-    }
+    const camBtn = page.locator('#huddle-video-btn');
+    await expect(camBtn).toBeVisible();
+    await camBtn.click();
+    await expect(camBtn).toHaveClass(/bg-blue-600/);
 
     // Expand to full stage overlay if available
     const expandBtn = page.locator('#huddle-expand-btn');

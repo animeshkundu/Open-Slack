@@ -33,7 +33,11 @@ const VideoTile: React.FC<VideoTileProps> = ({ participant, isLocal }) => {
   }, [participant.stream, isLocal]);
 
   return (
-    <div className="relative bg-neutral-900 rounded-xl overflow-hidden aspect-video flex items-center justify-center border border-neutral-800 shadow-md group">
+    <div
+      data-huddle-participant={participant.pubkey}
+      data-huddle-screen-sharing={participant.isScreenSharing ? 'true' : 'false'}
+      className="relative bg-neutral-900 rounded-xl overflow-hidden aspect-video flex items-center justify-center border border-neutral-800 shadow-md group"
+    >
       {/* Hidden audio element ensures remote audio always plays even when video is off */}
       {!isLocal && participant.stream && (
         <audio ref={audioRef} autoPlay playsInline muted={false} className="hidden" />
