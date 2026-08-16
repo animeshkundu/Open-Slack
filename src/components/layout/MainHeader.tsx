@@ -122,7 +122,7 @@ export const MainHeader: React.FC<MainHeaderProps> = ({ onOpenInvite }) => {
 
   const handleCopyHuddleLink = () => {
     if (!activeWorkspace || !activeChannel) return;
-    const payloadStr = btoa(JSON.stringify(activeWorkspace));
+    const payloadStr = btoa(unescape(encodeURIComponent(JSON.stringify(activeWorkspace))));
     const huddleUrl = `${window.location.origin}${window.location.pathname}#invite=${payloadStr}&huddle=${encodeURIComponent(activeChannel.name)}`;
     navigator.clipboard.writeText(huddleUrl);
     setCopiedLink(true);
@@ -134,7 +134,7 @@ export const MainHeader: React.FC<MainHeaderProps> = ({ onOpenInvite }) => {
 
   const handleCopyChannelLink = () => {
     if (!activeWorkspace || !activeChannel) return;
-    const payloadStr = btoa(JSON.stringify(activeWorkspace));
+    const payloadStr = btoa(unescape(encodeURIComponent(JSON.stringify(activeWorkspace))));
     const chanUrl = `${window.location.origin}${window.location.pathname}#invite=${payloadStr}&channel=${encodeURIComponent(activeChannel.name)}`;
     navigator.clipboard.writeText(chanUrl);
     setCopiedChannelLink(true);
@@ -147,7 +147,7 @@ export const MainHeader: React.FC<MainHeaderProps> = ({ onOpenInvite }) => {
   const handleCopyInviteLink = () => {
     playSound.pop();
     const inviteLink = activeWorkspace
-      ? `${window.location.origin}${window.location.pathname}#invite=${btoa(JSON.stringify(activeWorkspace))}`
+      ? `${window.location.origin}${window.location.pathname}#invite=${btoa(unescape(encodeURIComponent(JSON.stringify(activeWorkspace))))}`
       : window.location.href;
     navigator.clipboard.writeText(inviteLink);
     onOpenInvite();

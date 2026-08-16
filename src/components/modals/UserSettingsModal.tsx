@@ -82,6 +82,7 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
     identity,
     keys,
     activeWorkspace,
+    workspaces,
     preferences,
     updateProfile,
     updatePreferences,
@@ -164,7 +165,8 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
     if (activeTab === 'linked_devices') {
       try {
         const currentIdentity = identity || { pubkey: 'mock-pubkey', handle: '@user', displayName: 'User', avatarUrl: '' };
-        const payloadStr = encodeDeviceSyncPayload(currentIdentity as any, keys, activeWorkspace ? [activeWorkspace] : []);
+        const syncWorkspaces = workspaces.length > 0 ? workspaces : (activeWorkspace ? [activeWorkspace] : []);
+        const payloadStr = encodeDeviceSyncPayload(currentIdentity as any, keys, syncWorkspaces);
         const fullUrl = `${window.location.origin}${window.location.pathname}#device-sync=${payloadStr}`;
         setDeviceSyncUrl(fullUrl);
         QRCode.toDataURL(fullUrl, {

@@ -16,15 +16,29 @@ interface VideoTileProps {
 
 const VideoTile: React.FC<VideoTileProps> = ({ participant, isLocal }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
 
   useEffect(() => {
     if (videoRef.current && participant.stream) {
       videoRef.current.srcObject = participant.stream;
+      videoRef.current.play().catch(() => {});
     }
   }, [participant.stream, participant.isVideoOn, participant.isScreenSharing]);
 
+  useEffect(() => {
+    if (audioRef.current && participant.stream && !isLocal) {
+      audioRef.current.srcObject = participant.stream;
+      audioRef.current.play().catch(() => {});
+    }
+  }, [participant.stream, isLocal]);
+
   return (
     <div className="relative bg-neutral-900 rounded-xl overflow-hidden aspect-video flex items-center justify-center border border-neutral-800 shadow-md group">
+      {/* Hidden audio element ensures remote audio always plays even when video is off */}
+      {!isLocal && participant.stream && (
+        <audio ref={audioRef} autoPlay playsInline muted={false} className="hidden" />
+      )}
+
       {participant.stream && (participant.isVideoOn || participant.isScreenSharing) ? (
         <video
           ref={videoRef}

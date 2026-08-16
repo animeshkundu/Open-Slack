@@ -2,7 +2,24 @@
 
 This is a concise, human-readable record of meaningful repository evolution. Detailed implementation history remains in Git.
 
-## 2026-08-16 (Mobile Workspace Switching & Global Permissions Modal)
+## 2026-08-16 (Linked Device Sync, Teammate Invites, Multi-Browser Huddle Parity & Cache Busting)
+
+- **Device Sync & QR Code Pairing Fix**:
+  - Fixed an issue where scanned QR codes or copied `#device-sync=` URLs resulted in secondary devices loading into isolated workspaces instead of syncing with the primary account.
+  - Enhanced `encodeDeviceSyncPayload` in `src/lib/multiDevice.ts` to transmit the full array of user workspaces (including passphrases, relays, owner IDs, settings, and slugs) and complete identity profiles.
+  - Updated `WorkspaceContext.tsx` mount logic (`handleInviteLinkFromUrl`) to intercept `#device-sync=` payloads, store synced workspaces to `localStorage`, restore master keys and identity, and set the active workspace to match the primary device.
+  - Added safe UTF-8 base64 encoding and decoding (`unescape(encodeURIComponent(...))`) across all sync and invite surfaces.
+- **Teammate Invite Flow Fix**:
+  - Fixed teammate invite URL generation in `InviteModal.tsx`, `MainHeader.tsx`, `MessageList.tsx`, and `HuddleOverlay.tsx` to ensure all workspace connection parameters and channel/huddle query params (`&huddle=`, `&channel=`) are preserved and parsed accurately.
+  - Updated `LandingPage.tsx` and `JoinWorkspaceModal.tsx` to handle invite links with query parameters and decode device-sync strings seamlessly.
+- **Multi-Browser Huddle Audio/Video Parity**:
+  - Added persistent audio playback elements in `VideoGrid.tsx` (`<audio autoPlay playsInline muted={false} />`) for all remote participants, ensuring live audio streams from peers in the same channel huddle are rendered without requiring manual media reactivation.
+  - Verified multi-user concurrent huddle entrance and synchronization in `tests/e2e/p2p-multibrowser.spec.ts`.
+- **Cache-Busting & Progressive Web App Lifecycle**:
+  - Configured strict content hash generation for all build chunks (`assets/[name]-[hash].js` and `assets/[name]-[hash].css`) in `vite.config.ts`.
+  - Configured Workbox in `vite-plugin-pwa` with `cleanupOutdatedCaches: true`, `clientsClaim: true`, and `skipWaiting: true` to prevent stale versions and ensure clients immediately pick up new deployments upon release.
+- **Automated Multi-Browser Verification**:
+  - Expanded `tests/e2e/p2p-multibrowser.spec.ts` to cover end-to-end multi-browser workspace invite joins, secondary device QR sync pairing, and concurrent huddle sessions.
 
 - **Mobile Workspace Switching**:
   - Integrated the workspace list directly into the header dropdown in `PrimarySidebar.tsx` for mobile viewports.

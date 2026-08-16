@@ -35,7 +35,7 @@ export const MessageList: React.FC<MessageListProps> = ({ messages }) => {
   const handleCopyInviteLink = () => {
     playSound.pop();
     const inviteLink = activeWorkspace
-      ? `${window.location.origin}${window.location.pathname}#invite=${btoa(JSON.stringify(activeWorkspace))}`
+      ? `${window.location.origin}${window.location.pathname}#invite=${btoa(unescape(encodeURIComponent(JSON.stringify(activeWorkspace))))}`
       : window.location.href;
     navigator.clipboard.writeText(inviteLink);
     setCopiedInvite(true);

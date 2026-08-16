@@ -46,7 +46,7 @@ export const HuddleOverlay: React.FC<HuddleOverlayProps> = ({ onOpenInvite }) =>
       return;
     }
     if (activeWorkspace) {
-      const payloadStr = btoa(JSON.stringify(activeWorkspace));
+      const payloadStr = btoa(unescape(encodeURIComponent(JSON.stringify(activeWorkspace))));
       const huddleUrl = `${window.location.origin}${window.location.pathname}#invite=${payloadStr}&huddle=${encodeURIComponent(huddleState.channelName || '')}`;
       if (typeof navigator !== 'undefined' && (navigator as any).share) {
         navigator.share({

@@ -43,7 +43,7 @@ export const InviteModal: React.FC<InviteModalProps> = ({
   const previewCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
   // Generate Invite URL payload with base64 data
-  const payloadStr = activeWorkspace ? btoa(JSON.stringify(activeWorkspace)) : '';
+  const payloadStr = activeWorkspace ? btoa(unescape(encodeURIComponent(JSON.stringify(activeWorkspace)))) : '';
   const huddleQuery = initialHuddleChannel ? `&huddle=${encodeURIComponent(initialHuddleChannel)}` : '';
   const inviteUrl = `${window.location.origin}${window.location.pathname}#invite=${payloadStr}${huddleQuery}`;
   const jsonConfig = activeWorkspace ? JSON.stringify(activeWorkspace, null, 2) : '';

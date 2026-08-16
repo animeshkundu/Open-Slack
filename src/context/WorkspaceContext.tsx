@@ -18,6 +18,7 @@ import {
 } from '../lib/crypto';
 import { FileTransferProgress } from '../lib/fileTransfer';
 import { extractMentions, isUserMentioned } from '../lib/mentions';
+import { decodeDeviceSyncPayload } from '../lib/multiDevice';
 import {
   isDNDActive,
   requestNotificationPermission,
@@ -279,7 +280,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const hash = window.location.hash;
     const search = new URLSearchParams(window.location.search);
     if (hash === '#landing' || search.get('landing') === 'true') return true;
-    if (hash.startsWith('#invite=') || hash.startsWith('#/join/')) return false;
+    if (hash.startsWith('#invite=') || hash.startsWith('#/join/') || hash.startsWith('#device-sync=')) return false;
 
     // First-time visitor who has never submitted their display name lands on Landing Page
     const storedIdentity = localStorage.getItem('openslack_user_identity') || localStorage.getItem('quietslack_user_identity');
@@ -356,7 +357,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setIdentity(initIdentity);
       setKeys(initKeys);
 
-      // Check URL for invite link hash (#invite=... or #/join?...)
+      // Check URL for invite link hash (#invite=... or #device-sync=... or #/join?...)
       handleInviteLinkFromUrl(initIdentity);
     });
   }, []);
@@ -372,22 +373,73 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     applyThemeToDom(config);
   }, [preferences.themeName, preferences.customTheme]);
 
-  // Handle invite links in hash (e.g. #invite=...) and query parameters
+  // Handle invite links in hash (e.g. #invite=..., #device-sync=...) and query parameters
   const handleInviteLinkFromUrl = (user: UserIdentity) => {
     try {
       const hash = window.location.hash;
+
+      // A. Handle #device-sync=...
+      if (hash.startsWith('#device-sync=')) {
+        setShowLandingPage(false);
+        const payloadStr = decodeURIComponent(hash.replace('#device-sync=', '').split('&')[0]);
+        const syncPayload = decodeDeviceSyncPayload(payloadStr);
+
+        if (syncPayload) {
+          // 1. Synchronize Identity
+          if (syncPayload.identity) {
+            const syncedIdentity = {
+              ...syncPayload.identity,
+              hasCustomName: true,
+            };
+            setIdentity(syncedIdentity);
+            localStorage.setItem('openslack_user_identity', JSON.stringify(syncedIdentity));
+          }
+
+          // 2. Synchronize Keys
+          if (syncPayload.keys) {
+            setKeys(syncPayload.keys as any);
+          }
+
+          // 3. Synchronize Workspaces
+          if (syncPayload.workspaces && syncPayload.workspaces.length > 0) {
+            const syncedWorkspaces = syncPayload.workspaces as Workspace[];
+            setWorkspaces(syncedWorkspaces);
+            localStorage.setItem('openslack_workspaces', JSON.stringify(syncedWorkspaces));
+            const targetWsId = syncedWorkspaces[0].id;
+            setActiveWorkspaceId(targetWsId);
+            localStorage.setItem('openslack_active_ws', targetWsId);
+          }
+
+          window.history.replaceState(null, '', window.location.pathname);
+          return;
+        }
+      }
+
+      // B. Handle #invite=... and #/join/...
       if (hash.startsWith('#invite=') || hash.startsWith('#/join/')) {
         setShowLandingPage(false);
-        const payloadStr = decodeURIComponent(hash.replace('#invite=', '').replace('#/join/', ''));
-        const inviteData = JSON.parse(atob(payloadStr)) as Workspace;
+        const cleanHash = hash.replace(/^#\/?(invite=|join\/)/, '');
+        const [encodedPayload, ...queryParts] = cleanHash.split('&');
+        const hashParams = new URLSearchParams(queryParts.join('&'));
+        const hashHuddle = hashParams.get('huddle');
+        const hashChannel = hashParams.get('channel');
+
+        const payloadStr = decodeURIComponent(encodedPayload);
+        const inviteData = JSON.parse(decodeURIComponent(escape(atob(payloadStr)))) as Workspace;
         if (inviteData.id && inviteData.name) {
           saveAndJoinWorkspace(inviteData, user);
+          if (hashChannel) {
+            setActiveChannelId(hashChannel);
+          }
+          if (hashHuddle) {
+            setActiveChannelId(hashHuddle);
+          }
           window.history.replaceState(null, '', window.location.pathname);
           return;
         }
       }
     } catch (e) {
-      console.warn('Invalid invite payload:', e);
+      console.warn('Invalid invite/device-sync payload:', e);
     }
 
     const { workspace: queryWsParam, channel: queryChParam } = getUrlParams();

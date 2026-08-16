@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import React, { useState } from 'react';
 import { useWorkspace } from '../../context/WorkspaceContext';
+import { decodeDeviceSyncPayload } from '../../lib/multiDevice';
 import { Workspace } from '../../types';
 
 interface JoinWorkspaceModalProps {
@@ -80,9 +81,17 @@ export const JoinWorkspaceModal: React.FC<JoinWorkspaceModalProps> = ({
       }
 
       let wsData: Workspace;
-      if (input.includes('#invite=')) {
-        const payloadStr = decodeURIComponent(input.split('#invite=')[1]);
-        wsData = JSON.parse(atob(payloadStr));
+      if (input.includes('#device-sync=')) {
+        const payloadStr = decodeURIComponent(input.split('#device-sync=')[1].split('&')[0]);
+        const parsed = decodeDeviceSyncPayload(payloadStr);
+        if (parsed && parsed.workspaces && parsed.workspaces.length > 0) {
+          wsData = parsed.workspaces[0] as Workspace;
+        } else {
+          throw new Error('Invalid device sync payload');
+        }
+      } else if (input.includes('#invite=') || input.includes('#/join/')) {
+        const payloadStr = decodeURIComponent(input.split(/#invite=|#\/join\//)[1].split('&')[0]);
+        wsData = JSON.parse(decodeURIComponent(escape(atob(payloadStr))));
       } else if (input.startsWith('{')) {
         wsData = JSON.parse(input);
       } else {

@@ -66,6 +66,21 @@ export function encodeDeviceSyncPayload(
     deviceName: device.deviceName,
     handle: identity?.handle || '@user',
     displayName: identity?.displayName || 'User',
+    identity: identity
+      ? {
+          pubkey: identity.pubkey || identity.masterPubkey || 'pubkey',
+          masterPubkey: identity.masterPubkey || identity.pubkey,
+          handle: identity.handle,
+          displayName: identity.displayName,
+          avatarUrl: identity.avatarUrl || '',
+          color: identity.color || '#1264A3',
+          status: identity.status || 'active',
+          statusEmoji: identity.statusEmoji || '',
+          statusDetails: identity.statusDetails,
+          hasCustomName: true,
+          lastSeen: Date.now(),
+        }
+      : undefined,
     keys: keys
       ? {
           signPublicKey: keys.signPublicKey,
@@ -76,10 +91,17 @@ export function encodeDeviceSyncPayload(
       : undefined,
     workspaces:
       workspaces.length > 0
-        ? workspaces.slice(0, 5).map((w) => ({
+        ? workspaces.slice(0, 20).map((w) => ({
             id: w.id,
             name: w.name,
+            passphrase: w.passphrase || '',
             relays: w.relays || [],
+            ownerPubkey: w.ownerPubkey || w.ownerId || '',
+            ownerId: w.ownerId || w.ownerPubkey,
+            settings: w.settings,
+            created: w.created || Date.now(),
+            createdAt: w.createdAt || new Date(w.created || Date.now()).toISOString(),
+            slug: w.slug,
           }))
         : undefined,
     timestamp: Date.now(),
@@ -99,11 +121,12 @@ export function decodeDeviceSyncPayload(encodedStr: string): DeviceSyncPayload {
 
     const payload: DeviceSyncPayload = {
       version: raw.version || raw.v || 1,
-      masterPubkey: raw.masterPubkey || raw.mp || '',
+      masterPubkey: raw.masterPubkey || raw.mp || (raw.identity && raw.identity.pubkey) || '',
       deviceId: raw.deviceId || raw.did || 'device',
       deviceName: raw.deviceName || raw.dn || 'Device',
       identity: raw.identity || {
         pubkey: raw.masterPubkey || raw.mp || '',
+        masterPubkey: raw.masterPubkey || raw.mp || '',
         handle: raw.handle || raw.h || '@user',
         displayName: raw.displayName || raw.dn || 'User',
         statusText: '',
@@ -112,13 +135,14 @@ export function decodeDeviceSyncPayload(encodedStr: string): DeviceSyncPayload {
         joinedAt: Date.now(),
         lastSeen: Date.now(),
         color: '#1264A3',
+        hasCustomName: true,
       },
       keys: raw.keys || { publicKey: raw.masterPubkey || raw.mp || '', privateKey: 'synced' },
       workspaces: raw.workspaces || (raw.workspace ? [raw.workspace] : []),
       timestamp: raw.timestamp || raw.ts || Date.now(),
     };
 
-    if (!payload.masterPubkey) {
+    if (!payload.masterPubkey && (!payload.workspaces || payload.workspaces.length === 0)) {
       throw new Error('Invalid device pairing payload structure');
     }
     return payload;
