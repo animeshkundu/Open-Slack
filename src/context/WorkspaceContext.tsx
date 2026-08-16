@@ -129,6 +129,8 @@ interface WorkspaceContextValue {
   setShowLandingPage: (show: boolean) => void;
   mobileView: MobileViewType;
   setMobileView: (view: MobileViewType) => void;
+  isSidebarCollapsed: boolean;
+  toggleSidebar: () => void;
 
   // Search
   searchQuery: string;
@@ -285,6 +287,20 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     return false;
   });
   const [mobileView, setMobileView] = useState<MobileViewType>('chat');
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
+    if (typeof localStorage !== 'undefined') {
+      return localStorage.getItem('openslack_sidebar_collapsed') === 'true';
+    }
+    return false;
+  });
+
+  const toggleSidebar = () => {
+    setIsSidebarCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem('openslack_sidebar_collapsed', String(next));
+      return next;
+    });
+  };
 
   // Search
   const [searchQuery, setSearchQuery] = useState('');
@@ -623,6 +639,8 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                       workspaceId: activeWorkspace.id,
                       recipientId: identity.pubkey,
                       actorId: msg.authorPubkey,
+                      actorName: authorName,
+                      actorAvatar: author?.avatarUrl,
                       type: isMention ? 'mention' : 'thread_reply',
                       channelId: msg.channelId,
                       messageId: msg.id,
@@ -850,18 +868,25 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   // Profile Updater
   const updateProfile = (updates: Partial<UserIdentity>) => {
-    if (!identity) return;
-    const updated = { ...identity, ...updates };
-    setIdentity(updated);
-    saveIdentity(updated);
-    p2pNetwork.updateLocalIdentity(updated);
+    setIdentity((prev) => {
+      // If identity is null, we can't safely update yet as we lack master keys/pubkeys
+      // We rely on LandingPage/onboarding to wait for identity before allowing submission
+      if (!prev) {
+        console.warn('[WorkspaceContext] Attempted to update profile before identity loaded');
+        return prev;
+      }
+      const updated = { ...prev, ...updates };
+      saveIdentity(updated);
+      p2pNetwork.updateLocalIdentity(updated);
 
-    if (ydocRef.current) {
-      const yUsers = ydocRef.current.getMap<UserIdentity>('users');
-      ydocRef.current.transact(() => {
-        yUsers.set(updated.pubkey, updated);
-      });
-    }
+      if (ydocRef.current) {
+        const yUsers = ydocRef.current.getMap<UserIdentity>('users');
+        ydocRef.current.transact(() => {
+          yUsers.set(updated.pubkey, updated);
+        });
+      }
+      return updated;
+    });
   };
 
   // Workspace Actions
@@ -1084,7 +1109,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     });
 
     const dmTitle = buildDmTitle(peerNames);
-    // Opaque id — never derive from member pubkeys (leave + recreate must not overwrite)
+    // Opaque id - never derive from member pubkeys (leave + recreate must not overwrite)
     const id = createDmChannelId();
     const newDm: Channel = {
       id,
@@ -1130,7 +1155,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
     if (chan.isDirectMessage) {
       // Soft-leave: remove only the local user from the member roster.
-      // Never delete the shared DM document — that would wipe history for peers
+      // Never delete the shared DM document - that would wipe history for peers
       // and let a later recreate clobber another conversation.
       const updatedMembers = (chan.members || []).filter((m) => m !== identity.pubkey);
       if (updatedMembers.length === 0) {
@@ -1590,6 +1615,8 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         workspaceId: activeWorkspace?.id || '',
         recipientId: identity.pubkey,
         actorId: dummyPubkey,
+        actorName: dummy.name,
+        actorAvatar: dummyUser.avatarUrl,
         type: 'mention',
         channelId: activeChannel.id,
         messageId: newMsg.id,
@@ -1694,6 +1721,8 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setShowLandingPage,
     mobileView,
     setMobileView,
+    isSidebarCollapsed,
+    toggleSidebar,
     searchQuery,
     setSearchQuery,
     isSearchOpen,

@@ -6,9 +6,11 @@ import {
   Hash,
   Headphones,
   Lock,
+  LogOut,
   MessageSquare,
   Mic,
   MicOff,
+  PanelLeftClose,
   PhoneOff,
   Plus,
   Search,
@@ -57,6 +59,7 @@ export const PrimarySidebar: React.FC<PrimarySidebarProps> = ({
     notifications,
     setShowLandingPage,
     setMobileView,
+    toggleSidebar,
   } = useWorkspace();
 
   const [showWorkspaceMenu, setShowWorkspaceMenu] = useState(false);
@@ -83,13 +86,13 @@ export const PrimarySidebar: React.FC<PrimarySidebarProps> = ({
         color: 'var(--theme-sidebar-text, #BCABB6)',
       }}
     >
-      {/* Workspace Header Dropdown */}
-      <div className="relative">
+      {/* Workspace Header Dropdown & Collapse Button */}
+      <div className="relative border-b border-black/20 flex items-center justify-between pr-2">
         <button
           id="workspace-header-menu-btn"
           type="button"
           onClick={() => setShowWorkspaceMenu(!showWorkspaceMenu)}
-          className="w-full h-14 p-4 flex items-center justify-between border-b border-black/20 text-white hover:bg-black/15 transition cursor-pointer"
+          className="flex-1 h-14 p-4 flex items-center justify-between text-white hover:bg-black/15 transition cursor-pointer min-w-0"
         >
           <div className="flex items-center gap-2 min-w-0">
             <span className="font-black text-base tracking-tight truncate text-white">
@@ -99,20 +102,21 @@ export const PrimarySidebar: React.FC<PrimarySidebarProps> = ({
           </div>
         </button>
 
+        <button
+          id="collapse-sidebar-btn"
+          type="button"
+          onClick={toggleSidebar}
+          className="p-2 rounded-lg text-white/70 hover:text-white hover:bg-black/20 transition cursor-pointer flex-shrink-0"
+          title="Collapse sidebar (Ctrl+Shift+D)"
+        >
+          <PanelLeftClose className="w-4 h-4" />
+        </button>
+
         {showWorkspaceMenu && (
           <div
             id="workspace-header-dropdown"
-            className="absolute top-14 left-2 z-50 w-64 bg-white text-neutral-800 rounded-xl shadow-2xl border border-neutral-200 py-1.5 animate-in fade-in zoom-in-95 duration-100"
+            className="absolute top-14 left-2 z-50 w-64 bg-white text-neutral-800 rounded-xl shadow-2xl border border-neutral-200 py-1 animate-in fade-in zoom-in-95 duration-100"
           >
-            <div className="px-3.5 py-2.5 border-b border-neutral-100 bg-neutral-50/70">
-              <div className="font-bold text-xs text-neutral-900 truncate">
-                {activeWorkspace?.name}
-              </div>
-              <div className="text-[10px] text-neutral-500 font-mono">
-                ID: {activeWorkspace?.id.slice(0, 16)}...
-              </div>
-            </div>
-
             <button
               id="ws-menu-invite-btn"
               type="button"
@@ -168,10 +172,10 @@ export const PrimarySidebar: React.FC<PrimarySidebarProps> = ({
                 setShowWorkspaceMenu(false);
                 setShowLandingPage(true);
               }}
-              className="w-full px-3.5 py-2 hover:bg-neutral-100 text-xs font-semibold flex items-center gap-2.5 text-neutral-700 cursor-pointer"
+              className="w-full px-3.5 py-2 hover:bg-red-50 text-xs font-semibold flex items-center gap-2.5 text-red-600 hover:text-red-700 transition cursor-pointer"
             >
-              <Globe className="w-4 h-4 text-purple-600" />
-              <span>Landing Page & Docs</span>
+              <LogOut className="w-4 h-4" />
+              <span>Sign out of Open-Slack</span>
             </button>
           </div>
         )}
@@ -203,7 +207,7 @@ export const PrimarySidebar: React.FC<PrimarySidebarProps> = ({
             id="quick-activity-btn"
             type="button"
             onClick={() => {
-              // On phone, Activity is a bottom-tab surface — never cover MobileNavBar
+              // On phone, Activity is a bottom-tab surface - never cover MobileNavBar
               // with the full-viewport right drawer.
               const isPhone =
                 typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches;
@@ -481,30 +485,62 @@ export const PrimarySidebar: React.FC<PrimarySidebarProps> = ({
             </div>
           )}
         </div>
+      </div>
 
-        {/* Slack-style workspace invite — sits under Channels/DMs like Slack's sidebar CTA */}
-        <div className="pt-2 border-t border-white/10">
+      {/* Pinned Bottom Footer: User Profile & Workspace Invite */}
+      <div className="p-2 border-t border-white/10 mt-auto flex-shrink-0 space-y-1">
+        <button
+          id="sidebar-invite-teammates-btn"
+          type="button"
+          onClick={onOpenInvite}
+          className="w-full flex items-center justify-between px-3 py-2 rounded-md text-xs font-semibold opacity-80 hover:opacity-100 hover:bg-black/15 hover:text-white transition cursor-pointer"
+          title="Invite people to this workspace"
+        >
+          <div className="flex items-center gap-2.5">
+            <UserPlus className="w-4 h-4 opacity-75" />
+            <span>Invite people</span>
+          </div>
+          {peerUsers.size === 0 && (
+            <span className="relative flex h-2 w-2 mr-1" title="Waiting for teammates">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-400" />
+            </span>
+          )}
+        </button>
+
+        {identity && (
           <button
-            id="sidebar-invite-teammates-btn"
+            id="sidebar-user-profile-btn"
             type="button"
-            onClick={onOpenInvite}
-            className="w-full flex items-center justify-between px-3 py-1.5 rounded-md text-xs font-semibold opacity-90 hover:opacity-100 hover:bg-black/15 hover:text-white transition cursor-pointer"
-            title="Invite people to this workspace"
+            onClick={onOpenSettings}
+            className="w-full flex items-center gap-3 px-3 py-2 rounded-md hover:bg-black/15 transition group cursor-pointer"
           >
-            <div className="flex items-center gap-2.5">
-              <span className="w-5 h-5 rounded-md bg-white/10 flex items-center justify-center flex-shrink-0">
-                <UserPlus className="w-3.5 h-3.5 opacity-90" />
-              </span>
-              <span>Invite people</span>
+            <div className="relative flex-shrink-0">
+              {identity.avatarUrl ? (
+                <img
+                  src={identity.avatarUrl}
+                  alt={identity.displayName}
+                  className="w-8 h-8 rounded-lg object-cover border border-white/10"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <div className="w-8 h-8 rounded-lg bg-neutral-600 flex items-center justify-center font-bold text-white text-[11px]">
+                  {identity.displayName.slice(0, 2).toUpperCase()}
+                </div>
+              )}
+              <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-[#2BAC76] border-2 border-neutral-800 rounded-full" />
             </div>
-            {peerUsers.size === 0 && (
-              <span className="relative flex h-2 w-2 mr-1" title="Waiting for teammates">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-400" />
-              </span>
-            )}
+            <div className="flex-1 min-w-0 text-left">
+              <div className="text-xs font-bold text-white truncate leading-tight">
+                {identity.displayName}
+              </div>
+              <div className="text-[10px] opacity-60 truncate leading-tight">
+                {identity.status || identity.handle}
+              </div>
+            </div>
+            <Settings className="w-3.5 h-3.5 opacity-0 group-hover:opacity-60 transition-opacity" />
           </button>
-        </div>
+        )}
       </div>
 
       {/* Live Active Huddle Widget (Displayed ONLY when in an active call) */}

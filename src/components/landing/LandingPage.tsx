@@ -217,7 +217,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnterApp }) => {
 
           {/* Subtitle */}
           <p className="text-lg sm:text-xl text-neutral-600 max-w-2xl mx-auto leading-relaxed mb-8">
-            Everything you love about Slack — channels, direct messages, file sharing, and voice huddles — running 100% private in your browser.
+            Everything you love about Slack - channels, direct messages, file sharing, and voice huddles - running 100% private in your browser.
           </p>
 
           {/* Quick Launch Hero Input */}
@@ -761,7 +761,7 @@ channel.onmessage = (e) => Y.applyUpdate(ydoc, new Uint8Array(e.data));`}</code>
               #
             </div>
             <span className="font-bold text-neutral-200">Open-Slack</span>
-            <span>— Open-source P2P team collaboration platform.</span>
+            <span>- Open-source P2P team collaboration platform.</span>
           </div>
 
           <div className="flex items-center gap-6">

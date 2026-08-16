@@ -119,6 +119,8 @@ export const ActivityFeedDrawer: React.FC<ActivityFeedDrawerProps> = ({
         ) : (
           notifications.map((notif) => {
             const actor = peerUsers.get(notif.actorId);
+            const displayName = actor?.displayName || notif.actorName || 'Teammate';
+            const avatarUrl = actor?.avatarUrl || notif.actorAvatar;
             const channel = channels.find((c) => c.id === notif.channelId);
 
             return (
@@ -130,16 +132,16 @@ export const ActivityFeedDrawer: React.FC<ActivityFeedDrawerProps> = ({
                 }`}
               >
                 <div className="relative flex-shrink-0">
-                  {actor?.avatarUrl ? (
+                  {avatarUrl ? (
                     <img
-                      src={actor.avatarUrl}
-                      alt={actor.displayName}
+                      src={avatarUrl}
+                      alt={displayName}
                       className="w-8 h-8 rounded-lg border border-neutral-200 object-cover"
                       referrerPolicy="no-referrer"
                     />
                   ) : (
                     <div className="w-8 h-8 rounded-lg bg-neutral-200 flex items-center justify-center font-bold text-xs text-neutral-700">
-                      {actor?.displayName?.slice(0, 2) || '??'}
+                      {displayName.slice(0, 2).toUpperCase() || '??'}
                     </div>
                   )}
                   <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-amber-500 text-white flex items-center justify-center text-[9px] shadow-xs">
@@ -150,7 +152,7 @@ export const ActivityFeedDrawer: React.FC<ActivityFeedDrawerProps> = ({
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-1">
                     <span className="text-xs font-bold text-neutral-900 truncate">
-                      {actor?.displayName || 'Teammate'}
+                      {displayName}
                     </span>
                     <span className="text-[10px] text-neutral-400">
                       {new Date(notif.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}

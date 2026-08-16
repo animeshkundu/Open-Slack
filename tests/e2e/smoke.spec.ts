@@ -12,7 +12,13 @@ test.describe('Open Slack Smoke & Core UI Suite', () => {
     await expect(page.locator('#openslack-root-shell')).toBeVisible();
 
     // Primary channels sidebar
-    await expect(page.locator('#primary-sidebar-container')).toBeVisible();
+    await expect(page.locator('#primary-sidebar-container')).toBeVisible({ timeout: 10000 });
+    
+    // Identity hydrates asynchronously, wait for profile button
+    const profileBtn = page.locator('#sidebar-user-profile-btn');
+    await profileBtn.waitFor({ state: 'visible', timeout: 15000 });
+    await expect(profileBtn).toBeVisible();
+    
     await expect(page.getByRole('button', { name: 'Channels', exact: true })).toBeVisible();
 
     // Default channel general

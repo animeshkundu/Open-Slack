@@ -16,7 +16,7 @@ export function sameMemberSet(a?: string[] | null, b?: string[] | null): boolean
 
 /**
  * Opaque DM / group-DM channel id.
- * Membership must never be encoded in the id — otherwise leave + recreate overwrites
+ * Membership must never be encoded in the id - otherwise leave + recreate overwrites
  * an existing conversation in the shared Yjs map.
  */
 export function createDmChannelId(): string {

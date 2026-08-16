@@ -122,46 +122,6 @@ export const WorkspaceBar: React.FC<WorkspaceBarProps> = ({
             }`}
           />
         </div>
-
-        {/* Settings button */}
-        <button
-          id="workspace-settings-btn"
-          type="button"
-          onClick={onOpenSettings}
-          className="w-8 h-8 rounded-lg hover:bg-white/10 text-white/60 hover:text-white flex items-center justify-center transition"
-          title="Preferences & Security Vault"
-        >
-          <Settings className="w-4 h-4" />
-        </button>
-
-        {/* User Profile Avatar with Online Dot */}
-        {identity && (
-          <div className="relative w-10 h-10 mt-1">
-            <button
-              id="workspace-user-profile-btn"
-              type="button"
-              onClick={onOpenSettings}
-              className="w-10 h-10 rounded-lg bg-gray-600 flex items-center justify-center text-white text-xs overflow-hidden group focus:outline-none"
-              title={`${identity.displayName} (${identity.handle})`}
-            >
-              {identity.avatarUrl ? (
-                <img
-                  src={identity.avatarUrl}
-                  alt={identity.displayName}
-                  className="w-full h-full object-cover group-hover:scale-105 transition"
-                  referrerPolicy="no-referrer"
-                />
-              ) : (
-                <div
-                  className="w-full h-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center font-bold text-white text-xs"
-                >
-                  {identity.displayName.slice(0, 2).toUpperCase()}
-                </div>
-              )}
-            </button>
-            <span className="absolute bottom-0 right-0 w-3 h-3 bg-[#2BAC76] border-2 border-[#19171D] rounded-full pointer-events-none" />
-          </div>
-        )}
       </div>
     </div>
   );

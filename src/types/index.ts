@@ -191,6 +191,8 @@ export interface AppNotification {
   workspaceId: string;
   recipientId: string;
   actorId: string;           // User who triggered the notification
+  actorName?: string;        // Persisted author name when notification occurred
+  actorAvatar?: string;      // Persisted author avatar URL when notification occurred
   type: 'mention' | 'thread_reply' | 'reaction' | 'join_request';
   channelId?: string;
   messageId?: string;

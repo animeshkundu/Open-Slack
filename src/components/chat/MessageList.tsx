@@ -138,48 +138,6 @@ export const MessageList: React.FC<MessageListProps> = ({ messages }) => {
                   <span id="privacy-subtext-public">Public to workspace: Visible to all approved members of this workspace.</span>
                 )}
               </div>
-
-              {/* 1-Click Interactive Quick-Action Chips */}
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  id="welcome-chip-say-hello"
-                  onClick={() => handleSendChip('Say hello to the team!')}
-                  className="px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-[#4A154B] border border-purple-200 rounded-full text-xs font-bold transition flex items-center gap-1.5 shadow-2xs cursor-pointer active:scale-95"
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-purple-600" />
-                  <span>Say hello to team</span>
-                </button>
-
-                <button
-                  type="button"
-                  id="welcome-chip-testing"
-                  onClick={() => handleSendChip('Testing out Open-Slack!')}
-                  className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-[#007a5a] border border-emerald-200 rounded-full text-xs font-bold transition flex items-center gap-1.5 shadow-2xs cursor-pointer active:scale-95"
-                >
-                  <Check className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>Testing Open-Slack</span>
-                </button>
-
-                <button
-                  type="button"
-                  id="welcome-chip-invite"
-                  onClick={handleCopyInviteLink}
-                  className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-[#1164A3] border border-blue-200 rounded-full text-xs font-bold transition flex items-center gap-1.5 shadow-2xs cursor-pointer active:scale-95"
-                >
-                  {copiedInvite ? (
-                    <>
-                      <Check className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>Link Copied!</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-3.5 h-3.5" />
-                      <span>Copy Invite Link</span>
-                    </>
-                  )}
-                </button>
-              </div>
             </div>
           </div>
         </div>

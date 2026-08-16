@@ -130,16 +130,30 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
   const [deviceSyncUrl, setDeviceSyncUrl] = useState<string>('');
 
   useEffect(() => {
-    if (activeTab === 'linked_devices' && identity && keys) {
+    if (activeTab === 'linked_devices') {
       try {
-        const payloadStr = encodeDeviceSyncPayload(identity, keys, activeWorkspace ? [activeWorkspace] : []);
+        const currentIdentity = identity || { pubkey: 'mock-pubkey', handle: '@user', displayName: 'User', avatarUrl: '' };
+        const payloadStr = encodeDeviceSyncPayload(currentIdentity as any, keys, activeWorkspace ? [activeWorkspace] : []);
         const fullUrl = `${window.location.origin}${window.location.pathname}#device-sync=${payloadStr}`;
         setDeviceSyncUrl(fullUrl);
-        QRCode.toDataURL(fullUrl, { width: 220, margin: 1 })
+        QRCode.toDataURL(fullUrl, {
+          width: 220,
+          margin: 1,
+          errorCorrectionLevel: 'L',
+          color: { dark: '#111827', light: '#FFFFFF' },
+        })
           .then(setDeviceQrDataUrl)
-          .catch((err) => console.warn('QR render error:', err));
+          .catch((err) => {
+            console.warn('QR render error, falling back to basic URL:', err);
+            QRCode.toDataURL(window.location.href, { width: 220, margin: 1, errorCorrectionLevel: 'L' })
+              .then(setDeviceQrDataUrl)
+              .catch((fallbackErr) => console.error('QR fallback failed:', fallbackErr));
+          });
       } catch (err) {
         console.warn('Device payload build error:', err);
+        QRCode.toDataURL(window.location.href, { width: 220, margin: 1, errorCorrectionLevel: 'L' })
+          .then(setDeviceQrDataUrl)
+          .catch((fallbackErr) => console.error('QR fallback failed:', fallbackErr));
       }
     }
   }, [activeTab, identity, keys, activeWorkspace]);
@@ -696,7 +710,7 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
                   <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-700 mb-2">
                     Pre-Configured Slack Themes
                   </h4>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {Object.values(PRESET_THEMES).map((thm) => (
                       <button
                         key={thm.name}
@@ -1013,40 +1027,44 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
                   <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-700 mb-2 flex items-center gap-1.5">
                     <QrCode className="w-4 h-4 text-[#1264A3]" /> Pair Mobile Phone or Secondary Laptop
                   </h4>
-                  <div className="flex flex-col sm:flex-row items-center gap-4 p-4 bg-neutral-50 border border-neutral-200 rounded-xl">
-                    {deviceQrDataUrl ? (
-                      <img
-                        id="linked-device-qr-img"
-                        src={deviceQrDataUrl}
-                        alt="Linked Device Pairing QR Code"
-                        className="w-44 h-44 rounded-lg border border-neutral-300 shadow-xs"
-                      />
-                    ) : (
-                      <div className="w-44 h-44 flex items-center justify-center bg-white border border-neutral-200 rounded-lg text-xs text-neutral-400">
-                        Generating Pairing QR...
-                      </div>
-                    )}
-                    <div className="flex-1 space-y-2 text-xs">
-                      <div className="font-bold text-neutral-900">Scan QR Code or Copy Direct Link</div>
+                  <div className="flex flex-col md:flex-row items-center md:items-start gap-4 sm:gap-6 p-4 bg-neutral-50 border border-neutral-200 rounded-xl">
+                    <div className="flex-shrink-0">
+                      {deviceQrDataUrl ? (
+                        <img
+                          id="linked-device-qr-img"
+                          src={deviceQrDataUrl}
+                          alt="Linked Device Pairing QR Code"
+                          className="w-36 h-36 sm:w-40 sm:h-40 md:w-44 md:h-44 rounded-lg border border-neutral-300 shadow-xs"
+                        />
+                      ) : (
+                        <div className="w-36 h-36 sm:w-40 sm:h-40 md:w-44 md:h-44 flex items-center justify-center bg-white border border-neutral-200 rounded-lg text-xs text-neutral-400">
+                          Generating Pairing QR...
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 space-y-2.5 text-xs w-full">
+                      <div id="linked-device-instruction-header" className="font-bold text-neutral-900 text-sm md:text-xs">Scan QR Code or Copy Direct Link</div>
                       <p className="text-neutral-600 leading-relaxed">
                         Open Open-Slack on your phone or secondary browser and scan this QR code or open the link below to sync your profile, workspace keys, and chat history instantly.
                       </p>
-                      <div className="pt-1 flex items-center gap-2">
-                        <input
-                          type="text"
-                          readOnly
-                          value={deviceSyncUrl}
-                          id="linked-device-url-input"
-                          className="flex-1 px-3 py-1.5 bg-white border border-neutral-300 rounded text-[11px] font-mono select-all outline-none"
-                        />
+                      <div className="pt-1 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                        <div className="flex-1 min-w-0 relative">
+                          <input
+                            type="text"
+                            readOnly
+                            value={deviceSyncUrl}
+                            id="linked-device-url-input"
+                            className="w-full px-3 py-2 bg-white border border-neutral-300 rounded text-[10px] sm:text-[11px] font-mono select-all outline-none focus:border-[#1264A3] transition"
+                          />
+                        </div>
                         <button
                           type="button"
                           id="copy-linked-device-url-btn"
                           onClick={() => copyToClipboard(deviceSyncUrl, 'linked_device_url')}
-                          className="px-3 py-1.5 bg-[#007a5a] text-white font-bold rounded text-xs flex items-center gap-1 cursor-pointer hover:bg-[#148567]"
+                          className="px-3 py-2 bg-[#007a5a] text-white font-bold rounded text-xs flex items-center justify-center gap-1.5 cursor-pointer hover:bg-[#148567] transition shadow-xs sm:flex-shrink-0"
                         >
                           {copiedKey === 'linked_device_url' ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                          <span>{copiedKey === 'linked_device_url' ? 'Copied' : 'Copy'}</span>
+                          <span>{copiedKey === 'linked_device_url' ? 'Copied' : 'Copy Link'}</span>
                         </button>
                       </div>
                     </div>
@@ -1058,22 +1076,22 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
                     Active Registered Devices
                   </h4>
                   <div className="space-y-2">
-                    <div className="p-3 bg-white border border-neutral-200 rounded-xl flex items-center justify-between">
+                    <div className="p-3 bg-white border border-neutral-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-0">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold">
+                        <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold flex-shrink-0">
                           <Smartphone className="w-4 h-4" />
                         </div>
-                        <div>
-                          <div className="text-xs font-bold text-neutral-900 flex items-center gap-2">
-                            <span>{getOrCreateDeviceId().deviceName}</span>
-                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">This Device</span>
+                        <div className="min-w-0">
+                          <div className="text-xs font-bold text-neutral-900 flex flex-wrap items-center gap-2">
+                            <span className="truncate">{getOrCreateDeviceId().deviceName}</span>
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 flex-shrink-0">This Device</span>
                           </div>
-                          <div className="text-[11px] text-neutral-500 font-mono">
+                          <div className="text-[11px] text-neutral-500 font-mono truncate">
                             ID: {getOrCreateDeviceId().deviceId}
                           </div>
                         </div>
                       </div>
-                      <div className="text-[11px] text-emerald-600 font-bold flex items-center gap-1">
+                      <div className="text-[11px] text-emerald-600 font-bold flex items-center gap-1 sm:justify-end">
                         <span className="w-2 h-2 rounded-full bg-emerald-500" />
                         <span>Active Now</span>
                       </div>
@@ -1200,7 +1218,7 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
             {/* 5. NETWORK TAB */}
             {activeTab === 'network' && (
               <div className="space-y-4">
-                <div className="flex items-center justify-between p-3.5 bg-neutral-50 border border-neutral-200 rounded-lg">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 bg-neutral-50 border border-neutral-200 rounded-lg">
                   <div>
                     <div className="text-xs font-bold text-neutral-900">
                       Signaling Mesh Status
@@ -1430,17 +1448,17 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
                 </div>
 
                 {/* Clear / Maintenance Row */}
-                <div className="p-4 bg-neutral-50 border border-neutral-200 rounded-xl flex items-center justify-between">
-                  <div>
+                <div className="p-4 bg-neutral-50 border border-neutral-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="space-y-0.5">
                     <div className="text-xs font-bold text-neutral-900">Local Media Cache Cleanup</div>
-                    <div className="text-[11px] text-neutral-500">
+                    <div className="text-[11px] text-neutral-500 leading-relaxed">
                       Clear cached media and attachment files while preserving channel text history
                     </div>
                   </div>
                   <button
                     type="button"
                     onClick={handleClearMediaStorage}
-                    className="px-3 py-1.5 bg-neutral-200 hover:bg-red-50 hover:text-red-700 hover:border-red-300 border border-neutral-300 text-neutral-800 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                    className="w-full sm:w-auto px-4 py-2 bg-neutral-200 hover:bg-red-50 hover:text-red-700 hover:border-red-300 border border-neutral-300 text-neutral-800 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs whitespace-nowrap"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                     <span>{clearedStorageSuccess ? 'Cache Cleared!' : 'Purge Media Cache'}</span>

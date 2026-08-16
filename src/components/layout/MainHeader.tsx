@@ -13,6 +13,8 @@ import {
   MicOff,
   Monitor,
   MoreHorizontal,
+  PanelLeft,
+  PanelLeftOpen,
   PhoneOff,
   Pin,
   Search,
@@ -50,6 +52,8 @@ export const MainHeader: React.FC<MainHeaderProps> = ({ onOpenInvite }) => {
     peerUsers,
     notifications,
     setMobileView,
+    isSidebarCollapsed,
+    toggleSidebar,
   } = useWorkspace();
 
   const { isInstallable, installApp, isOffline } = usePWAInstall();
@@ -155,7 +159,7 @@ export const MainHeader: React.FC<MainHeaderProps> = ({ onOpenInvite }) => {
     const isPhone =
       typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches;
 
-    // Activity is a primary mobile tab — route there so the bottom bar stays visible
+    // Activity is a primary mobile tab - route there so the bottom bar stays visible
     if (panel === 'activity_feed' && isPhone) {
       setRightPanel('none');
       setMobileView('activity');
@@ -189,6 +193,21 @@ export const MainHeader: React.FC<MainHeaderProps> = ({ onOpenInvite }) => {
       >
         {/* Left: Channel Information & Metadata */}
         <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-shrink">
+          {/* Desktop Toggle Sidebar Button */}
+          <button
+            id="desktop-toggle-sidebar-btn"
+            type="button"
+            onClick={toggleSidebar}
+            className="hidden md:flex p-1.5 -ml-1 hover:bg-neutral-100 rounded-lg text-neutral-600 focus:outline-none cursor-pointer flex-shrink-0 transition"
+            title={isSidebarCollapsed ? "Expand sidebar (Ctrl+Shift+D)" : "Collapse sidebar (Ctrl+Shift+D)"}
+          >
+            {isSidebarCollapsed ? (
+              <PanelLeftOpen className="w-5 h-5 text-neutral-700" />
+            ) : (
+              <PanelLeft className="w-5 h-5 text-neutral-500 hover:text-neutral-700" />
+            )}
+          </button>
+
           {/* Mobile Back / Menu button */}
           <button
             id="mobile-back-to-sidebar-btn"
@@ -200,44 +219,35 @@ export const MainHeader: React.FC<MainHeaderProps> = ({ onOpenInvite }) => {
             <ChevronLeft className="w-5 h-5" />
           </button>
 
-          <div className="flex items-center gap-1.5 min-w-0">
-            <span className="text-neutral-500 font-bold text-base flex-shrink-0">
-              {activeChannel?.isPrivate ? (
-                <Lock className="w-4 h-4 text-neutral-600" />
-              ) : activeChannel?.isDirectMessage ? (
-                <Users className="w-4 h-4 text-neutral-600" />
-              ) : (
-                <Hash className="w-4 h-4 text-neutral-600" />
-              )}
-            </span>
-
-            <h1
-              className="font-bold text-sm sm:text-base text-neutral-900 truncate min-w-0"
-              title={activeChannel?.name || 'general'}
+          <div className="flex items-center gap-1 min-w-0">
+            <button
+              id="header-channel-details-trigger"
+              type="button"
+              onClick={() => togglePanel('channel_details')}
+              className="flex items-center gap-1.5 hover:bg-neutral-100/80 px-2 py-1 rounded-lg text-neutral-900 font-bold transition text-sm sm:text-base cursor-pointer min-w-0"
+              title="Show details & members"
             >
-              {activeChannel?.name || 'general'}
-            </h1>
+              <span className="text-neutral-500 font-bold flex-shrink-0">
+                {activeChannel?.isPrivate ? (
+                  <Lock className="w-3.5 h-3.5 text-neutral-600" />
+                ) : activeChannel?.isDirectMessage ? (
+                  <Users className="w-3.5 h-3.5 text-neutral-600" />
+                ) : (
+                  <Hash className="w-4 h-4 text-neutral-600" />
+                )}
+              </span>
 
-            {/* Header Privacy Badges */}
-            {activeChannel?.isDirectMessage ? (
-              <span id="header-privacy-badge-dm" className="px-2 py-0.5 rounded text-[11px] font-medium bg-blue-50 text-blue-700 border border-blue-200 ml-1.5 flex-shrink-0">
-                Private Conversation
+              <span className="truncate max-w-[120px] sm:max-w-[200px] md:max-w-[240px]">
+                {activeChannel?.name || 'general'}
               </span>
-            ) : activeChannel?.isPrivate ? (
-              <span id="header-privacy-badge-private" className="px-2 py-0.5 rounded text-[11px] font-medium bg-purple-50 text-purple-700 border border-purple-200 ml-1.5 flex-shrink-0">
-                Private Channel ({activeChannel?.members?.length || 1} Members)
-              </span>
-            ) : (
-              <span id="header-privacy-badge-public" className="px-2 py-0.5 rounded text-[11px] font-medium bg-neutral-100 text-neutral-600 border border-neutral-200 ml-1.5 flex-shrink-0">
-                Public to Workspace
-              </span>
-            )}
+              <ChevronDown className="w-3 h-3 text-neutral-500 flex-shrink-0" />
+            </button>
 
             <button
               id="star-channel-btn"
               type="button"
               onClick={() => setIsStarred(!isStarred)}
-              className={`p-1 hover:bg-neutral-100 rounded transition cursor-pointer flex-shrink-0 ${
+              className={`p-1.5 hover:bg-neutral-100 rounded-lg transition cursor-pointer flex-shrink-0 ${
                 isStarred ? 'text-amber-500' : 'text-neutral-300 hover:text-neutral-600'
               }`}
               title={isStarred ? 'Unstar channel' : 'Star channel'}
@@ -246,39 +256,14 @@ export const MainHeader: React.FC<MainHeaderProps> = ({ onOpenInvite }) => {
             </button>
           </div>
 
-          {/* Topic & Member details + Peer Status Badge */}
-          <div className="text-[11px] text-neutral-500 truncate hidden lg:flex items-center space-x-2 ml-2 border-l border-neutral-200 pl-2">
-            {peerUsers.size > 0 ? (
-              <span id="header-peer-pill-connected" className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 font-bold border border-emerald-200 text-xs shadow-2xs">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span>{peerUsers.size} {peerUsers.size === 1 ? 'Peer Connected' : 'Peers Connected'}</span>
+          {/* Elegant inline Topic, no heavy text-based details */}
+          {activeChannel?.topic && (
+            <div className="text-[12px] text-neutral-400 hidden lg:flex items-center gap-2 ml-1 border-l border-neutral-200 pl-2.5 min-w-0">
+              <span className="text-neutral-400 truncate max-w-[200px]" title={activeChannel.topic}>
+                {activeChannel.topic}
               </span>
-            ) : (
-              <button
-                type="button"
-                id="header-peer-pill-waiting"
-                onClick={handleCopyInviteLink}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold border border-amber-200 text-xs transition cursor-pointer shadow-2xs"
-                title="Click to copy invite link to clipboard"
-              >
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
-                </span>
-                <span>Waiting for teammates...</span>
-                <span className="px-1.5 py-0.5 rounded bg-amber-200/80 text-[10px] font-bold text-amber-950 flex items-center gap-1">
-                  <Copy className="w-3 h-3" />
-                  <span>{copiedLink ? 'Copied!' : 'Copy Link'}</span>
-                </span>
-              </button>
-            )}
-            {activeChannel?.topic && (
-              <>
-                <span>•</span>
-                <span className="truncate max-w-[180px]">{activeChannel.topic}</span>
-              </>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
         {/* Center: Global Search Bar Trigger (Visible on wide screens, collapses gracefully to search button) */}
@@ -316,7 +301,7 @@ export const MainHeader: React.FC<MainHeaderProps> = ({ onOpenInvite }) => {
           {activeChannel && (
             <div ref={huddleMenuRef} className="relative flex-shrink-0">
               <div
-                className={`inline-flex items-center rounded-lg border transition shadow-2xs overflow-hidden ${
+                className={`inline-flex items-center rounded-lg border transition shadow-3xs overflow-hidden h-8 ${
                   isInActiveHuddle
                     ? 'bg-[#007a5a] text-white border-[#007a5a]'
                     : 'bg-white hover:bg-neutral-50 text-neutral-700 border-neutral-200'
@@ -327,7 +312,7 @@ export const MainHeader: React.FC<MainHeaderProps> = ({ onOpenInvite }) => {
                   id="channel-huddle-btn"
                   type="button"
                   onClick={() => startOrJoinHuddle(activeChannel.id)}
-                  className={`px-2.5 sm:px-3 py-1.5 text-xs font-bold flex items-center gap-1.5 cursor-pointer transition ${
+                  className={`px-2.5 sm:px-3 h-full text-xs font-bold flex items-center gap-1.5 cursor-pointer transition ${
                     isInActiveHuddle
                       ? 'hover:bg-[#148567]'
                       : 'hover:text-neutral-900'
@@ -352,10 +337,10 @@ export const MainHeader: React.FC<MainHeaderProps> = ({ onOpenInvite }) => {
                   id="channel-huddle-dropdown-trigger"
                   type="button"
                   onClick={() => setShowHuddleMenu(!showHuddleMenu)}
-                  className={`px-1.5 py-1.5 border-l transition cursor-pointer ${
+                  className={`px-1.5 h-full border-l transition cursor-pointer flex items-center justify-center ${
                     isInActiveHuddle
-                      ? 'border-white/20 hover:bg-[#148567] text-white'
-                      : 'border-neutral-200 hover:bg-neutral-100 text-neutral-500 hover:text-neutral-800'
+                      ? 'border-white/15 hover:bg-[#148567] text-white'
+                      : 'border-neutral-200/60 hover:bg-neutral-100/60 text-neutral-400 hover:text-neutral-700'
                   }`}
                   title="Huddle options"
                 >
@@ -521,12 +506,12 @@ export const MainHeader: React.FC<MainHeaderProps> = ({ onOpenInvite }) => {
             </div>
           )}
 
-          {/* Member Avatars Stack (Visible on wide desktop) */}
+          {/* Member Avatars Stack (Visible on desktop & tablet) */}
           <button
             id="channel-members-stack-btn"
             type="button"
             onClick={() => togglePanel('channel_details')}
-            className="hidden xl:flex -space-x-1 items-center hover:opacity-80 transition cursor-pointer px-1 py-1 flex-shrink-0"
+            className="hidden md:flex -space-x-1.5 items-center hover:opacity-85 transition cursor-pointer px-1 py-1 flex-shrink-0"
             title="View channel members"
           >
             {channelMembers

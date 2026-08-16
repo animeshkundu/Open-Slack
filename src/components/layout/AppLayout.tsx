@@ -38,6 +38,8 @@ export const AppLayout: React.FC = () => {
     dismissToast,
     selectChannel,
     setMobileView,
+    isSidebarCollapsed,
+    toggleSidebar,
   } = useWorkspace();
 
   const isFirstTimeUser = Boolean(identity && !identity.hasCustomName);
@@ -51,17 +53,21 @@ export const AppLayout: React.FC = () => {
   const [isPendingApprovalsOpen, setIsPendingApprovalsOpen] = useState(false);
   const [isWorkspaceSettingsOpen, setIsWorkspaceSettingsOpen] = useState(false);
 
-  // Global Keyboard Shortcuts (Cmd+K / Ctrl+K for search)
+  // Global Keyboard Shortcuts (Cmd+K / Ctrl+K for search, Cmd+Shift+D / Ctrl+Shift+D for toggle sidebar)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         setIsSearchOpen(true);
       }
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'd') {
+        e.preventDefault();
+        toggleSidebar();
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [setIsSearchOpen]);
+  }, [setIsSearchOpen, toggleSidebar]);
 
   // If landing page is toggled on, show LandingPage component
   if (showLandingPage) {
@@ -87,6 +93,8 @@ export const AppLayout: React.FC = () => {
           className={`${
             (mobileView === 'sidebar' || mobileView === 'dms') && rightPanel === 'none'
               ? 'flex flex-1 w-full md:w-[260px] md:flex-none'
+              : isSidebarCollapsed
+              ? 'hidden'
               : 'hidden md:flex md:w-[260px] md:flex-none'
           }`}
         >
@@ -100,7 +108,7 @@ export const AppLayout: React.FC = () => {
           />
         </div>
 
-        {/* 2b. Mobile Activity Feed Screen (< 768px) — bottom tab keeps MobileNavBar visible */}
+        {/* 2b. Mobile Activity Feed Screen (< 768px) - bottom tab keeps MobileNavBar visible */}
         <div
           id="mobile-activity-screen"
           data-testid="mobile-activity-screen"

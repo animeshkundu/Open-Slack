@@ -54,7 +54,7 @@ test.describe('Open Slack Comprehensive Self-Review & Autonomous E2E Matrix', ()
     await page.locator('#mobile-nav-channels-btn').click();
     await expect(page.locator('#message-stream-container')).toBeVisible();
 
-    // 2. Activity Tab — bottom nav must remain visible (Slack mobile parity)
+    // 2. Activity Tab - bottom nav must remain visible (Slack mobile parity)
     await page.locator('#mobile-nav-activity-btn').click();
     await expect(page.locator('#mobile-activity-screen')).toBeVisible();
     await expect(page.locator('#mobile-activity-feed-drawer')).toBeVisible();

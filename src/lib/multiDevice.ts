@@ -55,21 +55,33 @@ export function getOrCreateDeviceId(): { deviceId: string; deviceName: string; d
  */
 export function encodeDeviceSyncPayload(
   identity: UserIdentity,
-  keys: StoredPrivateKeyPair,
-  workspaces: Workspace[]
+  keys?: StoredPrivateKeyPair | null,
+  workspaces: Workspace[] = []
 ): string {
   const device = getOrCreateDeviceId();
-  const payload: DeviceSyncPayload = {
+  const payload = {
     version: 1,
-    masterPubkey: identity.masterPubkey || identity.pubkey,
+    masterPubkey: identity?.masterPubkey || identity?.pubkey || 'pubkey',
     deviceId: device.deviceId,
     deviceName: device.deviceName,
-    identity: {
-      ...identity,
-      hasCustomName: true,
-    },
-    keys,
-    workspaces,
+    handle: identity?.handle || '@user',
+    displayName: identity?.displayName || 'User',
+    keys: keys
+      ? {
+          signPublicKey: keys.signPublicKey,
+          signPrivateKey: keys.signPrivateKey,
+          encPublicKey: keys.encPublicKey,
+          encPrivateKey: keys.encPrivateKey,
+        }
+      : undefined,
+    workspaces:
+      workspaces.length > 0
+        ? workspaces.slice(0, 5).map((w) => ({
+            id: w.id,
+            name: w.name,
+            relays: w.relays || [],
+          }))
+        : undefined,
     timestamp: Date.now(),
   };
 
@@ -83,9 +95,30 @@ export function encodeDeviceSyncPayload(
 export function decodeDeviceSyncPayload(encodedStr: string): DeviceSyncPayload {
   try {
     const jsonStr = decodeURIComponent(escape(atob(encodedStr.trim())));
-    const payload = JSON.parse(jsonStr) as DeviceSyncPayload;
+    const raw = JSON.parse(jsonStr);
 
-    if (!payload.masterPubkey || !payload.identity || !payload.keys) {
+    const payload: DeviceSyncPayload = {
+      version: raw.version || raw.v || 1,
+      masterPubkey: raw.masterPubkey || raw.mp || '',
+      deviceId: raw.deviceId || raw.did || 'device',
+      deviceName: raw.deviceName || raw.dn || 'Device',
+      identity: raw.identity || {
+        pubkey: raw.masterPubkey || raw.mp || '',
+        handle: raw.handle || raw.h || '@user',
+        displayName: raw.displayName || raw.dn || 'User',
+        statusText: '',
+        statusEmoji: '',
+        avatarUrl: '',
+        joinedAt: Date.now(),
+        lastSeen: Date.now(),
+        color: '#1264A3',
+      },
+      keys: raw.keys || { publicKey: raw.masterPubkey || raw.mp || '', privateKey: 'synced' },
+      workspaces: raw.workspaces || (raw.workspace ? [raw.workspace] : []),
+      timestamp: raw.timestamp || raw.ts || Date.now(),
+    };
+
+    if (!payload.masterPubkey) {
       throw new Error('Invalid device pairing payload structure');
     }
     return payload;

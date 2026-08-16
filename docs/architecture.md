@@ -26,9 +26,9 @@ Local persistence is handled through the storage layer (`src/lib/storage.ts`) us
 
 DM channel helpers live in `src/lib/channels.ts`:
 
-- **Opaque IDs** (`dm_<random>`) — membership is never encoded in the map key, so leave + recreate cannot clobber another conversation in the shared Yjs `channels` map.
-- **Member-set matching** — `openDirectMessage` reopens an existing 1:1 or group DM when the peer set matches (including conversations the local user previously left), restoring membership instead of allocating a replacement channel.
-- **Soft leave** — closing a DM removes only the local pubkey from `members`; the shared document and message history remain for remaining peers. Sidebar lists filter to channels where the local user is still a member.
+- **Opaque IDs** (`dm_<random>`) - membership is never encoded in the map key, so leave + recreate cannot clobber another conversation in the shared Yjs `channels` map.
+- **Member-set matching** - `openDirectMessage` reopens an existing 1:1 or group DM when the peer set matches (including conversations the local user previously left), restoring membership instead of allocating a replacement channel.
+- **Soft leave** - closing a DM removes only the local pubkey from `members`; the shared document and message history remain for remaining peers. Sidebar lists filter to channels where the local user is still a member.
 
 ## Teammate Invitation & Sharing
 

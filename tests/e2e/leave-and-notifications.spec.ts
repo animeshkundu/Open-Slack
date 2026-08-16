@@ -16,7 +16,7 @@ test.describe('Leave Channels/DMs and Slack Toast Notifications Suite', () => {
     // 2. Fill details and toggle Private
     await page.locator('#channel-name-input').fill(channelName);
     await page.locator('#channel-topic-input').fill('Confidential workspace discussions');
-    // Toggle is a visually hidden checkbox — click the peer track div / label
+    // Toggle is a visually hidden checkbox - click the peer track div / label
     await page.locator('label:has(#channel-private-toggle)').click();
     await page.locator('#submit-create-channel-btn').click();
 
@@ -78,7 +78,7 @@ test.describe('Leave Channels/DMs and Slack Toast Notifications Suite', () => {
       await expect(page.locator('#main-channel-header')).toBeVisible();
     }
 
-    // All three DMs remain listed — starting a new one must not replace prior chats
+    // All three DMs remain listed - starting a new one must not replace prior chats
     await expect(page.locator('[id^="sidebar-dm-"]')).toHaveCount(3);
   });
 

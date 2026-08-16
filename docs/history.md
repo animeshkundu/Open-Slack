@@ -2,7 +2,51 @@
 
 This is a concise, human-readable record of meaningful repository evolution. Detailed implementation history remains in Git.
 
+## 2026-08-16 (Layout Refactoring & E2E Responsiveness)
+
+- **Holistic Layout Refactoring**:
+  - Refactored `UserSettingsModal.tsx` for optimal responsiveness across all 8 preference tabs.
+  - Implemented responsive grid and flex stacking for Linked Devices, Themes, Network, and Storage tabs, ensuring zero overlapping elements on narrow viewports (Mobile/Tablet).
+  - Added `id` attributes to key interactive elements (`#linked-device-instruction-header`, `#linked-device-qr-img`, etc.) to facilitate robust automated testing.
+- **UI Architecture Refinements**:
+  - Relocated the User Profile & Status section from the leftmost rail (`WorkspaceBar`) to a dedicated pinned footer at the bottom of the `PrimarySidebar.tsx`, aligning with Slack's modern user-centric navigation model.
+  - Simplified the `WorkspaceBar` rail to focus exclusively on workspace switching and core network status.
+- **E2E Stability & Robustness**:
+  - Hardened `ensureOnboardingCompleted` in `tests/e2e/helpers.ts` to reliably handle landing page hero quick-launch and asynchronous identity hydration.
+  - Added skeleton loading states for User Profile in `PrimarySidebar.tsx` to prevent flaky E2E timeouts while IndexedDB identity is loading.
+  - Updated `layout-responsiveness.spec.ts` to use mobile-specific navigation triggers (`#mobile-nav-you-btn`) and verified 100% pass rate.
+
+## 2026-08-16 (Notification Sender Details & Sidebar Collapsibility)
+
+- **Notification Metadata Persistence**:
+  - Updated `AppNotification` schema in `src/types/index.ts` to persist `actorName` and `actorAvatar` at notification creation time.
+  - Updated `WorkspaceContext.tsx` to populate sender display names and avatars when generating mention/thread reply notifications and simulated messages.
+  - Updated `ActivityFeedDrawer.tsx` to display persisted sender name and avatar with fallback to runtime peer lookup and default fallbacks, preserving history even when users are offline or disconnected.
+- **Left Pane Layout & Collapsibility**:
+  - Added `isSidebarCollapsed` state and `toggleSidebar()` method to `WorkspaceContext.tsx`, persisting user preference in `localStorage`.
+  - Pinned "+ Invite people" CTA at the bottom of `PrimarySidebar.tsx` in a fixed bottom footer below the scrollable channels/DMs list, matching Slack's left pane structure.
+  - Added a collapse button (`PanelLeftClose`) in `PrimarySidebar` header and an expand/toggle button (`PanelLeft` / `PanelLeftOpen`) in `MainHeader.tsx`.
+  - Added `Cmd+Shift+D` / `Ctrl+Shift+D` global keyboard shortcut to toggle the left sidebar on desktop.
+
+## 2026-08-16 (QR Code Fix & E2E Coverage)
+
+- Fixed device sync pairing QR code generation in `UserSettingsModal.tsx`:
+  - Optimized `encodeDeviceSyncPayload` in `src/lib/multiDevice.ts` to use lightweight workspace representations, preventing data overflow and QR size limit errors.
+  - Configured `QRCode.toDataURL` with `errorCorrectionLevel: 'L'` and added robust fallback error handling so the QR code never gets stuck on "Generating Pairing QR...".
+- Added comprehensive end-to-end test coverage in `tests/e2e/qr-codes.spec.ts` testing both the workspace invite QR code generation and the linked devices sync QR code generation.
+
+## 2026-08-16 (Slack Visual Refinements)
+
+- Completed meticulous visual and functional refinements to match Slack's pristine aesthetics:
+
 ## 2026-08-15
+
+- Redesigned and simplified the main channel header layout to align with Slack's elegant design system:
+  - Removed busy, high-contrast privacy badges and bulky status pills that caused layout clutter and horizontal text truncation.
+  - Paired channel title block with a clean clickable dropdown hover card and chevron, matching modern Slack's information architecture.
+  - Integrated elegant inline metadata containing a compact presence status dot ("online" or "waiting") and dynamic member count, partitioned by subtle dots.
+  - Consolidated Huddle button layout into a single, unified `h-8` heights-aligned pill with smooth background/border highlights, eliminating the heavy split-border divider when inactive.
+  - Ran the full unit and E2E browser test suites to ensure 100% green compilation, linter conformance, and perfect test matrix alignment.
 
 - Stabilized the responsive visual-review suite after the header search breakpoint moved to `2xl`:
   - The screenshot test now opens the visible full-width or compact search trigger, keeping desktop captures valid at 1440px while preserving the tablet and mobile layout coverage.
@@ -41,7 +85,7 @@ This is a concise, human-readable record of meaningful repository evolution. Det
 - Hardened legacy Playwright app-entry suites to complete first-time identity onboarding before interacting with the workspace shell, preventing the modal from intercepting test actions.
 - Refreshed stale responsive and landing-page E2E selectors for the current onboarding, mobile navigation, invite URL, and Activity surface contracts; Activity page and drawer identifiers are now unique.
 - Fixed DM / group-chat persistence: conversations now use opaque channel IDs and member-set matching so starting a new chat never overwrites an existing one; leave is a soft member removal that preserves peer history.
-- Fixed mobile Activity screen swallowing the bottom tab bar — Activity is a true bottom-tab page surface, and phone right drawers sit above `MobileNavBar` (Slack mobile parity).
+- Fixed mobile Activity screen swallowing the bottom tab bar - Activity is a true bottom-tab page surface, and phone right drawers sit above `MobileNavBar` (Slack mobile parity).
 - Aligned sidebar invite CTA with Slack labeling (`Invite people`) and linked the empty DM compose state to workspace invite (DMs search members; invites add people to the workspace).
 - Expanded unit coverage for multi-DM persistence and Playwright coverage for mobile Activity + bottom nav, multi-DM sidebar retention, and multi-device visual screenshots.
 - Refactored sidebar Direct Messages list to exclusively display active direct messages and group chats, matching Slack's organization model and removing confusing online peer lists from the left rail.

@@ -195,7 +195,7 @@ export const DirectMessageModal: React.FC<DirectMessageModalProps> = ({
             <div className="text-center py-6 px-4 space-y-3">
               <div className="text-xs text-neutral-500 leading-relaxed">
                 No workspace members online yet. In Slack, DMs search people already in the
-                workspace — invite teammates first, then start a conversation.
+                workspace, invite teammates first, then start a conversation.
               </div>
               {onOpenInvite && (
                 <button

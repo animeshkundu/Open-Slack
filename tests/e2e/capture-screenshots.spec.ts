@@ -117,7 +117,7 @@ test.describe('Pixel-Perfect Visual Screenshots Suite Across 3 Device Types', ()
     await expect(page.locator('#primary-sidebar-container')).toBeVisible({ timeout: 5000 });
     await page.screenshot({ path: 'screenshots/11-mobile-sidebar-view.png' });
 
-    // Mobile Activity tab — bottom nav must remain in frame
+    // Mobile Activity tab - bottom nav must remain in frame
     await page.locator('#mobile-nav-activity-btn').click();
     await expect(page.locator('#mobile-activity-screen')).toBeVisible({ timeout: 5000 });
     await expect(page.locator('#mobile-nav-bar')).toBeVisible();
