@@ -168,7 +168,9 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
         setDeviceQrDataUrl('');
         setDeviceQrError('');
         const currentIdentity = identity || { pubkey: 'mock-pubkey', handle: '@user', displayName: 'User', avatarUrl: '' };
-        const syncWorkspaces = workspaces.length > 0 ? workspaces : (activeWorkspace ? [activeWorkspace] : []);
+        const syncWorkspaces = activeWorkspace
+          ? [activeWorkspace, ...workspaces.filter((workspace) => workspace.id !== activeWorkspace.id)]
+          : workspaces;
         const payloadStr = encodeDeviceSyncPayload(currentIdentity as any, keys, syncWorkspaces);
         const fullUrl = `${window.location.origin}${window.location.pathname}#device-sync=${payloadStr}`;
         setDeviceSyncUrl(fullUrl);

@@ -103,11 +103,19 @@ export interface P2PEvents {
   onPresenceUpdate?: (peerId: string, user: UserIdentity) => void;
   onTypingUpdate?: (channelId: string, userPubkey: string, isTyping: boolean) => void;
   onHuddleStateUpdate?: (channelId: string, participants: HuddleParticipant[]) => void;
+  onPeerHuddleJoin?: (peerId: string, channelId: string, user: UserIdentity, isScreenSharing: boolean) => void;
   onPeerHuddleLeave?: (peerId: string, channelId: string) => void;
   onPeerStream?: (stream: MediaStream, peerId: string, channelId: string) => void;
   onFileReceived?: (attachment: Attachment, senderPeerId: string) => void;
   onFileProgress?: (progress: FileTransferProgress) => void;
   onConnectionStatusChange?: (status: 'connecting' | 'connected' | 'reconnecting' | 'disconnected') => void;
+}
+
+interface HuddleSignal {
+  type: 'join' | 'leave' | 'update';
+  channelId: string;
+  user?: UserIdentity;
+  isScreenSharing?: boolean;
 }
 
 export class P2PNetworkManager {
@@ -125,7 +133,7 @@ export class P2PNetworkManager {
   private sendTyping: ((payload: any, options?: { target?: string }) => Promise<void>) | null = null;
   private sendFileHeader: ((header: FileChunkHeader, options?: { target?: string }) => Promise<void>) | null = null;
   private sendFileChunk: ((chunk: FileChunkData, options?: { target?: string }) => Promise<void>) | null = null;
-  private sendHuddle: ((payload: { type: 'join' | 'leave'; channelId: string }, options?: { target?: string }) => Promise<void>) | null = null;
+  private sendHuddle: ((payload: HuddleSignal, options?: { target?: string }) => Promise<void>) | null = null;
 
   private activeStream: MediaStream | null = null;
   private activeHuddleChannelId: string | null = null;
@@ -287,7 +295,7 @@ export class P2PNetworkManager {
       const typeAction = this.room.makeAction<any>('type');
       const fileHeaderAction = this.room.makeAction<any>('file_hdr');
       const fileChunkAction = this.room.makeAction<any>('file_chk');
-      const huddleAction = this.room.makeAction<{ type: 'join' | 'leave'; channelId: string }>('huddle');
+      const huddleAction = this.room.makeAction<any>('huddle');
 
       this.sendSyncVector = (data, opts) => vectorAction.send(data, opts);
       this.sendDeltaUpdate = (data, opts) => deltaAction.send(data, opts);
@@ -360,6 +368,14 @@ export class P2PNetworkManager {
         }
 
         this.peerHuddleChannels.set(ctx.peerId, payload.channelId);
+        if (payload.user) {
+          this.events.onPeerHuddleJoin?.(
+            ctx.peerId,
+            payload.channelId,
+            payload.user,
+            Boolean(payload.isScreenSharing)
+          );
+        }
         const pendingStream = this.pendingPeerStreams.get(ctx.peerId);
         if (pendingStream) {
           this.pendingPeerStreams.delete(ctx.peerId);
@@ -385,7 +401,10 @@ export class P2PNetworkManager {
         }
 
         if (this.activeHuddleChannelId && this.sendHuddle) {
-          this.sendHuddle({ type: 'join', channelId: this.activeHuddleChannelId }, { target: peerId });
+          this.sendHuddle(
+            { type: 'join', channelId: this.activeHuddleChannelId, user: this.localIdentity },
+            { target: peerId }
+          );
         }
 
         // If local huddle stream is active, attach stream
@@ -560,7 +579,20 @@ export class P2PNetworkManager {
 
   public startHuddle(channelId: string) {
     this.activeHuddleChannelId = channelId;
-    this.sendHuddle?.({ type: 'join', channelId });
+    if (this.localIdentity) {
+      this.sendHuddle?.({ type: 'join', channelId, user: this.localIdentity });
+    }
+  }
+
+  public setHuddleScreenSharing(isScreenSharing: boolean) {
+    if (this.activeHuddleChannelId && this.localIdentity) {
+      this.sendHuddle?.({
+        type: 'update',
+        channelId: this.activeHuddleChannelId,
+        user: this.localIdentity,
+        isScreenSharing,
+      });
+    }
   }
 
   public leaveHuddle() {

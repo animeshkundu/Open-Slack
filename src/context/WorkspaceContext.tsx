@@ -349,6 +349,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const cameraTrackRef = useRef<MediaStreamTrack | null>(null);
   const screenShareTrackRef = useRef<MediaStreamTrack | null>(null);
   const peerIdToPubkeyRef = useRef<Map<string, string>>(new Map());
+  const handledInitialWorkspaceLinkRef = useRef(false);
 
   // 1. Initialize User Identity & Persistence on Mount
   useEffect(() => {
@@ -383,6 +384,8 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   // Handle invite links in hash (e.g. #invite=..., #device-sync=...) and query parameters
   const handleInviteLinkFromUrl = (user: UserIdentity) => {
+    if (handledInitialWorkspaceLinkRef.current) return;
+
     try {
       const hash = window.location.hash;
 
@@ -393,6 +396,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         const syncPayload = decodeDeviceSyncPayload(payloadStr);
 
         if (syncPayload) {
+          handledInitialWorkspaceLinkRef.current = true;
           // 1. Synchronize Identity
           if (syncPayload.identity) {
             const syncedIdentity = {
@@ -435,6 +439,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         const payloadStr = decodeURIComponent(encodedPayload);
         const inviteData = JSON.parse(decodeURIComponent(escape(atob(payloadStr)))) as Workspace;
         if (inviteData.id && inviteData.name) {
+          handledInitialWorkspaceLinkRef.current = true;
           saveAndJoinWorkspace(inviteData, user);
           if (hashChannel) {
             setActiveChannelId(hashChannel);
@@ -762,6 +767,29 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           });
           doc.transact(() => {
             yUsers.set(remoteUser.pubkey, remoteUser);
+          });
+        },
+        onPeerHuddleJoin: (peerId, channelId, remoteUser, isScreenSharing) => {
+          peerIdToPubkeyRef.current.set(peerId, remoteUser.pubkey);
+          setPeerUsers((prev) => {
+            const next = new Map(prev);
+            next.set(remoteUser.pubkey, { ...remoteUser, isOnline: true });
+            return next;
+          });
+          setHuddleState((prev) => {
+            if (!prev.isActive || prev.channelId !== channelId) return prev;
+            const nextMap = new Map(prev.participants);
+            const existing = nextMap.get(remoteUser.pubkey);
+            nextMap.set(remoteUser.pubkey, {
+              pubkey: remoteUser.pubkey,
+              displayName: remoteUser.displayName,
+              avatarUrl: remoteUser.avatarUrl,
+              isMuted: existing?.isMuted ?? false,
+              isVideoOn: existing?.isVideoOn ?? false,
+              isScreenSharing,
+              stream: existing?.stream,
+            });
+            return { ...prev, participants: nextMap };
           });
         },
         onTypingUpdate: (channelId, userPubkey, isTyping) => {
@@ -1606,6 +1634,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             localMediaStreamRef.current.removeTrack(screenTrack);
             screenShareTrackRef.current = null;
             p2pNetwork.refreshMediaStream();
+            p2pNetwork.setHuddleScreenSharing(false);
           }
           setHuddleState((prev) => ({ ...prev, isScreenSharing: false }));
         };
@@ -1613,6 +1642,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           localMediaStreamRef.current.addTrack(screenTrack);
           screenShareTrackRef.current = screenTrack;
           p2pNetwork.refreshMediaStream();
+          p2pNetwork.setHuddleScreenSharing(true);
         }
         setHuddleState((prev) => ({ ...prev, isScreenSharing: true }));
       } catch (err: any) {
@@ -1627,6 +1657,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         localMediaStreamRef.current.removeTrack(screenShareTrackRef.current);
         screenShareTrackRef.current = null;
         p2pNetwork.refreshMediaStream();
+        p2pNetwork.setHuddleScreenSharing(false);
       }
       setHuddleState((prev) => ({ ...prev, isScreenSharing: false }));
     }

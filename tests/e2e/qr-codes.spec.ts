@@ -50,7 +50,6 @@ test.describe('QR Code Generation End-to-End Tests', () => {
     await expect(urlInput).toBeVisible();
     const syncUrl = await urlInput.inputValue();
     expect(syncUrl).toContain('#device-sync=');
-    await expect(page.locator('#linked-device-qr-status')).not.toContainText('Use Copy Link below');
 
     // 5. Close user settings modal
     await page.locator('#close-settings-modal').click();

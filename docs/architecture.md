@@ -42,6 +42,8 @@ Invitations support multi-channel distribution via `InviteModal.tsx` and in-hudd
 
 WebRTC data channels carry synchronized workspace state and direct payloads. Multi-protocol signaling uses both high-availability Nostr relays (NIP-01 ephemeral events) and WebTorrent / BitTorrent tracker swarms (BEP-03) for peer discovery without central servers. Relays are purely an ephemeral rendezvous layer; they are never the source of truth for messages. File transfers use chunked peer channels with SHA-256 integrity verification, and huddles use mesh peer media streams.
 
+Huddle membership is signaled with the workspace's peer mesh using the stable channel ID before its media stream is rendered. This binds incoming streams to the intended channel and maps the transient WebRTC peer ID to the stable user public key received through presence, so tiles, participant counts, and media refreshes remain associated with the correct teammate. Adding or removing camera and screen-share tracks refreshes the peer stream for already connected participants.
+
 ### Mobile Battery Life & Adaptive P2P Network Intervals
 
 To ensure high responsiveness while preventing mobile battery drain:
@@ -62,6 +64,7 @@ To ensure high responsiveness while preventing mobile battery drain:
 
 - **Standalone Mode Support**: Configured Web App Manifest (`public/manifest.json`) and Service Worker registration (`src/lib/usePWAInstall.ts`).
 - **Auto-Updates**: Background Service Worker automatically downloads new assets and provides instant updates.
+- **Release cache busting**: Vite emits content-hashed JavaScript and CSS asset names, while Workbox precache revisions and cleanup replace obsolete assets on each release.
 - **Install Touchpoints**:
   - Dismissible floating `PWAInstallPrompt` banner on web browsers.
   - Direct 1-click install button in the "App & Battery (PWA)" tab of `UserSettingsModal`.
