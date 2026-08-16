@@ -1,12 +1,11 @@
 import { expect, test } from '@playwright/test';
-import { ensureOnboardingCompleted } from './helpers';
+import { openWorkspace } from './helpers';
 
 test.describe('Layout & Responsiveness', () => {
   test.beforeEach(async ({ page }) => {
     // Set a large desktop viewport explicitly to ensure sidebar is not hidden by Tailwind breakpoints
     await page.setViewportSize({ width: 1440, height: 900 });
-    await page.goto('/');
-    await ensureOnboardingCompleted(page, 'Test User');
+    await openWorkspace(page, 'Test User');
     
     // Brief wait for React state and animations to settle
     await page.waitForTimeout(1000);

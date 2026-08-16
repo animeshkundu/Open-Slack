@@ -1,10 +1,9 @@
 import { expect, test } from '@playwright/test';
-import { ensureOnboardingCompleted } from './helpers';
+import { openWorkspace } from './helpers';
 
 test.describe('Secondary workspace flows', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('./');
-    await ensureOnboardingCompleted(page);
+    await openWorkspace(page);
   });
 
   test('creates a channel and makes it the active conversation', async ({ page }) => {
@@ -33,7 +32,7 @@ test.describe('Secondary workspace flows', () => {
     await expect(page.locator('#workspace-settings-modal-card')).toBeVisible();
     await page.locator('#close-ws-settings-modal').click();
 
-    await page.locator('#workspace-user-profile-btn').click();
+    await page.locator('#sidebar-user-profile-btn, #workspace-user-profile-btn').first().click();
     await expect(page.locator('#user-settings-modal-card')).toBeVisible();
     await page.locator('#tab-themes-btn').click();
     await expect(page.getByText('Pre-Configured Slack Themes')).toBeVisible();

@@ -122,6 +122,31 @@ export const WorkspaceBar: React.FC<WorkspaceBarProps> = ({
             }`}
           />
         </div>
+
+        {/* User Profile / Settings */}
+        {identity && (
+          <button
+            id="sidebar-user-profile-btn"
+            type="button"
+            onClick={onOpenSettings}
+            className="w-10 h-10 rounded-xl overflow-hidden relative cursor-pointer border border-white/10 hover:ring-2 hover:ring-white/40 transition group"
+            title={`${identity.displayName} (Profile & Preferences)`}
+          >
+            {identity.avatarUrl ? (
+              <img
+                src={identity.avatarUrl}
+                alt={identity.displayName}
+                className="w-full h-full object-cover"
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <div className="w-full h-full bg-neutral-700 flex items-center justify-center font-bold text-xs text-white">
+                {identity.displayName.slice(0, 2).toUpperCase()}
+              </div>
+            )}
+            <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-[#2BAC76] border-2 border-[#19171D] rounded-full" />
+          </button>
+        )}
       </div>
     </div>
   );

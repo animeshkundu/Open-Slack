@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { ensureOnboardingCompleted } from './helpers';
+import { ensureOnboardingCompleted, injectNostrRelayMocks } from './helpers';
 
 test.describe('Multi-Browser P2P Interaction & CRDT Synchronization', () => {
   test('synchronizes messages and presence across two isolated browser contexts', async ({ browser }) => {
@@ -7,6 +7,7 @@ test.describe('Multi-Browser P2P Interaction & CRDT Synchronization', () => {
     const contextA = await browser.newContext({
       permissions: ['microphone', 'camera'],
     });
+    await injectNostrRelayMocks(contextA);
     const pageA = await contextA.newPage();
     await pageA.goto('./');
     await ensureOnboardingCompleted(pageA, 'Peer A');
@@ -26,6 +27,7 @@ test.describe('Multi-Browser P2P Interaction & CRDT Synchronization', () => {
     const contextB = await browser.newContext({
       permissions: ['microphone', 'camera'],
     });
+    await injectNostrRelayMocks(contextB);
     const pageB = await contextB.newPage();
     await pageB.goto(inviteUrl);
     await ensureOnboardingCompleted(pageB, 'Peer B');

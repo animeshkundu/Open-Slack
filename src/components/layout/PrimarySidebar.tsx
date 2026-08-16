@@ -10,7 +10,6 @@ import {
   MessageSquare,
   Mic,
   MicOff,
-  PanelLeftClose,
   PhoneOff,
   Plus,
   Search,
@@ -86,13 +85,13 @@ export const PrimarySidebar: React.FC<PrimarySidebarProps> = ({
         color: 'var(--theme-sidebar-text, #BCABB6)',
       }}
     >
-      {/* Workspace Header Dropdown & Collapse Button */}
-      <div className="relative border-b border-black/20 flex items-center justify-between pr-2">
+      {/* Workspace Header Dropdown */}
+      <div className="relative border-b border-black/20 flex items-center justify-between">
         <button
           id="workspace-header-menu-btn"
           type="button"
           onClick={() => setShowWorkspaceMenu(!showWorkspaceMenu)}
-          className="flex-1 h-14 p-4 flex items-center justify-between text-white hover:bg-black/15 transition cursor-pointer min-w-0"
+          className="w-full h-14 p-4 flex items-center justify-between text-white hover:bg-black/15 transition cursor-pointer min-w-0"
         >
           <div className="flex items-center gap-2 min-w-0">
             <span className="font-black text-base tracking-tight truncate text-white">
@@ -100,16 +99,6 @@ export const PrimarySidebar: React.FC<PrimarySidebarProps> = ({
             </span>
             <ChevronDown className="w-4 h-4 opacity-75 flex-shrink-0" />
           </div>
-        </button>
-
-        <button
-          id="collapse-sidebar-btn"
-          type="button"
-          onClick={toggleSidebar}
-          className="p-2 rounded-lg text-white/70 hover:text-white hover:bg-black/20 transition cursor-pointer flex-shrink-0"
-          title="Collapse sidebar (Ctrl+Shift+D)"
-        >
-          <PanelLeftClose className="w-4 h-4" />
         </button>
 
         {showWorkspaceMenu && (
@@ -487,8 +476,8 @@ export const PrimarySidebar: React.FC<PrimarySidebarProps> = ({
         </div>
       </div>
 
-      {/* Pinned Bottom Footer: User Profile & Workspace Invite */}
-      <div className="p-2 border-t border-white/10 mt-auto flex-shrink-0 space-y-1">
+      {/* Pinned Bottom Footer: Workspace Invite */}
+      <div className="p-2 border-t border-white/10 mt-auto flex-shrink-0">
         <button
           id="sidebar-invite-teammates-btn"
           type="button"
@@ -507,40 +496,6 @@ export const PrimarySidebar: React.FC<PrimarySidebarProps> = ({
             </span>
           )}
         </button>
-
-        {identity && (
-          <button
-            id="sidebar-user-profile-btn"
-            type="button"
-            onClick={onOpenSettings}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-md hover:bg-black/15 transition group cursor-pointer"
-          >
-            <div className="relative flex-shrink-0">
-              {identity.avatarUrl ? (
-                <img
-                  src={identity.avatarUrl}
-                  alt={identity.displayName}
-                  className="w-8 h-8 rounded-lg object-cover border border-white/10"
-                  referrerPolicy="no-referrer"
-                />
-              ) : (
-                <div className="w-8 h-8 rounded-lg bg-neutral-600 flex items-center justify-center font-bold text-white text-[11px]">
-                  {identity.displayName.slice(0, 2).toUpperCase()}
-                </div>
-              )}
-              <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-[#2BAC76] border-2 border-neutral-800 rounded-full" />
-            </div>
-            <div className="flex-1 min-w-0 text-left">
-              <div className="text-xs font-bold text-white truncate leading-tight">
-                {identity.displayName}
-              </div>
-              <div className="text-[10px] opacity-60 truncate leading-tight">
-                {identity.status || identity.handle}
-              </div>
-            </div>
-            <Settings className="w-3.5 h-3.5 opacity-0 group-hover:opacity-60 transition-opacity" />
-          </button>
-        )}
       </div>
 
       {/* Live Active Huddle Widget (Displayed ONLY when in an active call) */}

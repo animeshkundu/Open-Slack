@@ -1,10 +1,9 @@
 import { expect, test } from '@playwright/test';
-import { ensureOnboardingCompleted } from './helpers';
+import { openWorkspace } from './helpers';
 
 test.describe('Landing Page & Responsiveness Suite', () => {
   test('landing page is scrollable and displays all core marketing & architecture sections', async ({ page }) => {
-    await page.goto('./');
-    await ensureOnboardingCompleted(page);
+    await openWorkspace(page);
     
     // Switch to landing page if in app view
     const landingBtn = page.locator('#ws-menu-landing-page-btn');
@@ -52,8 +51,7 @@ test.describe('Landing Page & Responsiveness Suite', () => {
   test('responsive layout adapts smoothly to Mobile (375px), Tablet (768px), and Desktop (1440px)', async ({ page }) => {
     // Desktop Viewport
     await page.setViewportSize({ width: 1440, height: 900 });
-    await page.goto('./');
-    await ensureOnboardingCompleted(page);
+    await openWorkspace(page);
     await expect(page.locator('#workspace-rail-bar')).toBeVisible();
     await expect(page.locator('#primary-sidebar-container')).toBeVisible();
     await expect

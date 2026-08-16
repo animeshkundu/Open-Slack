@@ -137,7 +137,7 @@ test.describe('Complete visual surface matrix', () => {
       if (viewport.name === 'mobile') {
         await page.locator('#mobile-nav-you-btn').click();
       } else {
-        await page.locator('#workspace-user-profile-btn').click();
+        await page.locator('#sidebar-user-profile-btn, #workspace-user-profile-btn').first().click();
       }
       await expect(page.locator('#user-settings-modal-card')).toBeVisible();
       for (const tab of ['profile', 'themes', 'notifications', 'linked-devices', 'privacy', 'crypto', 'network', 'storage'] as const) {

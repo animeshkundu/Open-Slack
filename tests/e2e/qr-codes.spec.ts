@@ -1,12 +1,11 @@
 import { expect, test } from '@playwright/test';
-import { ensureOnboardingCompleted } from './helpers';
+import { openWorkspace } from './helpers';
 
 test.describe('QR Code Generation End-to-End Tests', () => {
   test.beforeEach(async ({ page }) => {
     page.on('console', (msg) => console.log(`[Browser Console] ${msg.type()}: ${msg.text()}`));
     page.on('pageerror', (err) => console.log(`[Browser Error] ${err.message}`));
-    await page.goto('./');
-    await ensureOnboardingCompleted(page);
+    await openWorkspace(page);
   });
 
   test('tests workspace invite QR code generation end-to-end', async ({ page }) => {
@@ -32,7 +31,7 @@ test.describe('QR Code Generation End-to-End Tests', () => {
 
   test('tests linked devices / device sync QR code generation end-to-end', async ({ page }) => {
     // 1. Open user profile settings
-    await page.locator('#workspace-user-profile-btn').click();
+    await page.locator('#sidebar-user-profile-btn, #workspace-user-profile-btn').first().click();
     await expect(page.locator('#user-settings-modal-card')).toBeVisible();
 
     // 2. Click Linked Devices tab

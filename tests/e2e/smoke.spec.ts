@@ -1,10 +1,9 @@
 import { expect, test } from '@playwright/test';
-import { ensureOnboardingCompleted } from './helpers';
+import { openWorkspace } from './helpers';
 
 test.describe('Open Slack Smoke & Core UI Suite', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('./');
-    await ensureOnboardingCompleted(page);
+    await openWorkspace(page);
   });
 
   test('loads Open Slack interface with primary elements', async ({ page }) => {

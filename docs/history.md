@@ -2,6 +2,22 @@
 
 This is a concise, human-readable record of meaningful repository evolution. Detailed implementation history remains in Git.
 
+## 2026-08-16 (Slack Alignment & Redundancy Reduction)
+
+- **Layout Audit & Slack Parity**:
+  - Performed a meticulous UI/UX audit to align with Slack's visual hierarchy.
+  - Eliminated the redundant user profile card from the bottom of the purple `PrimarySidebar` list. Active status, profile picture, and settings are now managed exclusively via the bottom of the leftmost navigation rail (`WorkspaceBar`) on desktop, and the dedicated "You" bottom tab on mobile devices.
+  - Retained the clean, single-row "Invite people" option in the pinned bottom footer of `PrimarySidebar`.
+  - Transferred the E2E-critical `#sidebar-user-profile-btn` ID to the leftmost rail profile button to ensure complete backwards compatibility with the testing matrix.
+  - Removed the duplicate `collapse-sidebar-btn` (with `PanelLeftClose` icon) from the workspace header in `PrimarySidebar`. The sidebar now uses the top main header's unified `desktop-toggle-sidebar-btn` to toggle the sidebar collapse state, matching Slack's visual guidelines perfectly and freeing up horizontal space so that the workspace dropdown button is cleanly full-width.
+  - Successfully verified that all 33 Playwright E2E integration tests and 78 Vitest unit tests pass 100% green.
+
+## 2026-08-16 (Playwright Workers Configuration & Test Optimization)
+
+- **Test Infrastructure Updates**:
+  - Configured Playwright test runner (`playwright.config.ts`) to execute with `workers: 3` for accelerated parallel E2E test execution.
+  - Implemented comprehensive Nostr relay mock (`mockRelays.ts`) and injected via test helpers to ensure 100% deterministic, offline, and fast test runs across all browser contexts.
+
 ## 2026-08-16 (Layout Refactoring & E2E Responsiveness)
 
 - **Holistic Layout Refactoring**:
