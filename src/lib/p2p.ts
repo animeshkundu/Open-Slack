@@ -400,7 +400,7 @@ export class P2PNetworkManager {
           this.sendPresence(this.localIdentity, { target: peerId });
         }
 
-        if (this.activeHuddleChannelId && this.sendHuddle) {
+        if (this.activeHuddleChannelId && this.sendHuddle && this.localIdentity) {
           this.sendHuddle(
             { type: 'join', channelId: this.activeHuddleChannelId, user: this.localIdentity },
             { target: peerId }
