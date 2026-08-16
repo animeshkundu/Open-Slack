@@ -1,6 +1,7 @@
 import {
   AtSign,
   Bell,
+  CheckCircle2,
   ChevronDown,
   Globe,
   Hash,
@@ -42,6 +43,8 @@ export const PrimarySidebar: React.FC<PrimarySidebarProps> = ({
 }) => {
   const {
     activeWorkspace,
+    workspaces,
+    switchWorkspace,
     channels,
     activeChannel,
     selectChannel,
@@ -104,68 +107,118 @@ export const PrimarySidebar: React.FC<PrimarySidebarProps> = ({
         {showWorkspaceMenu && (
           <div
             id="workspace-header-dropdown"
-            className="absolute top-14 left-2 z-50 w-64 bg-white text-neutral-800 rounded-xl shadow-2xl border border-neutral-200 py-1 animate-in fade-in zoom-in-95 duration-100"
+            className="absolute top-14 left-2 z-50 w-72 bg-white text-neutral-800 rounded-xl shadow-2xl border border-neutral-200 py-1.5 animate-in fade-in zoom-in-95 duration-100 flex flex-col"
           >
-            <button
-              id="ws-menu-invite-btn"
-              type="button"
-              onClick={() => {
-                setShowWorkspaceMenu(false);
-                onOpenInvite();
-              }}
-              className="w-full px-3.5 py-2 hover:bg-neutral-100 text-xs font-semibold flex items-center gap-2.5 text-neutral-700 cursor-pointer"
-            >
-              <UserPlus className="w-4 h-4 text-emerald-600" />
-              <span>Invite teammates</span>
-            </button>
-
-            <button
-              id="ws-menu-pending-approvals-btn"
-              type="button"
-              onClick={() => {
-                setShowWorkspaceMenu(false);
-                onOpenPendingApprovals();
-              }}
-              className="w-full px-3.5 py-2 hover:bg-neutral-100 text-xs font-semibold flex items-center justify-between text-neutral-700 cursor-pointer"
-            >
-              <div className="flex items-center gap-2.5">
-                <UserCheck className="w-4 h-4 text-blue-600" />
-                <span>Pending Approvals</span>
+            {/* Desktop-Style Workspace List (Only visible on mobile in this menu) */}
+            <div className="md:hidden px-3.5 py-2.5 border-b border-neutral-100">
+              <h4 className="text-[10px] font-black text-neutral-400 uppercase tracking-widest mb-3">
+                Your Workspaces
+              </h4>
+              <div className="space-y-2 max-h-[200px] overflow-y-auto pr-1">
+                {workspaces.map((ws) => {
+                  const isActive = ws.id === activeWorkspace?.id;
+                  const initials = ws.name
+                    .split(/\s+/)
+                    .map((w) => w[0])
+                    .slice(0, 2)
+                    .join('')
+                    .toUpperCase();
+                  
+                  return (
+                    <button
+                      key={ws.id}
+                      type="button"
+                      onClick={() => {
+                        switchWorkspace(ws.id);
+                        setShowWorkspaceMenu(false);
+                      }}
+                      className={`w-full flex items-center gap-3 p-2 rounded-lg transition text-left cursor-pointer ${
+                        isActive ? 'bg-neutral-100 border border-neutral-200' : 'hover:bg-neutral-50'
+                      }`}
+                    >
+                      <div 
+                        className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-xs font-black shadow-sm"
+                        style={{ backgroundColor: isActive ? '#4A154B' : '#611f69' }}
+                      >
+                        {initials}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className={`text-xs truncate ${isActive ? 'font-bold text-neutral-900' : 'text-neutral-600'}`}>
+                          {ws.name}
+                        </div>
+                        {isActive && <div className="text-[9px] text-[#007A5A] font-bold">Active Now</div>}
+                      </div>
+                      {isActive && <CheckCircle2 className="w-3.5 h-3.5 text-[#007A5A]" />}
+                    </button>
+                  );
+                })}
               </div>
-              {pendingApprovalsCount > 0 && (
-                <span className="px-1.5 py-0.5 bg-amber-500 text-white rounded-full text-[10px] font-bold">
-                  {pendingApprovalsCount}
-                </span>
-              )}
-            </button>
+            </div>
 
-            <button
-              id="ws-menu-ws-settings-btn"
-              type="button"
-              onClick={() => {
-                setShowWorkspaceMenu(false);
-                onOpenWorkspaceSettings();
-              }}
-              className="w-full px-3.5 py-2 hover:bg-neutral-100 text-xs font-semibold flex items-center gap-2.5 text-neutral-700 cursor-pointer"
-            >
-              <Settings className="w-4 h-4 text-neutral-500" />
-              <span>Workspace Administration</span>
-            </button>
+            <div className="py-1">
+              <button
+                id="ws-menu-invite-btn"
+                type="button"
+                onClick={() => {
+                  setShowWorkspaceMenu(false);
+                  onOpenInvite();
+                }}
+                className="w-full px-3.5 py-2 hover:bg-neutral-100 text-xs font-semibold flex items-center gap-2.5 text-neutral-700 cursor-pointer"
+              >
+                <UserPlus className="w-4 h-4 text-emerald-600" />
+                <span>Invite teammates to {activeWorkspace?.name}</span>
+              </button>
+
+              <button
+                id="ws-menu-pending-approvals-btn"
+                type="button"
+                onClick={() => {
+                  setShowWorkspaceMenu(false);
+                  onOpenPendingApprovals();
+                }}
+                className="w-full px-3.5 py-2 hover:bg-neutral-100 text-xs font-semibold flex items-center justify-between text-neutral-700 cursor-pointer"
+              >
+                <div className="flex items-center gap-2.5">
+                  <UserCheck className="w-4 h-4 text-blue-600" />
+                  <span>Pending Approvals</span>
+                </div>
+                {pendingApprovalsCount > 0 && (
+                  <span className="px-1.5 py-0.5 bg-amber-500 text-white rounded-full text-[10px] font-bold">
+                    {pendingApprovalsCount}
+                  </span>
+                )}
+              </button>
+
+              <button
+                id="ws-menu-ws-settings-btn"
+                type="button"
+                onClick={() => {
+                  setShowWorkspaceMenu(false);
+                  onOpenWorkspaceSettings();
+                }}
+                className="w-full px-3.5 py-2 hover:bg-neutral-100 text-xs font-semibold flex items-center gap-2.5 text-neutral-700 cursor-pointer"
+              >
+                <Settings className="w-4 h-4 text-neutral-500" />
+                <span>Workspace Administration</span>
+              </button>
+            </div>
 
             <div className="border-t border-neutral-100 my-1" />
 
-            <button
-              id="ws-menu-landing-page-btn"
-              type="button"
-              onClick={() => {
-                setShowWorkspaceMenu(false);
-                setShowLandingPage(true);
-              }}
-              className="w-full px-3.5 py-2 hover:bg-red-50 text-xs font-semibold flex items-center gap-2.5 text-red-600 hover:text-red-700 transition cursor-pointer"
-            >
-              <LogOut className="w-4 h-4" />
-              <span>Sign out of Open-Slack</span>
-            </button>
+            <div className="py-1">
+              <button
+                id="ws-menu-landing-page-btn"
+                type="button"
+                onClick={() => {
+                  setShowWorkspaceMenu(false);
+                  setShowLandingPage(true);
+                }}
+                className="w-full px-3.5 py-2 hover:bg-red-50 text-xs font-semibold flex items-center gap-2.5 text-red-600 hover:text-red-700 transition cursor-pointer"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>Sign out of Open-Slack</span>
+              </button>
+            </div>
           </div>
         )}
       </div>

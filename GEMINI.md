@@ -11,6 +11,7 @@ This repository-wide contract establishes operating standards for Gemini and all
    - Direct messages exclusively display active conversations.
    - Channel member lists and counts strictly reflect channel-scoped participants.
    - Responsive multi-device support (Desktop, Tablet, Mobile) with proper touch targets and viewport handling.
+   - **Strict Adherence**: Every feature, layout, and interaction MUST mirror Slack's own implementation as closely as possible.
 3. **Living Documentation Discipline**: Every functional or structural change MUST be paired with updates to living documents in `docs/`.
 
 ---

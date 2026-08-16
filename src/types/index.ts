@@ -20,6 +20,7 @@ export interface UserPreferences {
   displayDensity?: 'clean' | 'compact';
   batterySaver?: 'auto' | 'always' | 'never';
   notificationBannerDismissed?: boolean;
+  permissionsRequested?: boolean;
 }
 
 export interface UserStatus {

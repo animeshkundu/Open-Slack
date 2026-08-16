@@ -14,8 +14,10 @@ import { JoinWorkspaceModal } from '../modals/JoinWorkspaceModal';
 import { PendingApprovalsModal } from '../modals/PendingApprovalsModal';
 import { UserSettingsModal } from '../modals/UserSettingsModal';
 import { WorkspaceSettingsModal } from '../modals/WorkspaceSettingsModal';
+import { PermissionsModal } from '../modals/PermissionsModal';
 import { MainHeader } from './MainHeader';
 import { MobileNavBar } from './MobileNavBar';
+import { MobileYouScreen } from './MobileYouScreen';
 import { PrimarySidebar } from './PrimarySidebar';
 import { RightDrawer } from './RightDrawer';
 import { WorkspaceBar } from './WorkspaceBar';
@@ -27,6 +29,7 @@ import { SlackToastContainer } from '../notifications/SlackToastContainer';
 export const AppLayout: React.FC = () => {
   const {
     identity,
+    preferences,
     messages,
     setIsSearchOpen,
     mediaPermissionError,
@@ -54,6 +57,15 @@ export const AppLayout: React.FC = () => {
   const [isDMOpen, setIsDMOpen] = useState(false);
   const [isPendingApprovalsOpen, setIsPendingApprovalsOpen] = useState(false);
   const [isWorkspaceSettingsOpen, setIsWorkspaceSettingsOpen] = useState(false);
+  const [isPermissionsOpen, setIsPermissionsOpen] = useState(false);
+
+  // Auto-show permissions modal if not requested yet and user has profile
+  useEffect(() => {
+    if (identity?.hasCustomName && !preferences.permissionsRequested && !showLandingPage) {
+      const timer = setTimeout(() => setIsPermissionsOpen(true), 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [identity?.hasCustomName, preferences.permissionsRequested, showLandingPage]);
 
   // Global Keyboard Shortcuts (Cmd+K / Ctrl+K for search, Cmd+Shift+D / Ctrl+Shift+D for toggle sidebar)
   useEffect(() => {
@@ -127,6 +139,18 @@ export const AppLayout: React.FC = () => {
             variant="page"
             onClose={() => setMobileView('sidebar')}
           />
+        </div>
+
+        {/* 2c. Mobile "You" Screen (< 768px) */}
+        <div
+          id="mobile-you-screen"
+          className={`${
+            mobileView === 'you' && rightPanel === 'none'
+              ? 'flex flex-1 w-full bg-white md:hidden flex-col overflow-hidden min-h-0'
+              : 'hidden'
+          }`}
+        >
+          <MobileYouScreen onOpenSettings={() => setIsSettingsOpen(true)} />
         </div>
 
         {/* 3. Main Center Canvas: Header + Message Stream + Rich Composer */}
@@ -236,6 +260,10 @@ export const AppLayout: React.FC = () => {
       <WorkspaceSettingsModal
         isOpen={isWorkspaceSettingsOpen}
         onClose={() => setIsWorkspaceSettingsOpen(false)}
+      />
+      <PermissionsModal
+        isOpen={isPermissionsOpen}
+        onClose={() => setIsPermissionsOpen(false)}
       />
 
       {/* 8. Mandatory First-Time Visitor Profile Onboarding */}

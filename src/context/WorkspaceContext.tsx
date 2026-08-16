@@ -166,6 +166,7 @@ const DEFAULT_PREFERENCES: UserPreferences = {
   dndUntil: null,
   mutedChannelIds: [],
   channelNotificationOverrides: {},
+  permissionsRequested: false,
 };
 
 const DEFAULT_WORKSPACE_SETTINGS: WorkspaceSettings = {

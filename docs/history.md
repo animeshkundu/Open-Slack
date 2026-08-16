@@ -2,6 +2,20 @@
 
 This is a concise, human-readable record of meaningful repository evolution. Detailed implementation history remains in Git.
 
+## 2026-08-16 (Mobile Workspace Switching & Global Permissions Modal)
+
+- **Mobile Workspace Switching**:
+  - Integrated the workspace list directly into the header dropdown in `PrimarySidebar.tsx` for mobile viewports.
+  - This allows mobile users to switch workspaces by clicking the workspace name at the top of the sidebar, matching Slack's mobile information architecture.
+- **Global Permissions Onboarding**:
+  - Created a unified `PermissionsModal.tsx` requesting authorization for Camera, Microphone, Desktop Sharing (Screen Sharing), and Notifications.
+  - Implemented automatic modal triggering 1.5 seconds after a user completes their initial profile onboarding.
+  - Added `permissionsRequested` flag to `UserPreferences` to ensure the modal is only shown once per account.
+  - Integrated permission status querying using the browser Permissions API where available.
+- **Mobile "You" Screen & Slack Parity**:
+  - Implemented a dedicated `MobileYouScreen.tsx` to handle the "You" navigation tab on mobile devices, fixing a "black page" bug when closing settings.
+  - Updated `GEMINI.md` and `AGENTS.md` to enforce strict adherence to Slack's design and behavior across all platforms.
+
 ## 2026-08-16 (Mobile Battery Optimization, Native Notifications & PWA Installation)
 
 - **Mobile Battery Optimization**:
