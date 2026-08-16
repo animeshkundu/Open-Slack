@@ -15,23 +15,33 @@ test.describe('Pixel-Perfect Visual Screenshots Suite Across 3 Device Types', ()
     }
   });
 
-  test('captures full landing page across desktop and mobile', async ({ page }) => {
-    // 1. Landing Page Desktop
-    await page.setViewportSize({ width: 1440, height: 900 });
-    await openWorkspace(page);
-    
-    // Switch to landing page if in app view
-    const wsMenuBtn = page.locator('#workspace-header-menu-btn');
-    if (await wsMenuBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await wsMenuBtn.click();
-      await page.locator('#ws-menu-landing-page-btn').click();
-    }
-    await expect(page.locator('#open-slack-landing-page')).toBeVisible({ timeout: 10000 });
-    await page.screenshot({ path: 'screenshots/01-landing-page-desktop.png', fullPage: true });
+  test('captures full landing page across desktop, tablet, and mobile', async ({ page }) => {
+    const landingViewports = [
+      { name: 'desktop', width: 1440, height: 900 },
+      { name: 'tablet', width: 1024, height: 768 },
+      { name: 'mobile', width: 390, height: 844 },
+    ] as const;
 
-    // 2. Landing Page Mobile
-    await page.setViewportSize({ width: 390, height: 844 });
-    await page.screenshot({ path: 'screenshots/02-landing-page-mobile.png', fullPage: true });
+    let landingReady = false;
+    for (const viewport of landingViewports) {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      if (!landingReady) {
+        await openWorkspace(page);
+      }
+
+      // Switch to landing page if in app view.
+      const wsMenuBtn = page.locator('#workspace-header-menu-btn');
+      if (!landingReady && await wsMenuBtn.isVisible({ timeout: 3000 }).catch(() => false)) {
+        await wsMenuBtn.click();
+        await page.locator('#ws-menu-landing-page-btn').click();
+      }
+      await expect(page.locator('#open-slack-landing-page')).toBeVisible({ timeout: 10000 });
+      landingReady = true;
+      await page.screenshot({
+        path: `screenshots/landing-page-${viewport.name}.png`,
+        fullPage: true,
+      });
+    }
   });
 
   test('captures the responsive workspace shell in desktop, tablet, and mobile modes', async ({ page }) => {
@@ -74,7 +84,8 @@ test.describe('Pixel-Perfect Visual Screenshots Suite Across 3 Device Types', ()
     await page.locator('#close-activity-drawer-btn').click();
 
     // Search Modal (Cmd+K)
-    await page.locator('#header-search-bar-trigger').click();
+    const searchTrigger = page.locator('#header-search-bar-trigger:visible, #mobile-header-search-btn:visible').first();
+    await searchTrigger.click();
     await expect(page.locator('#search-modal-card')).toBeVisible({ timeout: 5000 });
     await page.screenshot({ path: 'screenshots/06-search-modal.png' });
     await page.locator('#search-modal-backdrop').click({ position: { x: 10, y: 10 } });

@@ -4,6 +4,10 @@ This is a concise, human-readable record of meaningful repository evolution. Det
 
 ## 2026-08-15
 
+- Stabilized the responsive visual-review suite after the header search breakpoint moved to `2xl`:
+  - The screenshot test now opens the visible full-width or compact search trigger, keeping desktop captures valid at 1440px while preserving the tablet and mobile layout coverage.
+  - Regenerated the canonical 1440px, 1024px, and 390px screenshot artifacts and removed stale duplicate captures that no longer represent the current suite.
+
 - Fixed landing page onboarding default and header layout responsiveness:
   - Ensured first-time visitors who have not provided a custom display name land on the Landing Page by default, while returning users resume directly on their last active workspace and channel.
   - Resolved `MainHeader` flex item overflow on tablet and small desktop screens by raising the center search bar trigger breakpoint to `2xl`, keeping Huddle buttons, action icons, and channel metadata perfectly aligned without overlapping backgrounds or borders.
