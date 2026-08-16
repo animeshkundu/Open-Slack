@@ -29,6 +29,23 @@ export async function requestNotificationPermission(): Promise<NotificationPermi
 }
 
 /**
+ * Checks current notification permission without triggering prompt
+ */
+export function getNotificationPermissionStatus(): NotificationPermission {
+  if (typeof window === 'undefined' || !('Notification' in window)) {
+    return 'denied';
+  }
+  return Notification.permission;
+}
+
+/**
+ * Checks if browser supports Web Notifications
+ */
+export function isNotificationSupported(): boolean {
+  return typeof window !== 'undefined' && 'Notification' in window;
+}
+
+/**
  * Evaluates whether a notification should trigger for the given user.
  */
 export function shouldNotify(

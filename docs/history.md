@@ -2,6 +2,22 @@
 
 This is a concise, human-readable record of meaningful repository evolution. Detailed implementation history remains in Git.
 
+## 2026-08-16 (Mobile Battery Optimization, Native Notifications & PWA Installation)
+
+- **Mobile Battery Optimization**:
+  - Implemented `BatteryOptimizationManager` in `src/lib/battery.ts` integrating Battery Status and Page Visibility APIs.
+  - Dynamically adjusts WebRTC mesh and Nostr relay presence heartbeats and anti-entropy vector intervals based on power states (`normal`: 15s/45s, `battery_saver`: 30s/90s, `background_throttled`: 60s/180s).
+  - Implemented instant wake-up catch-up (`onWakeup`) to eliminate lag when returning from background.
+  - Added user-configurable battery saver modes (`auto`, `always`, `never`) in `UserPreferences`.
+- **Native Notifications & Toast Cleanup**:
+  - Removed redundant in-app toast overlays on incoming peer activities/messages to eliminate screen clutter and respect Slack notification standards.
+  - Added non-intrusive `NotificationPermissionBanner.tsx` at top of application for explicit browser notification authorization.
+  - Integrated full OS and mobile push notifications with channel routing, mention badges, and sound cues.
+- **Progressive Web App (PWA) & Auto-Updates**:
+  - Implemented `usePWAInstall` hook managing `beforeinstallprompt`, standalone display mode detection, and service worker update checks.
+  - Created elegant floating `PWAInstallPrompt.tsx` with one-click install and dismissal support.
+  - Added a dedicated "App & Battery (PWA)" tab in `UserSettingsModal.tsx` containing one-click PWA installation, Service Worker auto-update triggers with version tracking, live battery level telemetry, and notification permission controls.
+
 ## 2026-08-16 (Slack Alignment & Redundancy Reduction)
 
 - **Layout Audit & Slack Parity**:

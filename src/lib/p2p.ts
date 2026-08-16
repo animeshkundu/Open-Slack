@@ -1,6 +1,7 @@
 import { joinRoom, Room } from 'trystero/nostr';
 import * as Y from 'yjs';
 import { Attachment, HuddleParticipant, UserIdentity } from '../types';
+import { batteryManager } from './battery';
 import {
   FileChunkData,
   FileChunkHeader,
@@ -134,8 +135,62 @@ export class P2PNetworkManager {
   private currentWorkspaceId: string | null = null;
   private currentRelays: string[] = DEFAULT_RELAYS;
 
+  private batteryUnsub: (() => void) | null = null;
+  private wakeupUnsub: (() => void) | null = null;
+
   constructor() {
     this.initTabLeaderElection();
+    this.initBatteryOptimization();
+  }
+
+  private initBatteryOptimization() {
+    this.batteryUnsub = batteryManager.subscribe(() => {
+      if (this.room && this.ydoc) {
+        this.startPresenceHeartbeat();
+        this.startAntiEntropySync();
+      }
+    });
+
+    this.wakeupUnsub = batteryManager.onWakeup(() => {
+      this.wakeUpAndCatchUp();
+    });
+  }
+
+  /**
+   * Instantly catch up on state vectors and presence upon app wake or tab visibility
+   */
+  public wakeUpAndCatchUp() {
+    console.log('[P2P] Wakeup / Catch-up triggered: refreshing state vector and presence');
+    if (this.ydoc && this.sendSyncVector && this.connectedPeers.size > 0) {
+      try {
+        const localVector = Y.encodeStateVector(this.ydoc);
+        this.sendSyncVector(localVector);
+      } catch (err) {
+        console.warn('[P2P] Catchup state vector error:', err);
+      }
+    }
+
+    if (this.localIdentity && this.sendPresence) {
+      try {
+        this.sendPresence({
+          ...this.localIdentity,
+          lastSeen: Date.now(),
+          isOnline: true,
+        });
+      } catch (err) {
+        console.warn('[P2P] Catchup presence error:', err);
+      }
+    }
+
+    if (this.relayStatus === 'disconnected' && this.currentWorkspaceId && this.ydoc && this.localIdentity) {
+      this.joinWorkspace(
+        this.currentWorkspaceId,
+        this.ydoc,
+        this.localIdentity,
+        this.currentRelays,
+        this.events
+      );
+    }
   }
 
   /**
@@ -418,6 +473,7 @@ export class P2PNetworkManager {
     if (this.presenceInterval) {
       clearInterval(this.presenceInterval);
     }
+    const intervalMs = batteryManager.getIntervals().presenceHeartbeatMs;
     this.presenceInterval = window.setInterval(() => {
       if (this.localIdentity && this.sendPresence) {
         this.sendPresence({
@@ -426,7 +482,7 @@ export class P2PNetworkManager {
           isOnline: true,
         });
       }
-    }, 15000);
+    }, intervalMs);
   }
 
   /**
@@ -436,12 +492,13 @@ export class P2PNetworkManager {
     if (this.antiEntropyInterval) {
       clearInterval(this.antiEntropyInterval);
     }
+    const intervalMs = batteryManager.getIntervals().antiEntropySyncMs;
     this.antiEntropyInterval = window.setInterval(() => {
       if (this.ydoc && this.sendSyncVector && this.connectedPeers.size > 0) {
         const localVector = Y.encodeStateVector(this.ydoc);
         this.sendSyncVector(localVector);
       }
-    }, 45000);
+    }, intervalMs);
   }
 
   public addMediaStream(stream: MediaStream) {

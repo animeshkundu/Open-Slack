@@ -42,6 +42,31 @@ Invitations support multi-channel distribution via `InviteModal.tsx` and in-hudd
 
 WebRTC data channels carry synchronized workspace state and direct payloads. Multi-protocol signaling uses both high-availability Nostr relays (NIP-01 ephemeral events) and WebTorrent / BitTorrent tracker swarms (BEP-03) for peer discovery without central servers. Relays are purely an ephemeral rendezvous layer; they are never the source of truth for messages. File transfers use chunked peer channels with SHA-256 integrity verification, and huddles use mesh peer media streams.
 
+### Mobile Battery Life & Adaptive P2P Network Intervals
+
+To ensure high responsiveness while preventing mobile battery drain:
+- **Battery Optimization Manager (`src/lib/battery.ts`)**: Integrates the standard Battery Status API and Page Visibility API into a unified reactive power manager.
+- **Power Profiles**:
+  - `normal`: 15s presence heartbeats, 45s anti-entropy sync vectors.
+  - `battery_saver` (when battery < 25% on mobile or user preference enabled): 30s presence heartbeats, 90s anti-entropy sync.
+  - `background_throttled` (when tab is hidden): 60s presence heartbeats, 180s anti-entropy sync.
+- **Instant Catch-up on Wake (`onWakeup`)**: When a background tab or device awakens, the P2P manager immediately sends a presence announcement and triggers an instant anti-entropy sync round to eliminate lag.
+
+## Native Notifications & Activity Feed
+
+- **Browser & OS Notifications**: Native `Notification` API is utilized for direct mentions, replies, and channel activities, respecting user DND preferences and channel mute rules.
+- **Permission Management**: Replaced activity-driven toast popups with a dedicated top-level `NotificationPermissionBanner` and detailed notification settings in `UserSettingsModal`.
+- **Activity Feed**: Incoming mentions and thread replies are cleanly indexed in the persisted in-memory Activity Feed for asynchronous catchup.
+
+## Progressive Web Application (PWA) & Auto-Updates
+
+- **Standalone Mode Support**: Configured Web App Manifest (`public/manifest.json`) and Service Worker registration (`src/lib/usePWAInstall.ts`).
+- **Auto-Updates**: Background Service Worker automatically downloads new assets and provides instant updates.
+- **Install Touchpoints**:
+  - Dismissible floating `PWAInstallPrompt` banner on web browsers.
+  - Direct 1-click install button in the "App & Battery (PWA)" tab of `UserSettingsModal`.
+  - iOS Safari step-by-step "Add to Home Screen" instructions.
+
 ## Identity & Multi-Device Architecture
 
 User master identities use ECDSA P-256 for message signing and ECDH P-256 for end-to-end encryption. Each master account can sign and authorize hierarchical Device Sub-Identities (`deviceId`, local device keypair, `masterPubkey`). Display handles adhere to the `@firstname.lastname` canonical format. The `generateHandleFromName` system enforces automated collision resolution by progressively truncating first name initials, 3-character prefixes, last name initials, or numeric suffixes against active workspace members.

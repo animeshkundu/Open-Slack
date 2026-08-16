@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  getNotificationPermissionStatus,
   isDNDActive,
+  isNotificationSupported,
   requestNotificationPermission,
   shouldNotify,
   showBrowserNotification,
@@ -157,5 +159,19 @@ describe('Notifications & DND Logic', () => {
 
     await expect(requestNotificationPermission()).resolves.toBe('denied');
     expect(showBrowserNotification('Broken')).toBeNull();
+  });
+
+  it('checks notification support and returns permission status', () => {
+    Reflect.deleteProperty(window, 'Notification');
+    expect(isNotificationSupported()).toBe(false);
+    expect(getNotificationPermissionStatus()).toBe('denied');
+
+    Object.defineProperty(window, 'Notification', {
+      configurable: true,
+      value: Object.assign(vi.fn(), { permission: 'granted' }),
+    });
+
+    expect(isNotificationSupported()).toBe(true);
+    expect(getNotificationPermissionStatus()).toBe('granted');
   });
 });

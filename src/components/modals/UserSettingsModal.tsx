@@ -1,5 +1,7 @@
 import {
   Activity,
+  Battery,
+  BatteryCharging,
   Bell,
   Check,
   CheckCircle2,
@@ -32,10 +34,16 @@ import {
 import QRCode from 'qrcode';
 import React, { useEffect, useState } from 'react';
 import { useWorkspace } from '../../context/WorkspaceContext';
+import { batteryManager, BatteryState } from '../../lib/battery';
 import { generateAvatarSvg } from '../../lib/crypto';
 import { generateHandleFromName } from '../../lib/mentions';
 import { encodeDeviceSyncPayload, getOrCreateDeviceId } from '../../lib/multiDevice';
-import { isDNDActive, requestNotificationPermission } from '../../lib/notifications';
+import {
+  getNotificationPermissionStatus,
+  isDNDActive,
+  requestNotificationPermission,
+  showBrowserNotification,
+} from '../../lib/notifications';
 import {
   ALL_RECOMMENDED_RELAYS,
   DEFAULT_RELAYS,
@@ -56,6 +64,7 @@ import {
   StorageQuotaInfo,
 } from '../../lib/storage';
 import { PRESET_THEMES, ThemeName } from '../../lib/theme';
+import { usePWAInstall } from '../../lib/usePWAInstall';
 import { ThemeDefinition } from '../../types';
 
 interface UserSettingsModalProps {
@@ -63,7 +72,7 @@ interface UserSettingsModalProps {
   onClose: () => void;
 }
 
-type TabType = 'profile' | 'themes' | 'notifications' | 'linked_devices' | 'privacy' | 'crypto' | 'network' | 'storage';
+type TabType = 'profile' | 'themes' | 'notifications' | 'app' | 'linked_devices' | 'privacy' | 'crypto' | 'network' | 'storage';
 
 export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
   isOpen,
@@ -79,9 +88,31 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
     setDND,
     connectedPeerCount,
     relayStatus,
+    triggerToast,
   } = useWorkspace();
 
   const [activeTab, setActiveTab] = useState<TabType>('profile');
+
+  // PWA & Battery State
+  const {
+    isInstallable,
+    isInstalled,
+    installApp,
+    checkForUpdate,
+    isCheckingUpdate,
+    updateAvailable,
+    swVersion,
+  } = usePWAInstall();
+  const [batteryState, setBatteryState] = useState<BatteryState>(batteryManager.getState());
+  const [updateStatusMessage, setUpdateStatusMessage] = useState<string | null>(null);
+  const [notifPermission, setNotifPermission] = useState<NotificationPermission>('default');
+  const [isInstallingPwa, setIsInstallingPwa] = useState(false);
+
+  useEffect(() => {
+    const unsub = batteryManager.subscribe(setBatteryState);
+    setNotifPermission(getNotificationPermissionStatus());
+    return unsub;
+  }, []);
 
   // Profile form states
   const [displayName, setDisplayName] = useState(identity?.displayName || '');
@@ -388,6 +419,20 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
             >
               <Bell className="w-4 h-4" />
               <span>Notifications & DND</span>
+            </button>
+
+            <button
+              id="tab-app-btn"
+              type="button"
+              onClick={() => setActiveTab('app')}
+              className={`w-auto sm:w-full flex-shrink-0 flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-bold transition text-left cursor-pointer whitespace-nowrap ${
+                activeTab === 'app'
+                  ? 'bg-neutral-900 text-white shadow-xs'
+                  : 'text-neutral-600 hover:bg-neutral-200/60'
+              }`}
+            >
+              <Smartphone className="w-4 h-4" />
+              <span>App & Battery (PWA)</span>
             </button>
 
             <button
@@ -1011,6 +1056,246 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
                         </div>
                       </label>
                     ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 4. APP & BATTERY (PWA) TAB */}
+            {activeTab === 'app' && (
+              <div className="space-y-6">
+                {/* PWA Installation Card */}
+                <div className="p-4.5 bg-neutral-50 rounded-2xl border border-neutral-200 space-y-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#4A154B] to-[#611f69] border border-purple-500/30 flex items-center justify-center flex-shrink-0 shadow-xs">
+                        <span className="font-extrabold text-[#ECB22E] text-lg font-sans">#</span>
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-neutral-900 flex items-center gap-2">
+                          <span>Progressive Web App (PWA)</span>
+                          {isInstalled ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Standalone App Installed
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-200">
+                              Web Browser Mode
+                            </span>
+                          )}
+                        </h4>
+                        <p className="text-xs text-neutral-600 mt-1 leading-relaxed">
+                          Install Open-Slack as a desktop or mobile application for instant launch, offline encrypted caching, native notifications, and automatic background updates.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 flex flex-wrap items-center gap-3">
+                    {isInstalled ? (
+                      <div className="text-xs text-neutral-700 bg-white px-3.5 py-2 rounded-xl border border-neutral-200 font-medium flex items-center gap-2">
+                        <Check className="w-4 h-4 text-emerald-600" />
+                        <span>Running in standalone native window.</span>
+                      </div>
+                    ) : (
+                      <button
+                        id="install-pwa-settings-btn"
+                        type="button"
+                        onClick={async () => {
+                          setIsInstallingPwa(true);
+                          const success = await installApp();
+                          setIsInstallingPwa(false);
+                          if (success) {
+                            triggerToast({
+                              authorName: 'Open-Slack App',
+                              content: 'Open-Slack installed successfully!',
+                              type: 'system',
+                            });
+                          }
+                        }}
+                        className="px-4 py-2 bg-[#007a5a] hover:bg-[#148567] text-white rounded-xl text-xs font-bold transition flex items-center gap-2 shadow-xs cursor-pointer"
+                      >
+                        <Download className="w-4 h-4" />
+                        <span>Install Open-Slack App</span>
+                      </button>
+                    )}
+                  </div>
+
+                  {!isInstalled && (
+                    <div className="p-3 bg-blue-50/70 border border-blue-200/80 rounded-xl text-[11px] text-blue-900 leading-relaxed">
+                      <span className="font-bold">iOS / Safari Users: </span>
+                      Tap the <span className="font-semibold">Share</span> icon in Safari, then scroll down and tap <span className="font-semibold">"Add to Home Screen"</span>.
+                    </div>
+                  )}
+                </div>
+
+                {/* Auto-Updates & Service Worker Card */}
+                <div className="p-4.5 bg-neutral-50 rounded-2xl border border-neutral-200 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <RefreshCw className="w-4 h-4 text-blue-600" />
+                      <h4 className="text-xs font-bold text-neutral-900">Automatic Updates</h4>
+                    </div>
+                    <span className="text-[11px] font-mono text-neutral-500">v{swVersion}</span>
+                  </div>
+
+                  <p className="text-xs text-neutral-600 leading-relaxed">
+                    Open-Slack uses a background Service Worker to automatically pull the latest decentralized client updates seamlessly.
+                  </p>
+
+                  <div className="pt-1 flex items-center gap-3">
+                    <button
+                      id="check-updates-btn"
+                      type="button"
+                      disabled={isCheckingUpdate}
+                      onClick={async () => {
+                        const res = await checkForUpdate();
+                        setUpdateStatusMessage(res.message);
+                      }}
+                      className="px-3.5 py-1.5 bg-neutral-200 hover:bg-neutral-300 text-neutral-800 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${isCheckingUpdate ? 'animate-spin' : ''}`} />
+                      <span>{isCheckingUpdate ? 'Checking for updates...' : 'Check for Updates'}</span>
+                    </button>
+
+                    {updateStatusMessage && (
+                      <span className="text-xs text-emerald-700 font-medium">
+                        {updateStatusMessage}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Mobile Battery Life & Power Optimization */}
+                <div className="p-4.5 bg-neutral-50 rounded-2xl border border-neutral-200 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      {batteryState.charging ? (
+                        <BatteryCharging className="w-4.5 h-4.5 text-emerald-600" />
+                      ) : (
+                        <Battery className="w-4.5 h-4.5 text-[#1264A3]" />
+                      )}
+                      <h4 className="text-xs font-bold text-neutral-900">Mobile Battery Saver & P2P Efficiency</h4>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-bold px-2 py-0.5 bg-neutral-200 text-neutral-800 rounded-md">
+                        {batteryState.charging ? '⚡ Charging' : `${Math.round(batteryState.level * 100)}% Battery`}
+                      </span>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                        batteryState.powerProfile === 'battery_saver'
+                          ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                          : batteryState.powerProfile === 'background_throttled'
+                          ? 'bg-purple-100 text-purple-900'
+                          : 'bg-emerald-100 text-emerald-900'
+                      }`}>
+                        {batteryState.powerProfile === 'battery_saver'
+                          ? 'Power Saver Active'
+                          : batteryState.powerProfile === 'background_throttled'
+                          ? 'Background Throttled'
+                          : 'High Performance'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-neutral-600 leading-relaxed">
+                    Decentralized P2P WebRTC mesh and Nostr relays can consume mobile power if heartbeats are sent too aggressively. Open-Slack automatically throttles background heartbeats and anti-entropy vector exchanges when power is low or tabs are hidden, catching up immediately when the app returns to view.
+                  </p>
+
+                  {/* Power Profile Selector */}
+                  <div className="space-y-2">
+                    {[
+                      {
+                        id: 'auto',
+                        label: 'Automatic (Recommended for Mobile & Desktop)',
+                        desc: 'Dynamically scales presence (15s–30s) and sync (45s–90s) based on battery level (<25%) and page visibility. Instantly catches up upon wake.',
+                      },
+                      {
+                        id: 'always',
+                        label: 'Always On (Maximum Battery Life)',
+                        desc: 'Reduces background mesh chatter to 30s presence and 90s anti-entropy sync for maximum battery savings.',
+                      },
+                      {
+                        id: 'never',
+                        label: 'Never (High Performance / Plugged In)',
+                        desc: 'Maintains rapid 15s presence and 45s sync vectors at all times.',
+                      },
+                    ].map((opt) => (
+                      <label
+                        key={opt.id}
+                        className={`p-3 rounded-xl border flex items-start gap-3 cursor-pointer transition ${
+                          (preferences.batterySaver || 'auto') === opt.id
+                            ? 'bg-blue-50/60 border-blue-300'
+                            : 'bg-white border-neutral-200 hover:bg-neutral-100/50'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="batterySaver"
+                          value={opt.id}
+                          checked={(preferences.batterySaver || 'auto') === opt.id}
+                          onChange={() => {
+                            updatePreferences({ batterySaver: opt.id as any });
+                            batteryManager.setUserPreference(opt.id as any);
+                          }}
+                          className="mt-0.5 text-[#1264A3]"
+                        />
+                        <div>
+                          <div className="text-xs font-bold text-neutral-900">{opt.label}</div>
+                          <div className="text-[11px] text-neutral-500 mt-0.5">{opt.desc}</div>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Browser & OS Notification Permission Status */}
+                <div className="p-4.5 bg-neutral-50 rounded-2xl border border-neutral-200 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Bell className="w-4 h-4 text-purple-600" />
+                      <h4 className="text-xs font-bold text-neutral-900">Desktop & Push Notifications</h4>
+                    </div>
+
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                      notifPermission === 'granted'
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : notifPermission === 'denied'
+                        ? 'bg-red-100 text-red-800'
+                        : 'bg-amber-100 text-amber-800'
+                    }`}>
+                      Permission: {notifPermission.toUpperCase()}
+                    </span>
+                  </div>
+
+                  <p className="text-xs text-neutral-600 leading-relaxed">
+                    Receive OS desktop and mobile alert banners whenever teammates send messages, @mention you, react to your messages, or start voice huddles.
+                  </p>
+
+                  <div className="pt-1 flex items-center gap-2">
+                    <button
+                      id="test-notification-btn"
+                      type="button"
+                      onClick={async () => {
+                        const perm = await requestNotificationPermission();
+                        setNotifPermission(perm);
+                        if (perm === 'granted') {
+                          showBrowserNotification('🔔 Open-Slack Test Notification', {
+                            body: 'Desktop and activity notifications are active and working!',
+                            tag: 'test-notif',
+                          });
+                          triggerToast({
+                            authorName: 'Slack Notifications',
+                            content: 'Test notification dispatched successfully.',
+                            type: 'system',
+                          });
+                        }
+                      }}
+                      className="px-3.5 py-1.5 bg-[#007a5a] hover:bg-[#148567] text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+                    >
+                      <Bell className="w-3.5 h-3.5" />
+                      <span>{notifPermission === 'granted' ? 'Send Test Notification' : 'Enable Notifications'}</span>
+                    </button>
                   </div>
                 </div>
               </div>

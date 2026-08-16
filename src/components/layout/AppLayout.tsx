@@ -20,6 +20,8 @@ import { PrimarySidebar } from './PrimarySidebar';
 import { RightDrawer } from './RightDrawer';
 import { WorkspaceBar } from './WorkspaceBar';
 import { ActivityFeedDrawer } from '../chat/ActivityFeedDrawer';
+import { NotificationPermissionBanner } from '../notifications/NotificationPermissionBanner';
+import { PWAInstallPrompt } from '../notifications/PWAInstallPrompt';
 import { SlackToastContainer } from '../notifications/SlackToastContainer';
 
 export const AppLayout: React.FC = () => {
@@ -79,6 +81,9 @@ export const AppLayout: React.FC = () => {
       id="openslack-root-shell"
       className="flex flex-col h-dvh min-h-0 w-full bg-[#1A1D21] overflow-hidden text-neutral-900 antialiased font-sans select-none"
     >
+      {/* Desktop & Mobile Web Notification Permission Banner */}
+      <NotificationPermissionBanner />
+
       <div className="flex-1 min-h-0 flex overflow-hidden relative">
         {/* 1. Leftmost Rail: Workspace Icons */}
         <div className="hidden md:flex">
@@ -248,6 +253,9 @@ export const AppLayout: React.FC = () => {
           setMobileView('chat');
         }}
       />
+
+      {/* 10. Floating PWA Installation Prompt */}
+      <PWAInstallPrompt />
     </div>
   );
 };

@@ -18,6 +18,8 @@ export interface UserPreferences {
   themeName?: 'aubergine' | 'nocturne' | 'ocin' | 'banana' | 'forest' | 'monument' | 'custom';
   customTheme?: ThemeDefinition;
   displayDensity?: 'clean' | 'compact';
+  batterySaver?: 'auto' | 'always' | 'never';
+  notificationBannerDismissed?: boolean;
 }
 
 export interface UserStatus {

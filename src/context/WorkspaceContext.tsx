@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { IndexeddbPersistence } from 'y-indexeddb';
 import * as Y from 'yjs';
+import { batteryManager } from '../lib/battery';
 import {
   buildDmTitle,
   createDmChannelId,
@@ -456,6 +457,9 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
   // Update Preferences Handler
   const updatePreferences = (updates: Partial<UserPreferences>) => {
+    if (updates.batterySaver) {
+      batteryManager.setUserPreference(updates.batterySaver);
+    }
     setPreferences((prev) => {
       const next = { ...prev, ...updates };
       localStorage.setItem('openslack_user_preferences', JSON.stringify(next));
@@ -617,21 +621,6 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                 const isReply = Boolean(msg.threadParentId);
 
                 if (shouldNotify(msg, identity.pubkey, identity.handle, preferences)) {
-                  // In-App Toast
-                  triggerToast({
-                    authorName,
-                    authorAvatar: author?.avatarUrl,
-                    authorPubkey: msg.authorPubkey,
-                    channelId: msg.channelId,
-                    channelName,
-                    isPrivate: channel?.isPrivate,
-                    isDirectMessage: channel?.isDirectMessage,
-                    content: msg.content,
-                    type: isMention ? 'mention' : isReply ? 'thread_reply' : 'message',
-                    messageId: msg.id,
-                    threadParentId: msg.threadParentId,
-                  });
-
                   // Notification record for Activity Feed
                   if (isMention || isReply) {
                     const notif: AppNotification = {
