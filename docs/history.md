@@ -5,6 +5,7 @@ This is a concise, human-readable record of meaningful repository evolution. Det
 ## 2026-08-17 (E2E Relay Isolation)
 
 - Playwright E2E tests now run through one worker because the shared local Nostr relay can otherwise leak presence and huddle events between parallel test contexts.
+- Vitest's jsdom setup always uses its in-memory WebSocket mock so Node's native WebSocket cannot emit cross-realm EventTarget errors during coverage runs.
 
 ## 2026-08-17 (CI Browser Parity & Seed Message Deduplication)
 
