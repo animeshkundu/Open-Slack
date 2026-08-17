@@ -2,6 +2,11 @@
 
 This is a concise, human-readable record of meaningful repository evolution. Detailed implementation history remains in Git.
 
+## 2026-08-17 (CI Browser Parity & Seed Message Deduplication)
+
+- CI and GitHub Pages validation now install both configured Playwright browsers, including Firefox coverage for the multi-browser huddle suites.
+- Message state filters duplicate CRDT entries by ID so concurrent workspace initialization cannot render repeated seeded welcome messages with conflicting React keys.
+
 ## 2026-08-17 (Coverage Regression Guard)
 
 - Added a focused P2P huddle roster assertion so newly introduced channel filtering remains covered and CI stays above the configured statement threshold.

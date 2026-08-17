@@ -610,8 +610,13 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setChannels(channelList);
 
       // Messages
-      const msgList = yMessages.toArray();
-      setRawMessages([...msgList]);
+      const seenMessageIds = new Set<string>();
+      const msgList = yMessages.toArray().filter((message) => {
+        if (seenMessageIds.has(message.id)) return false;
+        seenMessageIds.add(message.id);
+        return true;
+      });
+      setRawMessages(msgList);
 
       // Reactions
       const reactRecord: Record<string, Record<string, string[]>> = {};
@@ -651,18 +656,20 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           });
 
           // Welcome message from OpenBot
-          yMessages.push([
-            {
-              id: 'msg_welcome_seed',
-              channelId: 'chan_general',
-              authorPubkey: 'pubkey_openbot',
-              content: `👋 **Welcome to #general!**\n\nI'm **OpenBot**, your local workspace assistant. Open-Slack is a **free, instant team chat** with zero setup or central servers.\n\nEverything you send is saved locally in your browser and synced directly to teammates using WebRTC.\n\nInvite your team to start chatting in real-time!`,
-              timestamp: Date.now(),
-              createdAt: new Date().toISOString(),
-              mentions: ['@channel'],
-              reactions: { '🎉': [identity.pubkey], '👋': [identity.pubkey] },
-            },
-          ]);
+          if (!yMessages.toArray().some((message) => message.id === 'msg_welcome_seed')) {
+            yMessages.push([
+              {
+                id: 'msg_welcome_seed',
+                channelId: 'chan_general',
+                authorPubkey: 'pubkey_openbot',
+                content: `👋 **Welcome to #general!**\n\nI'm **OpenBot**, your local workspace assistant. Open-Slack is a **free, instant team chat** with zero setup or central servers.\n\nEverything you send is saved locally in your browser and synced directly to teammates using WebRTC.\n\nInvite your team to start chatting in real-time!`,
+                timestamp: Date.now(),
+                createdAt: new Date().toISOString(),
+                mentions: ['@channel'],
+                reactions: { '🎉': [identity.pubkey], '👋': [identity.pubkey] },
+              },
+            ]);
+          }
         });
       }
 

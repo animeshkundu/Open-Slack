@@ -59,7 +59,7 @@ jobs:
           find dist/assets -type f -name '*.js' -size +0c -print -quit | grep -q .
 
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps chromium firefox
 
       - name: Test production artifact
         env:
@@ -111,7 +111,7 @@ jobs:
         run: npm ci
 
       - name: Install Playwright browser
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps chromium firefox
 
       - name: Wait for GitHub Pages
         run: |
