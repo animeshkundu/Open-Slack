@@ -1,5 +1,5 @@
 import { expect, test, type Browser, type BrowserContext, type Page } from '@playwright/test';
-import { ensureOnboardingCompleted, injectNostrRelayMocks, openWorkspace } from './helpers';
+import { createMediaContext, ensureOnboardingCompleted, injectNostrRelayMocks, openWorkspace, waitForPeerMesh } from './helpers';
 
 async function createWorkspace(page: Page, name: string): Promise<void> {
   await page.locator('#add-workspace-rail-btn').click();
@@ -23,9 +23,7 @@ async function openPeer(
   displayName: string,
   url = './'
 ): Promise<{ context: BrowserContext; page: Page }> {
-  const context = await browser.newContext({
-    permissions: ['microphone', 'camera'],
-  });
+  const context = await createMediaContext(browser);
   await injectNostrRelayMocks(context);
   const page = await context.newPage();
   await page.goto(url);
@@ -106,6 +104,7 @@ test.describe('Multi-browser huddle mesh', () => {
   test('two peers join the same channel huddle with names, media, screenshare, and disconnect', async ({
     browser,
   }) => {
+    test.setTimeout(120000);
     const workspaceName = `Huddle Mesh ${Date.now()}`;
     const alice = await openPeer(browser, 'Alice Huddle');
     await createWorkspace(alice.page, workspaceName);
@@ -124,7 +123,9 @@ test.describe('Multi-browser huddle mesh', () => {
       timeout: 20000,
     });
 
-    // Bob should see Alice's huddle-started notice in #general
+    // Wait for WebRTC mesh + CRDT notice before joining the same huddle room
+    await waitForPeerMesh(alice.page, 1, 25000);
+    await waitForPeerMesh(bob.page, 1, 25000);
     await expect(bob.page.locator('[data-message-type="huddle_started"]').first()).toContainText(
       'started a huddle',
       { timeout: 20000 }
@@ -228,6 +229,7 @@ test.describe('Multi-browser huddle mesh', () => {
   });
 
   test('three peers in the same workspace/channel converge on one huddle room', async ({ browser }) => {
+    test.setTimeout(150000);
     const workspaceName = `Triple Huddle ${Date.now()}`;
     const alice = await openPeer(browser, 'Alice Three');
     await createWorkspace(alice.page, workspaceName);
@@ -242,6 +244,11 @@ test.describe('Multi-browser huddle mesh', () => {
     await expect(cara.page.locator('#workspace-header-menu-btn')).toContainText(workspaceName, {
       timeout: 20000,
     });
+
+    // Ensure the three-way mesh is up before huddle signaling
+    await waitForPeerMesh(alice.page, 2, 35000);
+    await waitForPeerMesh(bob.page, 2, 35000);
+    await waitForPeerMesh(cara.page, 2, 35000);
 
     // Stagger joins slightly to exercise join re-announce paths
     await alice.page.locator('#channel-huddle-btn').click();

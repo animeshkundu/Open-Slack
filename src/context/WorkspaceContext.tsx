@@ -1593,6 +1593,19 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         });
       }
 
+      // Seed any peers who already announced this channel huddle before we went active.
+      for (const remote of p2pNetwork.getPeersInHuddle(channelId)) {
+        peerIdToPubkeyRef.current.set(remote.peerId, remote.user.pubkey);
+        participants.set(remote.user.pubkey, {
+          pubkey: remote.user.pubkey,
+          displayName: remote.user.displayName,
+          avatarUrl: remote.user.avatarUrl,
+          isMuted: remote.media.isMuted,
+          isVideoOn: remote.media.isVideoOn,
+          isScreenSharing: remote.media.isScreenSharing,
+        });
+      }
+
       setHuddleState({
         channelId,
         channelName: channel?.name || 'general',

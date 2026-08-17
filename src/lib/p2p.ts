@@ -156,6 +156,15 @@ export class P2PNetworkManager {
     isVideoOn: false,
   };
   private peerHuddleChannels = new Map<string, string>();
+  /** Last known remote huddle roster entry (survives until leave/peer leave). */
+  private peerHuddleInfo = new Map<
+    string,
+    {
+      channelId: string;
+      user: UserIdentity;
+      media: Required<HuddleMediaState>;
+    }
+  >();
   private pendingPeerStreams = new Map<string, MediaStream>();
   private presenceInterval: number | null = null;
   private antiEntropyInterval: number | null = null;
@@ -399,19 +408,55 @@ export class P2PNetworkManager {
 
         if (payload.type === 'leave') {
           this.peerHuddleChannels.delete(ctx.peerId);
+          this.peerHuddleInfo.delete(ctx.peerId);
           this.pendingPeerStreams.delete(ctx.peerId);
           this.events.onPeerHuddleLeave?.(ctx.peerId, payload.channelId);
           return;
         }
 
         this.peerHuddleChannels.set(ctx.peerId, payload.channelId);
+        const media = {
+          isScreenSharing: Boolean(payload.isScreenSharing),
+          isMuted: Boolean(payload.isMuted),
+          isVideoOn: Boolean(payload.isVideoOn),
+        };
         if (payload.user) {
-          this.events.onPeerHuddleJoin?.(ctx.peerId, payload.channelId, payload.user, {
-            isScreenSharing: Boolean(payload.isScreenSharing),
-            isMuted: Boolean(payload.isMuted),
-            isVideoOn: Boolean(payload.isVideoOn),
+          this.peerHuddleInfo.set(ctx.peerId, {
+            channelId: payload.channelId,
+            user: payload.user as UserIdentity,
+            media,
           });
+          this.events.onPeerHuddleJoin?.(ctx.peerId, payload.channelId, payload.user, media);
         }
+
+        // Late joiners start their local huddle after peer-connect re-announce was ignored
+        // (UI only accepts joins while active). Reply with a targeted update so they learn
+        // who is already in the channel huddle — use `update` to avoid join/join ping-pong.
+        if (
+          payload.type === 'join' &&
+          this.activeHuddleChannelId &&
+          this.activeHuddleChannelId === payload.channelId &&
+          this.localIdentity &&
+          this.sendHuddle
+        ) {
+          void this.sendHuddle(
+            {
+              type: 'update',
+              channelId: this.activeHuddleChannelId,
+              user: this.localIdentity,
+              ...this.localHuddleMedia,
+            },
+            { target: ctx.peerId }
+          );
+          if (this.activeStream && this.room) {
+            try {
+              this.room.addStream(this.activeStream, { target: ctx.peerId });
+            } catch (e) {
+              console.warn('[P2P] Error sharing stream with late huddle joiner:', e);
+            }
+          }
+        }
+
         const pendingStream = this.pendingPeerStreams.get(ctx.peerId);
         if (pendingStream) {
           this.pendingPeerStreams.delete(ctx.peerId);
@@ -462,6 +507,7 @@ export class P2PNetworkManager {
         console.log(`[P2P] Peer left: ${peerId}`);
         this.connectedPeers.delete(peerId);
         this.peerHuddleChannels.delete(peerId);
+        this.peerHuddleInfo.delete(peerId);
         this.pendingPeerStreams.delete(peerId);
         this.events.onPeerLeave?.(peerId);
       };
@@ -671,6 +717,25 @@ export class P2PNetworkManager {
     };
   }
 
+  /** Peers known to be in a channel huddle (from prior join/update signals). */
+  public getPeersInHuddle(channelId: string): Array<{
+    peerId: string;
+    user: UserIdentity;
+    media: Required<HuddleMediaState>;
+  }> {
+    const result: Array<{
+      peerId: string;
+      user: UserIdentity;
+      media: Required<HuddleMediaState>;
+    }> = [];
+    for (const [peerId, info] of this.peerHuddleInfo.entries()) {
+      if (info.channelId === channelId) {
+        result.push({ peerId, user: info.user, media: info.media });
+      }
+    }
+    return result;
+  }
+
   public removeMediaStream() {
     if (this.activeStream && this.room) {
       try {
@@ -727,6 +792,7 @@ export class P2PNetworkManager {
     }
     this.connectedPeers.clear();
     this.peerHuddleChannels.clear();
+    this.peerHuddleInfo.clear();
     this.pendingPeerStreams.clear();
     this.currentWorkspaceId = null;
     this.relayStatus = 'disconnected';

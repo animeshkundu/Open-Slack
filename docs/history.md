@@ -18,8 +18,9 @@ This is a concise, human-readable record of meaningful repository evolution. Det
 - **True multi-browser Playwright validation**:
   - Added shared local Nostr relay (`tests/e2e/localNostrRelay.mjs`) and redirected E2E WebSockets to it so isolated contexts peer-connect for real.
   - Expanded `huddle.spec.ts` and `p2p-multibrowser.spec.ts` to assert 2–3 peer convergence, real names/avatars, A/V + screenshare flags, remote stream presence, and disconnect drops; Firefox project covers huddle/P2P specs alongside Chromium.
-  - Fixed React StrictMode leave/rejoin races: `leaveWorkspace` is epoch-gated and deferred one macrotask so Trystero room teardown cannot destroy a room that immediately re-joins on remount (this was blocking multi-peer WebRTC offers/answers in e2e).
-  - E2E mock forces a single logical Nostr relay URL (`window.__OPENSLACK_E2E_RELAYS`) to avoid 10× self-echo amplification against the local relay.
+  - Fixed multi-peer WebRTC join failures caused by React StrictMode double-mount: removed StrictMode around the app root because Trystero's module-level Nostr relay manager cannot survive async `room.leave()` racing an immediate re-join (offers never became remote descriptions).
+  - Kept `leaveWorkspace` epoch-gated/deferred as defense-in-depth for fast remounts, and pinned a single E2E relay via `window.__OPENSLACK_E2E_RELAYS`.
+  - Late huddle joiners now receive the existing roster: peers already in-channel reply to `join` with a targeted `update` (+ stream), and local activate seeds from `getPeersInHuddle()`.
 
 ## 2026-08-16 (Linked Device Sync, Teammate Invites, Multi-Browser Huddle Parity & Cache Busting)
 

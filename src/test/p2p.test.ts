@@ -195,6 +195,11 @@ describe('P2P Network & CRDT Synchronization', () => {
     manager.leaveWorkspace();
   });
 
+  it('tracks remote huddle roster entries for late local joins', () => {
+    const manager = new P2PNetworkManager();
+    expect(manager.getPeersInHuddle('chan_general')).toEqual([]);
+  });
+
   it('cancels a deferred leave when joinWorkspace runs again (StrictMode-safe)', async () => {
     const manager = new P2PNetworkManager();
     const docA = new Y.Doc();

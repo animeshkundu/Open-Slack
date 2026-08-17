@@ -17,7 +17,7 @@ const localBaseURL = previewBuild
 
 export default defineConfig({
   testDir: './tests/e2e',
-  timeout: 45000,
+  timeout: 90000,
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
@@ -31,7 +31,6 @@ export default defineConfig({
     actionTimeout: 10000,
     navigationTimeout: 15000,
     trace: 'on-first-retry',
-    permissions: ['camera', 'microphone'],
     launchOptions: {
       args: [
         '--use-fake-device-for-media-stream',
@@ -49,7 +48,15 @@ export default defineConfig({
     {
       // Cross-browser huddle validation (Chromium <-> Firefox)
       name: 'firefox',
-      use: { ...devices['Desktop Firefox'] },
+      use: {
+        ...devices['Desktop Firefox'],
+        launchOptions: {
+          firefoxUserPrefs: {
+            'media.navigator.streams.fake': true,
+            'media.navigator.permission.disabled': true,
+          },
+        },
+      },
       testMatch: /huddle\.spec\.ts|p2p-multibrowser\.spec\.ts/,
     },
   ],

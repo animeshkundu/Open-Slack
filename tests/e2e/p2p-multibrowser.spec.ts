@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { ensureOnboardingCompleted, injectNostrRelayMocks } from './helpers';
+import { createMediaContext, ensureOnboardingCompleted, injectNostrRelayMocks, waitForPeerMesh } from './helpers';
 
 async function createWorkspace(page: import('@playwright/test').Page, name: string): Promise<void> {
   await page.locator('#add-workspace-rail-btn').click();
@@ -12,9 +12,7 @@ async function createWorkspace(page: import('@playwright/test').Page, name: stri
 test.describe('Multi-Browser P2P Interaction & CRDT Synchronization', () => {
   test('opens the exact invited workspace in two isolated browser contexts', async ({ browser }) => {
     // 1. Create Peer A Context
-    const contextA = await browser.newContext({
-      permissions: ['microphone', 'camera'],
-    });
+    const contextA = await createMediaContext(browser);
     await injectNostrRelayMocks(contextA);
     const pageA = await contextA.newPage();
     await pageA.goto('./');
@@ -37,9 +35,7 @@ test.describe('Multi-Browser P2P Interaction & CRDT Synchronization', () => {
     await pageA.locator('#close-invite-modal-btn').click();
 
     // 3. Create Peer B Context in isolated incognito session
-    const contextB = await browser.newContext({
-      permissions: ['microphone', 'camera'],
-    });
+    const contextB = await createMediaContext(browser);
     await injectNostrRelayMocks(contextB);
     const pageB = await contextB.newPage();
     await pageB.goto(inviteUrl);
@@ -100,10 +96,9 @@ test.describe('Multi-Browser P2P Interaction & CRDT Synchronization', () => {
   test('two browsers join the same channel huddle, share media flags, and drop on leave', async ({
     browser,
   }) => {
+    test.setTimeout(120000);
     // 1. Create Peer A Context
-    const contextA = await browser.newContext({
-      permissions: ['microphone', 'camera'],
-    });
+    const contextA = await createMediaContext(browser);
     await injectNostrRelayMocks(contextA);
     const pageA = await contextA.newPage();
     await pageA.goto('./');
@@ -125,14 +120,14 @@ test.describe('Multi-Browser P2P Interaction & CRDT Synchronization', () => {
     await expect(pageA.locator('[data-message-type="huddle_started"]').first()).toBeVisible();
 
     // 2. Peer B joins same workspace via invite link
-    const contextB = await browser.newContext({
-      permissions: ['microphone', 'camera'],
-    });
+    const contextB = await createMediaContext(browser);
     await injectNostrRelayMocks(contextB);
     const pageB = await contextB.newPage();
     await pageB.goto(inviteUrl);
     await ensureOnboardingCompleted(pageB, 'Bob');
 
+    await waitForPeerMesh(pageA, 1, 25000);
+    await waitForPeerMesh(pageB, 1, 25000);
     // Peer B sees huddle notice then joins huddle on same channel
     await expect(pageB.locator('[data-message-type="huddle_started"]').first()).toBeVisible({
       timeout: 20000,

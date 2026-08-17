@@ -1,4 +1,4 @@
-import { expect, Page } from '@playwright/test';
+import { expect, type Browser, type BrowserContext, type Page } from '@playwright/test';
 import { injectNostrRelayMocks } from './mockRelays';
 
 export { injectNostrRelayMocks } from './mockRelays';
@@ -85,4 +85,34 @@ export async function openWorkspace(page: Page, displayName = 'Alice Reviewer'):
   await injectNostrRelayMocks(page);
   await page.goto('./');
   await ensureOnboardingCompleted(page, displayName);
+}
+
+
+/** Wait until the P2P status control reports at least `minPeers` connected peers. */
+export async function waitForPeerMesh(page: Page, minPeers = 1, timeout = 25000): Promise<void> {
+  await expect
+    .poll(
+      async () => {
+        return page.evaluate((min) => {
+          const el = document.querySelector('[title*="P2P Mesh"], [aria-label*="P2P Mesh"]');
+          const label = el?.getAttribute('title') || el?.getAttribute('aria-label') || '';
+          const match = label.match(/(\d+)\s*peers?/i);
+          const count = match ? Number(match[1]) : 0;
+          return count >= min ? count : 0;
+        }, minPeers);
+      },
+      { timeout }
+    )
+    .toBeGreaterThanOrEqual(minPeers);
+}
+
+
+/** Create a browser context with A/V permissions when the engine supports them (Chromium). */
+export async function createMediaContext(browser: Browser): Promise<BrowserContext> {
+  const name = browser.browserType().name();
+  if (name === 'chromium' || name === 'chrome' || name === 'msedge') {
+    return browser.newContext({ permissions: ['microphone', 'camera'] });
+  }
+  // Firefox/WebKit: Playwright does not support granting microphone/camera permissions.
+  return browser.newContext();
 }
