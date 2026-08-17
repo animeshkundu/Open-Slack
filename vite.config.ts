@@ -12,13 +12,26 @@ export default defineConfig(() => {
   const isGhPages = process.env.GITHUB_PAGES === 'true';
   const repositoryName = process.env.GITHUB_REPOSITORY?.split('/')[1] ?? 'Open-Slack';
   const pagesBasePath = `/${repositoryName}/`;
+  const appVersion = process.env.npm_package_version ?? '1.0.0';
+  const buildId =
+    process.env.GITHUB_SHA?.slice(0, 12) ||
+    process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 12) ||
+    process.env.BUILD_ID ||
+    `${Date.now().toString(36)}`;
 
   return {
     base: isGhPages ? pagesBasePath : './',
+    define: {
+      __APP_VERSION__: JSON.stringify(appVersion),
+      __BUILD_ID__: JSON.stringify(buildId),
+    },
     plugins: [
       react(),
       tailwindcss(),
       VitePWA({
+        // Manual registration via virtual:pwa-register so browser + installed PWA
+        // both skipWaiting, claim clients, and reload onto the new release.
+        injectRegister: false,
         registerType: 'autoUpdate',
         includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
         manifest: {
@@ -29,6 +42,8 @@ export default defineConfig(() => {
           background_color: '#1A1D21',
           display: 'standalone',
           start_url: isGhPages ? pagesBasePath : './',
+          // Bust installed-app shell metadata whenever the release identity changes.
+          id: isGhPages ? `${pagesBasePath}?v=${appVersion}-${buildId}` : `./?v=${appVersion}-${buildId}`,
           icons: [
             {
               src: 'pwa-192x192.png',
@@ -45,10 +60,42 @@ export default defineConfig(() => {
           ],
         },
         workbox: {
-          globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
+          // Content-hashed assets + HTML are revisioned in the precache manifest per build.
+          globPatterns: ['**/*.{js,css,html,ico,png,svg,webmanifest,woff2}'],
           cleanupOutdatedCaches: true,
           clientsClaim: true,
           skipWaiting: true,
+          navigateFallback: 'index.html',
+          navigateFallbackDenylist: [/^\/api\//],
+          runtimeCaching: [
+            {
+              // Always prefer the network for navigations so releases are not sticky.
+              urlPattern: ({ request }) => request.mode === 'navigate',
+              handler: 'NetworkFirst',
+              options: {
+                cacheName: `openslack-html-${buildId}`,
+                networkTimeoutSeconds: 3,
+                expiration: {
+                  maxEntries: 8,
+                  maxAgeSeconds: 60 * 60 * 24,
+                },
+              },
+            },
+            {
+              urlPattern: ({ request }) =>
+                request.destination === 'script' ||
+                request.destination === 'style' ||
+                request.destination === 'worker',
+              handler: 'CacheFirst',
+              options: {
+                cacheName: `openslack-assets-${buildId}`,
+                expiration: {
+                  maxEntries: 64,
+                  maxAgeSeconds: 60 * 60 * 24 * 30,
+                },
+              },
+            },
+          ],
         },
       }),
     ],

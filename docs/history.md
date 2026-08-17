@@ -2,6 +2,25 @@
 
 This is a concise, human-readable record of meaningful repository evolution. Detailed implementation history remains in Git.
 
+## 2026-08-17 (Flawless Huddle Mesh, Channel Notices, True Multi-Browser E2E, PWA Release Busting)
+
+- **PWA cache busting for browser + installed app**:
+  - Manual `virtual:pwa-register` in `src/main.tsx` with immediate activation, `onNeedRefresh` reload, and periodic/visibility/online update checks.
+  - Build injects `__APP_VERSION__` + `__BUILD_ID__`; Workbox uses build-scoped runtime caches, `NetworkFirst` navigations, content-hashed assets, `skipWaiting`, `clientsClaim`, and `cleanupOutdatedCaches`.
+- **Huddle reliability fixes**:
+  - Listen-only (mic denied) joins now still call `startHuddle` so peers always share the same channel-scoped room.
+  - Mute/camera/screen-share flags are broadcast on join/update and re-announced to peers who connect mid-call.
+  - Switching channel huddles cleanly leaves the previous room before joining the next.
+  - Remote stream handling no longer mis-labels single video tracks as screen shares.
+- **Channel huddle notifications**:
+  - Starting/leaving a huddle posts CRDT `huddle_started` / `huddle_ended` system messages into the channel.
+  - Remote peers get in-app huddle toasts, browser notifications, and a Join Huddle button on the notice chip.
+- **True multi-browser Playwright validation**:
+  - Added shared local Nostr relay (`tests/e2e/localNostrRelay.mjs`) and redirected E2E WebSockets to it so isolated contexts peer-connect for real.
+  - Expanded `huddle.spec.ts` and `p2p-multibrowser.spec.ts` to assert 2–3 peer convergence, real names/avatars, A/V + screenshare flags, remote stream presence, and disconnect drops; Firefox project covers huddle/P2P specs alongside Chromium.
+  - Fixed React StrictMode leave/rejoin races: `leaveWorkspace` is epoch-gated and deferred one macrotask so Trystero room teardown cannot destroy a room that immediately re-joins on remount (this was blocking multi-peer WebRTC offers/answers in e2e).
+  - E2E mock forces a single logical Nostr relay URL (`window.__OPENSLACK_E2E_RELAYS`) to avoid 10× self-echo amplification against the local relay.
+
 ## 2026-08-16 (Linked Device Sync, Teammate Invites, Multi-Browser Huddle Parity & Cache Busting)
 
 - **Device Sync & QR Code Pairing Fix**:

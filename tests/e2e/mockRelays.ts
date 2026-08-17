@@ -1,219 +1,120 @@
 import type { BrowserContext, Page } from '@playwright/test';
 
 /**
- * Client-side script injected into all pages before execution to mock
- * Nostr relays, WebRTC signaling sockets, and media devices.
- * This guarantees 100% deterministic, offline, fast E2E test runs
- * without any flakiness from remote public Nostr relays.
+ * Client-side script injected into all pages before execution.
+ * - Redirects external Nostr/tracker WebSockets to the shared local E2E relay
+ *   so multi-browser contexts can truly peer-connect.
+ * - Preserves a unique socket URL per original relay (query param) because
+ *   Trystero keys subscription batchers by `client.url`.
+ * - Mocks getUserMedia / getDisplayMedia with deterministic audio+video tracks.
  */
 export const MOCK_NOSTR_RELAYS_INIT_SCRIPT = `
 (() => {
   if (window.__openslack_mock_relays_active) return;
   window.__openslack_mock_relays_active = true;
 
+  // Force a single logical relay in e2e so Trystero does not open 10 sockets to the
+  // same local process (self-echo + race amplification under StrictMode).
+  window.__OPENSLACK_E2E_RELAYS = window.__OPENSLACK_E2E_RELAYS || ['wss://e2e.openslack.local'];
+
   const NativeWebSocket = window.WebSocket;
-  const mockBus = new BroadcastChannel('openslack_e2e_nostr_relay_bus');
-
-  // Shared in-memory event cache per tab/browser process
-  const activeMockSockets = new Set();
-  const globalEvents = new Map();
-
-  // Listen for broadcast events from other tabs / browser pages
-  mockBus.onmessage = (msgEvent) => {
-    try {
-      const { type, eventObj, senderSocketId } = msgEvent.data || {};
-      if (type === 'EVENT' && eventObj) {
-        globalEvents.set(eventObj.id, eventObj);
-        activeMockSockets.forEach((sock) => {
-          if (sock.__socketId !== senderSocketId && sock.readyState === 1) {
-            sock.__dispatchNostrEvent(eventObj);
-          }
-        });
-      }
-    } catch (_) {}
-  };
-
-  class MockNostrWebSocket extends EventTarget {
-    static CONNECTING = 0;
-    static OPEN = 1;
-    static CLOSING = 2;
-    static CLOSED = 3;
-
-    CONNECTING = 0;
-    OPEN = 1;
-    CLOSING = 2;
-    CLOSED = 3;
-
-    constructor(url, protocols) {
-      super();
-      this.url = String(url);
-      this.protocols = protocols;
-      this.readyState = MockNostrWebSocket.CONNECTING;
-      this.binaryType = 'blob';
-      this.bufferedAmount = 0;
-      this.extensions = '';
-      this.protocol = '';
-      this.__socketId = 'mock_sock_' + Math.random().toString(36).slice(2);
-      this.__subscriptions = new Map();
-
-      this.onopen = null;
-      this.onmessage = null;
-      this.onerror = null;
-      this.onclose = null;
-
-      activeMockSockets.add(this);
-
-      // Fast async connection simulation (5ms)
-      setTimeout(() => {
-        if (this.readyState === MockNostrWebSocket.CONNECTING) {
-          this.readyState = MockNostrWebSocket.OPEN;
-          const openEvent = new Event('open');
-          if (typeof this.onopen === 'function') {
-            this.onopen.call(this, openEvent);
-          }
-          this.dispatchEvent(openEvent);
-        }
-      }, 5);
-    }
-
-    send(data) {
-      if (this.readyState !== MockNostrWebSocket.OPEN) {
-        throw new Error('WebSocket is not open');
-      }
-
-      if (typeof data !== 'string') return;
-
-      try {
-        const payload = JSON.parse(data);
-        if (!Array.isArray(payload)) return;
-
-        const verb = payload[0];
-
-        if (verb === 'REQ') {
-          const subId = payload[1];
-          const filters = payload.slice(2);
-          this.__subscriptions.set(subId, filters);
-
-          // Deliver any cached past events that match
-          setTimeout(() => {
-            if (this.readyState !== MockNostrWebSocket.OPEN) return;
-            globalEvents.forEach((cachedEvt) => {
-              this.__sendFrame(['EVENT', subId, cachedEvt]);
-            });
-            // Send EOSE (End of Stored Events)
-            this.__sendFrame(['EOSE', subId]);
-          }, 10);
-        } else if (verb === 'EVENT') {
-          const eventObj = payload[1];
-          if (eventObj && eventObj.id) {
-            globalEvents.set(eventObj.id, eventObj);
-
-            // Acknowledge receipt with OK
-            setTimeout(() => {
-              this.__sendFrame(['OK', eventObj.id, true, '']);
-            }, 5);
-
-            // Deliver to other local sockets in this page
-            activeMockSockets.forEach((other) => {
-              if (other !== this && other.readyState === MockNostrWebSocket.OPEN) {
-                other.__dispatchNostrEvent(eventObj);
-              }
-            });
-
-            // Broadcast to other pages / contexts
-            mockBus.postMessage({
-              type: 'EVENT',
-              eventObj,
-              senderSocketId: this.__socketId,
-            });
-          }
-        } else if (verb === 'CLOSE') {
-          const subId = payload[1];
-          this.__subscriptions.delete(subId);
-        }
-      } catch (_) {
-        // Non-JSON or unsupported format
-      }
-    }
-
-    __dispatchNostrEvent(eventObj) {
-      this.__subscriptions.forEach((_filters, subId) => {
-        this.__sendFrame(['EVENT', subId, eventObj]);
-      });
-    }
-
-    __sendFrame(frameArray) {
-      if (this.readyState !== MockNostrWebSocket.OPEN) return;
-      const dataStr = JSON.stringify(frameArray);
-      const msgEvent = new MessageEvent('message', { data: dataStr });
-      if (typeof this.onmessage === 'function') {
-        this.onmessage.call(this, msgEvent);
-      }
-      this.dispatchEvent(msgEvent);
-    }
-
-    close(code = 1000, reason = '') {
-      if (this.readyState === MockNostrWebSocket.CLOSED || this.readyState === MockNostrWebSocket.CLOSING) {
-        return;
-      }
-      this.readyState = MockNostrWebSocket.CLOSING;
-      activeMockSockets.delete(this);
-      setTimeout(() => {
-        this.readyState = MockNostrWebSocket.CLOSED;
-        const closeEvt = new CloseEvent('close', { wasClean: true, code, reason });
-        if (typeof this.onclose === 'function') {
-          this.onclose.call(this, closeEvt);
-        }
-        this.dispatchEvent(closeEvt);
-      }, 5);
-    }
-  }
+  const E2E_RELAY_BASE = 'ws://127.0.0.1:' + (window.__OPENSLACK_E2E_RELAY_PORT || 7777);
 
   // Intercept WebSocket instantiation
   window.WebSocket = function (url, protocols) {
     const urlStr = String(url);
     // Allow local Vite dev server / HMR WebSockets to pass through natively
     if (
-      urlStr.includes('localhost:') ||
-      urlStr.includes('127.0.0.1:') ||
       urlStr.includes('/vite-hmr') ||
-      urlStr.startsWith('ws://localhost') ||
-      urlStr.startsWith('ws://127.0.0.1')
+      urlStr.includes('localhost:3000') ||
+      urlStr.includes('localhost:4173') ||
+      urlStr.includes('127.0.0.1:3000') ||
+      urlStr.includes('127.0.0.1:4173')
     ) {
       return new NativeWebSocket(url, protocols);
     }
 
-    // Mock all external Nostr relay and tracker connections
-    return new MockNostrWebSocket(url, protocols);
+    // Redirect external Nostr / tracker sockets to the shared local relay.
+    // Keep a unique query identity so Trystero batchers (keyed by socket.url)
+    // do not collapse multiple logical relays onto one batcher instance.
+    const redirected =
+      E2E_RELAY_BASE +
+      '/?relay=' +
+      encodeURIComponent(urlStr.replace(/^wss?:\\/\\//, '').slice(0, 80));
+    return new NativeWebSocket(redirected, protocols);
   };
   window.WebSocket.prototype = NativeWebSocket.prototype;
   window.WebSocket.CONNECTING = 0;
   window.WebSocket.OPEN = 1;
   window.WebSocket.CLOSING = 2;
   window.WebSocket.CLOSED = 3;
+  // Ensure instanceof checks still pass for redirected sockets.
+  Object.setPrototypeOf(window.WebSocket, NativeWebSocket);
 
   // Mock getUserMedia & getDisplayMedia for WebRTC calls in headless browser
   if (navigator.mediaDevices) {
-    const createMockMediaStream = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = 640;
-      canvas.height = 480;
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.fillStyle = '#4A154B';
-        ctx.fillRect(0, 0, 640, 480);
+    const createMockMediaStream = async (constraints = {}) => {
+      const tracks = [];
+
+      // Tone audio track so huddle mic paths always have audio
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (AudioCtx && constraints.audio !== false) {
+          const ctx = new AudioCtx();
+          const oscillator = ctx.createOscillator();
+          const gain = ctx.createGain();
+          gain.gain.value = 0.02;
+          const dest = ctx.createMediaStreamDestination();
+          oscillator.frequency.value = 440;
+          oscillator.connect(gain);
+          gain.connect(dest);
+          oscillator.start();
+          const audioTrack = dest.stream.getAudioTracks()[0];
+          if (audioTrack) {
+            audioTrack.enabled = true;
+            tracks.push(audioTrack);
+          }
+        }
+      } catch (_) {}
+
+      const wantsVideo = Boolean(constraints.video) || constraints.screen === true;
+      if (wantsVideo) {
+        const canvas = document.createElement('canvas');
+        canvas.width = 640;
+        canvas.height = 480;
+        const ctx2d = canvas.getContext('2d');
+        if (ctx2d) {
+          ctx2d.fillStyle = constraints.screen ? '#1264A3' : '#4A154B';
+          ctx2d.fillRect(0, 0, 640, 480);
+          ctx2d.fillStyle = '#FFFFFF';
+          ctx2d.font = '28px sans-serif';
+          ctx2d.fillText(constraints.screen ? 'SCREEN' : 'CAMERA', 40, 80);
+        }
+        if (canvas.captureStream) {
+          const videoStream = canvas.captureStream(15);
+          videoStream.getVideoTracks().forEach((t) => {
+            try {
+              t.contentHint = constraints.screen ? 'detail' : 'motion';
+            } catch (_) {}
+            tracks.push(t);
+          });
+        }
       }
-      const stream = canvas.captureStream ? canvas.captureStream(10) : new MediaStream();
-      return stream;
+
+      return new MediaStream(tracks);
     };
 
-    navigator.mediaDevices.getUserMedia = async (constraints) => {
-      return createMockMediaStream();
+    navigator.mediaDevices.getUserMedia = async (constraints = {}) => {
+      const normalized = {
+        audio: constraints.audio !== false,
+        video: Boolean(constraints.video),
+      };
+      return createMockMediaStream(normalized);
     };
 
     if (navigator.mediaDevices.getDisplayMedia) {
       navigator.mediaDevices.getDisplayMedia = async () => {
-        return createMockMediaStream();
+        return createMockMediaStream({ audio: false, video: true, screen: true });
       };
     }
   }

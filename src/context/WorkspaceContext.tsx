@@ -689,6 +689,32 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                 const channelName = channel ? channel.name : 'channel';
                 const isMention = isUserMentioned(msg, identity.pubkey, identity.handle);
                 const isReply = Boolean(msg.threadParentId);
+                const isHuddleNotice =
+                  msg.type === 'huddle_started' || msg.type === 'huddle_ended';
+
+                if (isHuddleNotice) {
+                  triggerToast({
+                    authorName,
+                    authorAvatar: author?.avatarUrl,
+                    authorPubkey: msg.authorPubkey,
+                    channelId: msg.channelId,
+                    channelName,
+                    content: msg.content,
+                    type: 'huddle',
+                    messageId: msg.id,
+                  });
+                  showBrowserNotification(`Huddle in #${channelName}`, {
+                    body: msg.content,
+                    tag: `huddle-${msg.id}`,
+                    onClick: () => {
+                      if (msg.channelId) selectChannel(msg.channelId);
+                    },
+                  });
+                  if (preferences.soundEnabled && !isDNDActive(preferences)) {
+                    playSound.huddleJoin();
+                  }
+                  return;
+                }
 
                 if (shouldNotify(msg, identity.pubkey, identity.handle, preferences)) {
                   // Notification record for Activity Feed
@@ -769,7 +795,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             yUsers.set(remoteUser.pubkey, remoteUser);
           });
         },
-        onPeerHuddleJoin: (peerId, channelId, remoteUser, isScreenSharing) => {
+        onPeerHuddleJoin: (peerId, channelId, remoteUser, media) => {
           peerIdToPubkeyRef.current.set(peerId, remoteUser.pubkey);
           setPeerUsers((prev) => {
             const next = new Map(prev);
@@ -784,9 +810,9 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
               pubkey: remoteUser.pubkey,
               displayName: remoteUser.displayName,
               avatarUrl: remoteUser.avatarUrl,
-              isMuted: existing?.isMuted ?? false,
-              isVideoOn: existing?.isVideoOn ?? false,
-              isScreenSharing,
+              isMuted: media.isMuted ?? existing?.isMuted ?? false,
+              isVideoOn: media.isVideoOn ?? existing?.isVideoOn ?? false,
+              isScreenSharing: media.isScreenSharing ?? existing?.isScreenSharing ?? false,
               stream: existing?.stream,
             });
             return { ...prev, participants: nextMap };
@@ -828,12 +854,15 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             const pubkey = peerIdToPubkeyRef.current.get(peerId) || peerId;
             const nextMap = new Map(prev.participants);
             const existing = nextMap.get(pubkey);
+            const videoTracks = stream.getVideoTracks().filter((t) => t.readyState !== 'ended');
+            const hasLiveVideo = videoTracks.length > 0;
             if (existing) {
               nextMap.set(pubkey, {
                 ...existing,
                 stream,
-                isVideoOn: stream.getVideoTracks().length > 0,
-                isScreenSharing: stream.getVideoTracks().length > 1,
+                // Prefer explicit signaling flags; fall back to live tracks for camera presence.
+                isVideoOn: existing.isVideoOn || (hasLiveVideo && !existing.isScreenSharing),
+                isScreenSharing: existing.isScreenSharing,
               });
             } else {
               const user = peerUsersRef.current.get(pubkey);
@@ -842,8 +871,8 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                 displayName: user?.displayName || `Teammate (${peerId.slice(0, 5)})`,
                 avatarUrl: user?.avatarUrl || '',
                 isMuted: false,
-                isVideoOn: stream.getVideoTracks().length > 0,
-                isScreenSharing: stream.getVideoTracks().length > 1,
+                isVideoOn: hasLiveVideo,
+                isScreenSharing: false,
                 stream,
               });
             }
@@ -1480,9 +1509,105 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   // Huddles (Voice / Video)
+  const postHuddleChannelNotice = (
+    channelId: string,
+    kind: 'huddle_started' | 'huddle_ended',
+    channelName?: string
+  ) => {
+    if (!identity || !ydocRef.current) return;
+    const label = channelName || channels.find((c) => c.id === channelId)?.name || 'channel';
+    const content =
+      kind === 'huddle_started'
+        ? `🎧 **${identity.displayName}** started a huddle in #${label}`
+        : `🎧 **${identity.displayName}** left the huddle in #${label}`;
+
+    const message: Message = {
+      id: `msg_huddle_${kind}_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      channelId,
+      senderId: identity.pubkey,
+      authorPubkey: identity.pubkey,
+      content,
+      type: kind,
+      timestamp: Date.now(),
+      createdAt: new Date().toISOString(),
+      reactions: {},
+    };
+
+    const yMessages = ydocRef.current.getArray<Message>('messages');
+    ydocRef.current.transact(() => {
+      yMessages.push([message]);
+    });
+  };
+
   const startOrJoinHuddle = async (channelId: string) => {
     const channel = channels.find((c) => c.id === channelId);
+    const wasInactive = !huddleState.isActive;
+    const switchingChannel =
+      huddleState.isActive && huddleState.channelId !== null && huddleState.channelId !== channelId;
     setMediaPermissionError(null);
+
+    // Leaving a previous channel huddle before joining another keeps peer maps accurate.
+    if (switchingChannel) {
+      p2pNetwork.leaveHuddle();
+      if (localMediaStreamRef.current) {
+        localMediaStreamRef.current.getTracks().forEach((t) => t.stop());
+        localMediaStreamRef.current = null;
+      }
+      cameraTrackRef.current = null;
+      screenShareTrackRef.current = null;
+      p2pNetwork.removeMediaStream();
+      if (huddleState.channelId) {
+        postHuddleChannelNotice(
+          huddleState.channelId,
+          'huddle_ended',
+          huddleState.channelName || undefined
+        );
+      }
+    }
+
+    const activateLocalHuddle = (opts: {
+      stream?: MediaStream;
+      isMuted: boolean;
+    }) => {
+      // Always announce membership — even listen-only joins must signal peers.
+      p2pNetwork.startHuddle(channelId, {
+        isMuted: opts.isMuted,
+        isVideoOn: false,
+        isScreenSharing: false,
+      });
+      if (opts.stream) {
+        localMediaStreamRef.current = opts.stream;
+        p2pNetwork.addMediaStream(opts.stream);
+      }
+
+      const participants = new Map<string, HuddleParticipant>();
+      if (identity) {
+        participants.set(identity.pubkey, {
+          pubkey: identity.pubkey,
+          displayName: identity.displayName,
+          avatarUrl: identity.avatarUrl,
+          isMuted: opts.isMuted,
+          isVideoOn: false,
+          isScreenSharing: false,
+          stream: opts.stream,
+        });
+      }
+
+      setHuddleState({
+        channelId,
+        channelName: channel?.name || 'general',
+        isActive: true,
+        isMuted: opts.isMuted,
+        isVideoOn: false,
+        isScreenSharing: false,
+        participants,
+      });
+
+      if (wasInactive || switchingChannel) {
+        postHuddleChannelNotice(channelId, 'huddle_started', channel?.name);
+      }
+      if (preferences.soundEnabled) playSound.huddleJoin();
+    };
 
     try {
       if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
@@ -1493,67 +1618,20 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         audio: true,
         video: false,
       });
-      localMediaStreamRef.current = stream;
-      p2pNetwork.startHuddle(channelId);
-      p2pNetwork.addMediaStream(stream);
-
-      const participants = new Map<string, HuddleParticipant>();
-      if (identity) {
-        participants.set(identity.pubkey, {
-          pubkey: identity.pubkey,
-          displayName: identity.displayName,
-          avatarUrl: identity.avatarUrl,
-          isMuted: false,
-          isVideoOn: false,
-          isScreenSharing: false,
-          stream,
-        });
-      }
-
-      setHuddleState({
-        channelId,
-        channelName: channel?.name || 'general',
-        isActive: true,
-        isMuted: false,
-        isVideoOn: false,
-        isScreenSharing: false,
-        participants,
-      });
-
-      if (preferences.soundEnabled) playSound.huddleJoin();
+      activateLocalHuddle({ stream, isMuted: false });
     } catch (err: any) {
-      p2pNetwork.leaveHuddle();
       console.warn('Microphone permission note, starting voice-ready interface:', err);
       const isDenied = err?.name === 'NotAllowedError' || err?.name === 'PermissionDeniedError';
       if (isDenied) {
         setMediaPermissionError('Microphone permission was denied. You joined the Huddle in listen-only mode.');
       }
-
-      const participants = new Map<string, HuddleParticipant>();
-      if (identity) {
-        participants.set(identity.pubkey, {
-          pubkey: identity.pubkey,
-          displayName: identity.displayName,
-          avatarUrl: identity.avatarUrl,
-          isMuted: true,
-          isVideoOn: false,
-          isScreenSharing: false,
-        });
-      }
-      setHuddleState({
-        channelId,
-        channelName: channel?.name || 'general',
-        isActive: true,
-        isMuted: true,
-        isVideoOn: false,
-        isScreenSharing: false,
-        participants,
-      });
-      if (preferences.soundEnabled) playSound.huddleJoin();
+      activateLocalHuddle({ isMuted: true });
     }
   };
 
   const leaveHuddle = () => {
+    const leavingChannelId = huddleState.channelId;
+    const leavingChannelName = huddleState.channelName || undefined;
     p2pNetwork.leaveHuddle();
     if (localMediaStreamRef.current) {
       localMediaStreamRef.current.getTracks().forEach((t) => t.stop());
@@ -1571,20 +1649,30 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       isScreenSharing: false,
       participants: new Map(),
     });
+    if (leavingChannelId) {
+      postHuddleChannelNotice(leavingChannelId, 'huddle_ended', leavingChannelName);
+    }
     if (preferences.soundEnabled) playSound.huddleLeave();
   };
 
   const toggleHuddleMute = () => {
+    const nextMuted = !huddleState.isMuted;
     if (localMediaStreamRef.current) {
       const audioTracks = localMediaStreamRef.current.getAudioTracks();
-      audioTracks.forEach((t) => (t.enabled = !t.enabled));
-      setHuddleState((prev) => ({
-        ...prev,
-        isMuted: !prev.isMuted,
-      }));
-    } else {
-      setHuddleState((prev) => ({ ...prev, isMuted: !prev.isMuted }));
+      audioTracks.forEach((t) => {
+        t.enabled = !nextMuted;
+      });
     }
+    p2pNetwork.setHuddleMediaState({ isMuted: nextMuted });
+    setHuddleState((prev) => {
+      if (!identity) return { ...prev, isMuted: nextMuted };
+      const nextMap = new Map(prev.participants);
+      const self = nextMap.get(identity.pubkey);
+      if (self) {
+        nextMap.set(identity.pubkey, { ...self, isMuted: nextMuted });
+      }
+      return { ...prev, isMuted: nextMuted, participants: nextMap };
+    });
   };
 
   const toggleHuddleVideo = async () => {
@@ -1596,12 +1684,30 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         }
         const videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
         const videoTrack = videoStream.getVideoTracks()[0];
-        if (localMediaStreamRef.current && videoTrack) {
-          localMediaStreamRef.current.addTrack(videoTrack);
+        if (videoTrack) {
+          if (!localMediaStreamRef.current) {
+            localMediaStreamRef.current = new MediaStream([videoTrack]);
+            p2pNetwork.addMediaStream(localMediaStreamRef.current);
+          } else {
+            localMediaStreamRef.current.addTrack(videoTrack);
+            p2pNetwork.refreshMediaStream();
+          }
           cameraTrackRef.current = videoTrack;
-          p2pNetwork.refreshMediaStream();
         }
-        setHuddleState((prev) => ({ ...prev, isVideoOn: true }));
+        p2pNetwork.setHuddleMediaState({ isVideoOn: true });
+        setHuddleState((prev) => {
+          if (!identity) return { ...prev, isVideoOn: true };
+          const nextMap = new Map(prev.participants);
+          const self = nextMap.get(identity.pubkey);
+          if (self) {
+            nextMap.set(identity.pubkey, {
+              ...self,
+              isVideoOn: true,
+              stream: localMediaStreamRef.current || self.stream,
+            });
+          }
+          return { ...prev, isVideoOn: true, participants: nextMap };
+        });
       } catch (err: any) {
         console.warn('Camera error:', err);
         if (err?.name === 'NotAllowedError' || err?.name === 'PermissionDeniedError') {
@@ -1617,7 +1723,16 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           p2pNetwork.refreshMediaStream();
         }
       }
-      setHuddleState((prev) => ({ ...prev, isVideoOn: false }));
+      p2pNetwork.setHuddleMediaState({ isVideoOn: false });
+      setHuddleState((prev) => {
+        if (!identity) return { ...prev, isVideoOn: false };
+        const nextMap = new Map(prev.participants);
+        const self = nextMap.get(identity.pubkey);
+        if (self) {
+          nextMap.set(identity.pubkey, { ...self, isVideoOn: false });
+        }
+        return { ...prev, isVideoOn: false, participants: nextMap };
+      });
     }
   };
 
@@ -1637,15 +1752,38 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             p2pNetwork.refreshMediaStream();
             p2pNetwork.setHuddleScreenSharing(false);
           }
-          setHuddleState((prev) => ({ ...prev, isScreenSharing: false }));
+          setHuddleState((prev) => {
+            if (!identity) return { ...prev, isScreenSharing: false };
+            const nextMap = new Map(prev.participants);
+            const self = nextMap.get(identity.pubkey);
+            if (self) {
+              nextMap.set(identity.pubkey, { ...self, isScreenSharing: false });
+            }
+            return { ...prev, isScreenSharing: false, participants: nextMap };
+          });
         };
-        if (localMediaStreamRef.current) {
+        if (!localMediaStreamRef.current) {
+          localMediaStreamRef.current = new MediaStream([screenTrack]);
+          p2pNetwork.addMediaStream(localMediaStreamRef.current);
+        } else {
           localMediaStreamRef.current.addTrack(screenTrack);
-          screenShareTrackRef.current = screenTrack;
           p2pNetwork.refreshMediaStream();
-          p2pNetwork.setHuddleScreenSharing(true);
         }
-        setHuddleState((prev) => ({ ...prev, isScreenSharing: true }));
+        screenShareTrackRef.current = screenTrack;
+        p2pNetwork.setHuddleScreenSharing(true);
+        setHuddleState((prev) => {
+          if (!identity) return { ...prev, isScreenSharing: true };
+          const nextMap = new Map(prev.participants);
+          const self = nextMap.get(identity.pubkey);
+          if (self) {
+            nextMap.set(identity.pubkey, {
+              ...self,
+              isScreenSharing: true,
+              stream: localMediaStreamRef.current || self.stream,
+            });
+          }
+          return { ...prev, isScreenSharing: true, participants: nextMap };
+        });
       } catch (err: any) {
         console.warn('Screen share cancelled or failed:', err);
         if (err?.name === 'NotAllowedError' || err?.name === 'PermissionDeniedError') {
@@ -1660,7 +1798,15 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         p2pNetwork.refreshMediaStream();
         p2pNetwork.setHuddleScreenSharing(false);
       }
-      setHuddleState((prev) => ({ ...prev, isScreenSharing: false }));
+      setHuddleState((prev) => {
+        if (!identity) return { ...prev, isScreenSharing: false };
+        const nextMap = new Map(prev.participants);
+        const self = nextMap.get(identity.pubkey);
+        if (self) {
+          nextMap.set(identity.pubkey, { ...self, isScreenSharing: false });
+        }
+        return { ...prev, isScreenSharing: false, participants: nextMap };
+      });
     }
   };
 

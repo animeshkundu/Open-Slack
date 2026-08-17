@@ -17,19 +17,19 @@ const localBaseURL = previewBuild
 
 export default defineConfig({
   testDir: './tests/e2e',
-  timeout: 15000,
+  timeout: 45000,
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: 3,
   reporter: 'html',
   expect: {
-    timeout: 5000,
+    timeout: 10000,
   },
   use: {
     baseURL: deployedBaseURL ?? localBaseURL,
-    actionTimeout: 5000,
-    navigationTimeout: 10000,
+    actionTimeout: 10000,
+    navigationTimeout: 15000,
     trace: 'on-first-retry',
     permissions: ['camera', 'microphone'],
     launchOptions: {
@@ -46,17 +46,38 @@ export default defineConfig({
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
     },
+    {
+      // Cross-browser huddle validation (Chromium <-> Firefox)
+      name: 'firefox',
+      use: { ...devices['Desktop Firefox'] },
+      testMatch: /huddle\.spec\.ts|p2p-multibrowser\.spec\.ts/,
+    },
   ],
   webServer: deployedBaseURL
-    ? undefined
-    : {
-        command: previewBuild
-          ? isCI
-            ? `npm run preview -- --host 0.0.0.0 --port 4173 --base /${repositoryName}/`
-            : 'npm run preview -- --host 0.0.0.0 --port 4173'
-          : 'npm run dev',
-        url: localBaseURL,
-        reuseExistingServer: !process.env.CI,
-        timeout: 120000,
-      },
+    ? [
+        {
+          command: 'node tests/e2e/localNostrRelay.mjs',
+          url: 'http://127.0.0.1:7777',
+          reuseExistingServer: !process.env.CI,
+          timeout: 60000,
+        },
+      ]
+    : [
+        {
+          command: 'node tests/e2e/localNostrRelay.mjs',
+          url: 'http://127.0.0.1:7777',
+          reuseExistingServer: !process.env.CI,
+          timeout: 60000,
+        },
+        {
+          command: previewBuild
+            ? isCI
+              ? `npm run preview -- --host 0.0.0.0 --port 4173 --base /${repositoryName}/`
+              : 'npm run preview -- --host 0.0.0.0 --port 4173'
+            : 'npm run dev',
+          url: localBaseURL,
+          reuseExistingServer: !process.env.CI,
+          timeout: 120000,
+        },
+      ],
 });

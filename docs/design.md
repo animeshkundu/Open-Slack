@@ -28,6 +28,8 @@ Viewport-locked app surfaces use `100dvh`, `min-h-0`, and explicit nested overfl
 - Include safe-area padding for fixed mobile navigation.
 - Global search is anchored at the top in the application header; sidebar tools avoid duplicating search controls and instead present focused Slack-style navigation for Activity & Mentions (with unread badge indicator) and Threads.
 - Main channel header uses a unified Slack-authentic segmented pill button for Huddle (`[ 🎧 Huddle | ▾ ]`). Clicking the dropdown reveals quick actions for Audio Huddle, Screen Share, Copy Huddle Link, and Invite Teammates.
+- Channel timelines render centered `huddle_started` / `huddle_ended` system notices (headphones badge + optional **Join Huddle** CTA) so teammates who are not yet in the call still see that a huddle was initiated.
+- Expanded huddle stage tiles expose stable test hooks (`data-huddle-participant-name`, avatar markers, mute/video/screen-share flags, stream presence) while showing each peer's real display name and avatar.
 - Main channel header features a Slack-style More Actions triple-dot menu (`...`) on all screen sizes to gracefully house secondary actions and prevent UI overlap during dynamic desktop window resizing.
 - Primary sidebar removes idle duplicate Huddle buttons and displays a live, ambient Active Huddle Mini-Widget with speaking audio wave indicators and quick mute/leave controls only while participating in an active call.
 - The `InviteModal` provides dedicated sub-views for direct link copying, instant QR code presentation, social deep links, and a canvas-rendered Privacy Preview Card.

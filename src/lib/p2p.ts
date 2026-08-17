@@ -103,7 +103,12 @@ export interface P2PEvents {
   onPresenceUpdate?: (peerId: string, user: UserIdentity) => void;
   onTypingUpdate?: (channelId: string, userPubkey: string, isTyping: boolean) => void;
   onHuddleStateUpdate?: (channelId: string, participants: HuddleParticipant[]) => void;
-  onPeerHuddleJoin?: (peerId: string, channelId: string, user: UserIdentity, isScreenSharing: boolean) => void;
+  onPeerHuddleJoin?: (
+    peerId: string,
+    channelId: string,
+    user: UserIdentity,
+    media: HuddleMediaState
+  ) => void;
   onPeerHuddleLeave?: (peerId: string, channelId: string) => void;
   onPeerStream?: (stream: MediaStream, peerId: string, channelId: string) => void;
   onFileReceived?: (attachment: Attachment, senderPeerId: string) => void;
@@ -116,6 +121,14 @@ interface HuddleSignal {
   channelId: string;
   user?: UserIdentity;
   isScreenSharing?: boolean;
+  isMuted?: boolean;
+  isVideoOn?: boolean;
+}
+
+export interface HuddleMediaState {
+  isScreenSharing?: boolean;
+  isMuted?: boolean;
+  isVideoOn?: boolean;
 }
 
 export class P2PNetworkManager {
@@ -137,6 +150,11 @@ export class P2PNetworkManager {
 
   private activeStream: MediaStream | null = null;
   private activeHuddleChannelId: string | null = null;
+  private localHuddleMedia: Required<HuddleMediaState> = {
+    isScreenSharing: false,
+    isMuted: false,
+    isVideoOn: false,
+  };
   private peerHuddleChannels = new Map<string, string>();
   private pendingPeerStreams = new Map<string, MediaStream>();
   private presenceInterval: number | null = null;
@@ -150,6 +168,9 @@ export class P2PNetworkManager {
 
   private batteryUnsub: (() => void) | null = null;
   private wakeupUnsub: (() => void) | null = null;
+  /** Monotonic session id so React StrictMode leave/join races cannot tear down a newer room. */
+  private sessionEpoch = 0;
+  private pendingLeaveTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
     this.initTabLeaderElection();
@@ -260,12 +281,28 @@ export class P2PNetworkManager {
     relays: string[] = DEFAULT_RELAYS,
     events: P2PEvents = {}
   ) {
-    this.leaveWorkspace();
+    // Cancel a deferred StrictMode leave and synchronously replace any prior room.
+    if (this.pendingLeaveTimer !== null) {
+      clearTimeout(this.pendingLeaveTimer);
+      this.pendingLeaveTimer = null;
+    }
+    this.sessionEpoch += 1;
+    this.teardownWorkspace();
+
     this.ydoc = ydoc;
     this.localIdentity = identity;
     this.events = events;
     this.currentWorkspaceId = workspaceId;
-    this.currentRelays = relays.length > 0 ? relays : DEFAULT_RELAYS;
+    const e2eRelays =
+      typeof window !== 'undefined' && Array.isArray((window as any).__OPENSLACK_E2E_RELAYS)
+        ? ((window as any).__OPENSLACK_E2E_RELAYS as string[]).filter(Boolean)
+        : null;
+    this.currentRelays =
+      e2eRelays && e2eRelays.length > 0
+        ? e2eRelays
+        : relays.length > 0
+          ? relays
+          : DEFAULT_RELAYS;
 
     const roomId = `os_${workspaceId.replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 32)}`;
 
@@ -369,12 +406,11 @@ export class P2PNetworkManager {
 
         this.peerHuddleChannels.set(ctx.peerId, payload.channelId);
         if (payload.user) {
-          this.events.onPeerHuddleJoin?.(
-            ctx.peerId,
-            payload.channelId,
-            payload.user,
-            Boolean(payload.isScreenSharing)
-          );
+          this.events.onPeerHuddleJoin?.(ctx.peerId, payload.channelId, payload.user, {
+            isScreenSharing: Boolean(payload.isScreenSharing),
+            isMuted: Boolean(payload.isMuted),
+            isVideoOn: Boolean(payload.isVideoOn),
+          });
         }
         const pendingStream = this.pendingPeerStreams.get(ctx.peerId);
         if (pendingStream) {
@@ -402,7 +438,12 @@ export class P2PNetworkManager {
 
         if (this.activeHuddleChannelId && this.sendHuddle && this.localIdentity) {
           this.sendHuddle(
-            { type: 'join', channelId: this.activeHuddleChannelId, user: this.localIdentity },
+            {
+              type: 'join',
+              channelId: this.activeHuddleChannelId,
+              user: this.localIdentity,
+              ...this.localHuddleMedia,
+            },
             { target: peerId }
           );
         }
@@ -577,22 +618,45 @@ export class P2PNetworkManager {
     }
   }
 
-  public startHuddle(channelId: string) {
+  public startHuddle(channelId: string, media: HuddleMediaState = {}) {
     this.activeHuddleChannelId = channelId;
+    this.localHuddleMedia = {
+      isScreenSharing: Boolean(media.isScreenSharing),
+      isMuted: Boolean(media.isMuted),
+      isVideoOn: Boolean(media.isVideoOn),
+    };
     if (this.localIdentity) {
-      this.sendHuddle?.({ type: 'join', channelId, user: this.localIdentity });
+      this.sendHuddle?.({
+        type: 'join',
+        channelId,
+        user: this.localIdentity,
+        ...this.localHuddleMedia,
+      });
     }
   }
 
-  public setHuddleScreenSharing(isScreenSharing: boolean) {
+  public setHuddleMediaState(media: HuddleMediaState) {
+    this.localHuddleMedia = {
+      isScreenSharing:
+        media.isScreenSharing !== undefined
+          ? Boolean(media.isScreenSharing)
+          : this.localHuddleMedia.isScreenSharing,
+      isMuted: media.isMuted !== undefined ? Boolean(media.isMuted) : this.localHuddleMedia.isMuted,
+      isVideoOn:
+        media.isVideoOn !== undefined ? Boolean(media.isVideoOn) : this.localHuddleMedia.isVideoOn,
+    };
     if (this.activeHuddleChannelId && this.localIdentity) {
       this.sendHuddle?.({
         type: 'update',
         channelId: this.activeHuddleChannelId,
         user: this.localIdentity,
-        isScreenSharing,
+        ...this.localHuddleMedia,
       });
     }
+  }
+
+  public setHuddleScreenSharing(isScreenSharing: boolean) {
+    this.setHuddleMediaState({ isScreenSharing });
   }
 
   public leaveHuddle() {
@@ -600,6 +664,11 @@ export class P2PNetworkManager {
       this.sendHuddle?.({ type: 'leave', channelId: this.activeHuddleChannelId });
     }
     this.activeHuddleChannelId = null;
+    this.localHuddleMedia = {
+      isScreenSharing: false,
+      isMuted: false,
+      isVideoOn: false,
+    };
   }
 
   public removeMediaStream() {
@@ -613,7 +682,27 @@ export class P2PNetworkManager {
     this.activeStream = null;
   }
 
+  /**
+   * Leave the current workspace room.
+   * Deferred by a macrotask so React StrictMode's mock unmount/remount does not
+   * destroy Trystero module state underneath the immediately re-joined room.
+   */
   public leaveWorkspace() {
+    const epochAtLeave = this.sessionEpoch;
+    if (this.pendingLeaveTimer !== null) {
+      clearTimeout(this.pendingLeaveTimer);
+    }
+    this.pendingLeaveTimer = setTimeout(() => {
+      this.pendingLeaveTimer = null;
+      if (this.sessionEpoch !== epochAtLeave) {
+        return;
+      }
+      this.teardownWorkspace();
+    }, 0);
+  }
+
+  /** Immediately tear down room state, timers, and Trystero membership. */
+  private teardownWorkspace() {
     this.leaveHuddle();
     if (this.reconnectTimeout) {
       clearTimeout(this.reconnectTimeout);
@@ -639,6 +728,7 @@ export class P2PNetworkManager {
     this.connectedPeers.clear();
     this.peerHuddleChannels.clear();
     this.pendingPeerStreams.clear();
+    this.currentWorkspaceId = null;
     this.relayStatus = 'disconnected';
   }
 }
