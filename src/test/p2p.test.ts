@@ -197,7 +197,36 @@ describe('P2P Network & CRDT Synchronization', () => {
 
   it('tracks remote huddle roster entries for late local joins', () => {
     const manager = new P2PNetworkManager();
-    expect(manager.getPeersInHuddle('chan_general')).toEqual([]);
+    (manager as any).peerHuddleInfo.set('peer_general', {
+      channelId: 'chan_general',
+      user: { ...dummyIdentity, pubkey: 'pub_remote_general' },
+      media: {
+        isScreenSharing: true,
+        isMuted: false,
+        isVideoOn: true,
+      },
+    });
+    (manager as any).peerHuddleInfo.set('peer_random', {
+      channelId: 'chan_random',
+      user: { ...dummyIdentity, pubkey: 'pub_remote_random' },
+      media: {
+        isScreenSharing: false,
+        isMuted: true,
+        isVideoOn: false,
+      },
+    });
+
+    expect(manager.getPeersInHuddle('chan_general')).toEqual([
+      {
+        peerId: 'peer_general',
+        user: { ...dummyIdentity, pubkey: 'pub_remote_general' },
+        media: {
+          isScreenSharing: true,
+          isMuted: false,
+          isVideoOn: true,
+        },
+      },
+    ]);
   });
 
   it('cancels a deferred leave when joinWorkspace runs again (StrictMode-safe)', async () => {

@@ -2,6 +2,10 @@
 
 This is a concise, human-readable record of meaningful repository evolution. Detailed implementation history remains in Git.
 
+## 2026-08-17 (Coverage Regression Guard)
+
+- Added a focused P2P huddle roster assertion so newly introduced channel filtering remains covered and CI stays above the configured statement threshold.
+
 ## 2026-08-17 (Flawless Huddle Mesh, Channel Notices, True Multi-Browser E2E, PWA Release Busting)
 
 - **PWA cache busting for browser + installed app**:
