@@ -160,12 +160,17 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
   // Device Sync & QR state
   const [deviceQrDataUrl, setDeviceQrDataUrl] = useState<string>('');
   const [deviceSyncUrl, setDeviceSyncUrl] = useState<string>('');
+  const [deviceQrError, setDeviceQrError] = useState<string>('');
 
   useEffect(() => {
     if (activeTab === 'linked_devices') {
       try {
+        setDeviceQrDataUrl('');
+        setDeviceQrError('');
         const currentIdentity = identity || { pubkey: 'mock-pubkey', handle: '@user', displayName: 'User', avatarUrl: '' };
-        const syncWorkspaces = workspaces.length > 0 ? workspaces : (activeWorkspace ? [activeWorkspace] : []);
+        const syncWorkspaces = activeWorkspace
+          ? [activeWorkspace, ...workspaces.filter((workspace) => workspace.id !== activeWorkspace.id)]
+          : workspaces;
         const payloadStr = encodeDeviceSyncPayload(currentIdentity as any, keys, syncWorkspaces);
         const fullUrl = `${window.location.origin}${window.location.pathname}#device-sync=${payloadStr}`;
         setDeviceSyncUrl(fullUrl);
@@ -177,19 +182,15 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
         })
           .then(setDeviceQrDataUrl)
           .catch((err) => {
-            console.warn('QR render error, falling back to basic URL:', err);
-            QRCode.toDataURL(window.location.href, { width: 220, margin: 1, errorCorrectionLevel: 'L' })
-              .then(setDeviceQrDataUrl)
-              .catch((fallbackErr) => console.error('QR fallback failed:', fallbackErr));
+            console.warn('QR render error:', err);
+            setDeviceQrError('This pairing link is too large for a QR code. Use Copy Link below instead.');
           });
       } catch (err) {
         console.warn('Device payload build error:', err);
-        QRCode.toDataURL(window.location.href, { width: 220, margin: 1, errorCorrectionLevel: 'L' })
-          .then(setDeviceQrDataUrl)
-          .catch((fallbackErr) => console.error('QR fallback failed:', fallbackErr));
+        setDeviceQrError('Could not create a pairing QR code. Use Copy Link below instead.');
       }
     }
-  }, [activeTab, identity, keys, activeWorkspace]);
+  }, [activeTab, identity, keys, activeWorkspace, workspaces]);
 
   useEffect(() => {
     if (activeTab === 'storage') {
@@ -1324,8 +1325,11 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
                           className="w-36 h-36 sm:w-40 sm:h-40 md:w-44 md:h-44 rounded-lg border border-neutral-300 shadow-xs"
                         />
                       ) : (
-                        <div className="w-36 h-36 sm:w-40 sm:h-40 md:w-44 md:h-44 flex items-center justify-center bg-white border border-neutral-200 rounded-lg text-xs text-neutral-400">
-                          Generating Pairing QR...
+                        <div
+                          id="linked-device-qr-status"
+                          className="w-36 h-36 sm:w-40 sm:h-40 md:w-44 md:h-44 flex items-center justify-center bg-white border border-neutral-200 rounded-lg text-xs text-neutral-400 text-center p-3"
+                        >
+                          {deviceQrError || 'Generating Pairing QR...'}
                         </div>
                       )}
                     </div>

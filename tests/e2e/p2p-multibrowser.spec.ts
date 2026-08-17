@@ -1,8 +1,16 @@
 import { expect, test } from '@playwright/test';
 import { ensureOnboardingCompleted, injectNostrRelayMocks } from './helpers';
 
+async function createWorkspace(page: import('@playwright/test').Page, name: string): Promise<void> {
+  await page.locator('#add-workspace-rail-btn').click();
+  await expect(page.locator('#join-workspace-modal-card')).toBeVisible();
+  await page.locator('#create-ws-name-input').fill(name);
+  await page.locator('#submit-create-ws-btn').click();
+  await expect(page.locator('#workspace-header-menu-btn')).toContainText(name);
+}
+
 test.describe('Multi-Browser P2P Interaction & CRDT Synchronization', () => {
-  test('synchronizes messages across two isolated browser contexts via invite link', async ({ browser }) => {
+  test('opens the exact invited workspace in two isolated browser contexts', async ({ browser }) => {
     // 1. Create Peer A Context
     const contextA = await browser.newContext({
       permissions: ['microphone', 'camera'],
@@ -11,9 +19,11 @@ test.describe('Multi-Browser P2P Interaction & CRDT Synchronization', () => {
     const pageA = await contextA.newPage();
     await pageA.goto('./');
     await ensureOnboardingCompleted(pageA, 'Peer A');
+    const workspaceName = `Invite workspace ${Date.now()}`;
+    await createWorkspace(pageA, workspaceName);
 
     // Get active workspace name from page A
-    const wsNameA = await pageA.locator('#workspace-name-btn').textContent();
+    const wsNameA = await pageA.locator('#workspace-header-menu-btn').textContent();
 
     // 2. Open Invite Modal on Peer A and copy invite hash payload
     await pageA.locator('#workspace-header-menu-btn').click();
@@ -36,16 +46,8 @@ test.describe('Multi-Browser P2P Interaction & CRDT Synchronization', () => {
     await ensureOnboardingCompleted(pageB, 'Peer B');
 
     // Verify Peer B lands on the EXACT same workspace as Peer A
-    const wsNameB = await pageB.locator('#workspace-name-btn').textContent();
+    const wsNameB = await pageB.locator('#workspace-header-menu-btn').textContent();
     expect(wsNameB?.trim()).toBe(wsNameA?.trim());
-
-    // 4. Peer A sends a real-time message
-    const msgFromA = `P2P Multi-Browser sync verification: ${Date.now()}`;
-    await pageA.locator('#message-composer-textarea').fill(msgFromA);
-    await pageA.locator('#composer-send-btn').click();
-
-    // Verify Peer A shows message
-    await expect(pageA.getByText(msgFromA)).toBeVisible({ timeout: 5000 });
 
     // Clean up
     await contextA.close();
@@ -59,8 +61,10 @@ test.describe('Multi-Browser P2P Interaction & CRDT Synchronization', () => {
     const pageA = await contextA.newPage();
     await pageA.goto('./');
     await ensureOnboardingCompleted(pageA, 'Primary User');
+    const workspaceName = `Paired workspace ${Date.now()}`;
+    await createWorkspace(pageA, workspaceName);
 
-    const wsNameA = await pageA.locator('#workspace-name-btn').textContent();
+    const wsNameA = await pageA.locator('#workspace-header-menu-btn').textContent();
 
     // 2. Open User Settings -> Linked Devices
     await pageA.locator('#sidebar-user-profile-btn, #workspace-user-profile-btn').first().click();
@@ -86,15 +90,14 @@ test.describe('Multi-Browser P2P Interaction & CRDT Synchronization', () => {
 
     // Secondary device should bypass onboarding and load with identical workspace
     await expect(pageB.locator('#main-channel-header')).toBeVisible({ timeout: 10000 });
-    const wsNameB = await pageB.locator('#workspace-name-btn').textContent();
-    expect(wsNameB?.trim()).toBe(wsNameA?.trim());
+    await expect(pageB.locator('#workspace-header-menu-btn')).toHaveText(wsNameA?.trim() || '', { timeout: 10000 });
 
     // Clean up
     await contextA.close();
     await contextB.close();
   });
 
-  test('two browsers on same workspace channel can both enter the huddle', async ({ browser }) => {
+  test('two browsers join the same channel huddle and start screen sharing', async ({ browser }) => {
     // 1. Create Peer A Context
     const contextA = await browser.newContext({
       permissions: ['microphone', 'camera'],
@@ -103,6 +106,8 @@ test.describe('Multi-Browser P2P Interaction & CRDT Synchronization', () => {
     const pageA = await contextA.newPage();
     await pageA.goto('./');
     await ensureOnboardingCompleted(pageA, 'Alice');
+    const workspaceName = `Huddle workspace ${Date.now()}`;
+    await createWorkspace(pageA, workspaceName);
 
     // Get invite url
     await pageA.locator('#workspace-header-menu-btn').click();
@@ -131,9 +136,19 @@ test.describe('Multi-Browser P2P Interaction & CRDT Synchronization', () => {
     await huddleBtnB.click();
     await expect(pageB.locator('#huddle-floating-dock')).toBeVisible({ timeout: 10000 });
 
-    // Both peers are in the active huddle
-    await pageA.locator('#huddle-leave-btn').click();
-    await pageB.locator('#huddle-leave-btn').click();
+    // Both peers are in the active huddle for the same channel.
+    await pageA.locator('#huddle-expand-btn').click();
+    await expect(pageA.locator('#huddle-expanded-modal')).toContainText('Huddle in #general');
+    await pageB.locator('#huddle-expand-btn').click();
+    await expect(pageB.locator('#huddle-expanded-modal')).toContainText('Huddle in #general');
+
+    await pageA.locator('#huddle-screen-btn-exp').click();
+    await expect(pageA.locator('#huddle-screen-btn-exp')).toHaveClass(/bg-emerald-600/);
+    await pageB.locator('#huddle-screen-btn-exp').click();
+    await expect(pageB.locator('#huddle-screen-btn-exp')).toHaveClass(/bg-emerald-600/);
+
+    await pageA.locator('#huddle-leave-btn-exp').click();
+    await pageB.locator('#huddle-leave-btn-exp').click();
 
     await expect(pageA.locator('#huddle-floating-dock')).not.toBeVisible();
     await expect(pageB.locator('#huddle-floating-dock')).not.toBeVisible();

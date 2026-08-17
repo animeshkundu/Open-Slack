@@ -63,6 +63,56 @@ describe('P2P Network & CRDT Synchronization', () => {
     expect(() => manager.removeMediaStream()).not.toThrow();
   });
 
+  it('announces huddle membership and refreshes an active media stream', () => {
+    const manager = new P2PNetworkManager();
+    const sendHuddle = vi.fn();
+    const removeStream = vi.fn();
+    const addStream = vi.fn();
+    const stream = {} as MediaStream;
+
+    (manager as any).localIdentity = dummyIdentity;
+    (manager as any).sendHuddle = sendHuddle;
+    (manager as any).room = { removeStream, addStream };
+    (manager as any).activeStream = stream;
+
+    manager.startHuddle('chan_general');
+    manager.setHuddleScreenSharing(true);
+    manager.refreshMediaStream();
+    manager.leaveHuddle();
+
+    expect(sendHuddle).toHaveBeenNthCalledWith(1, {
+      type: 'join',
+      channelId: 'chan_general',
+      user: dummyIdentity,
+    });
+    expect(sendHuddle).toHaveBeenNthCalledWith(2, {
+      type: 'update',
+      channelId: 'chan_general',
+      user: dummyIdentity,
+      isScreenSharing: true,
+    });
+    expect(sendHuddle).toHaveBeenNthCalledWith(3, {
+      type: 'leave',
+      channelId: 'chan_general',
+    });
+    expect(removeStream).toHaveBeenCalledWith(stream);
+    expect(addStream).toHaveBeenCalledWith(stream);
+  });
+
+  it('safely ignores huddle media updates before a room and identity are ready', () => {
+    const manager = new P2PNetworkManager();
+    const sendHuddle = vi.fn();
+    (manager as any).sendHuddle = sendHuddle;
+
+    manager.refreshMediaStream();
+    manager.setHuddleScreenSharing(true);
+    manager.leaveHuddle();
+    manager.startHuddle('chan_general');
+    manager.setHuddleScreenSharing(false);
+
+    expect(sendHuddle).not.toHaveBeenCalled();
+  });
+
   it('handles broadcast message payload and file chunking trigger safely', async () => {
     const manager = new P2PNetworkManager();
     const doc = new Y.Doc();

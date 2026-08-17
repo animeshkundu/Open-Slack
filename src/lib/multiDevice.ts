@@ -10,6 +10,37 @@ import {
   Workspace,
 } from '../types';
 
+function compactKeysForPairing(keys: StoredPrivateKeyPair) {
+  try {
+    const signPublic = JSON.parse(keys.signPublicKey);
+    const signPrivate = JSON.parse(keys.signPrivateKey);
+    const encPublic = JSON.parse(keys.encPublicKey);
+    const encPrivate = JSON.parse(keys.encPrivateKey);
+    if (![signPublic, signPrivate, encPublic, encPrivate].every((key) => key?.x && key?.y)) {
+      return keys;
+    }
+    return {
+      s: { x: signPublic.x, y: signPublic.y, d: signPrivate.d },
+      e: { x: encPublic.x, y: encPublic.y, d: encPrivate.d },
+    };
+  } catch {
+    return keys;
+  }
+}
+
+function expandPairedKeys(keys: any): StoredPrivateKeyPair {
+  if (!keys?.s || !keys?.e) return keys;
+  const toKey = (key: { x: string; y: string; d?: string }) =>
+    JSON.stringify({ kty: 'EC', crv: 'P-256', x: key.x, y: key.y, ...(key.d ? { d: key.d } : {}) });
+
+  return {
+    signPublicKey: toKey({ x: keys.s.x, y: keys.s.y }),
+    signPrivateKey: toKey(keys.s),
+    encPublicKey: toKey({ x: keys.e.x, y: keys.e.y }),
+    encPrivateKey: toKey(keys.e),
+  };
+}
+
 /**
   Generate a unique Device ID for the current browser/device instance.
  */
@@ -72,23 +103,11 @@ export function encodeDeviceSyncPayload(
           masterPubkey: identity.masterPubkey || identity.pubkey,
           handle: identity.handle,
           displayName: identity.displayName,
-          avatarUrl: identity.avatarUrl || '',
           color: identity.color || '#1264A3',
-          status: identity.status || 'active',
-          statusEmoji: identity.statusEmoji || '',
-          statusDetails: identity.statusDetails,
           hasCustomName: true,
-          lastSeen: Date.now(),
         }
       : undefined,
-    keys: keys
-      ? {
-          signPublicKey: keys.signPublicKey,
-          signPrivateKey: keys.signPrivateKey,
-          encPublicKey: keys.encPublicKey,
-          encPrivateKey: keys.encPrivateKey,
-        }
-      : undefined,
+    keys: keys ? compactKeysForPairing(keys) : undefined,
     workspaces:
       workspaces.length > 0
         ? workspaces.slice(0, 20).map((w) => ({
@@ -118,26 +137,34 @@ export function decodeDeviceSyncPayload(encodedStr: string): DeviceSyncPayload {
   try {
     const jsonStr = decodeURIComponent(escape(atob(encodedStr.trim())));
     const raw = JSON.parse(jsonStr);
+    const rawIdentity = raw.identity || {
+      pubkey: raw.masterPubkey || raw.mp || '',
+      masterPubkey: raw.masterPubkey || raw.mp || '',
+      handle: raw.handle || raw.h || '@user',
+      displayName: raw.displayName || raw.dn || 'User',
+    };
 
     const payload: DeviceSyncPayload = {
       version: raw.version || raw.v || 1,
       masterPubkey: raw.masterPubkey || raw.mp || (raw.identity && raw.identity.pubkey) || '',
       deviceId: raw.deviceId || raw.did || 'device',
       deviceName: raw.deviceName || raw.dn || 'Device',
-      identity: raw.identity || {
-        pubkey: raw.masterPubkey || raw.mp || '',
-        masterPubkey: raw.masterPubkey || raw.mp || '',
-        handle: raw.handle || raw.h || '@user',
-        displayName: raw.displayName || raw.dn || 'User',
-        statusText: '',
-        statusEmoji: '',
-        avatarUrl: '',
-        joinedAt: Date.now(),
-        lastSeen: Date.now(),
-        color: '#1264A3',
-        hasCustomName: true,
+      identity: {
+        ...rawIdentity,
+        avatarUrl: rawIdentity.avatarUrl || '',
+        status: rawIdentity.status || '',
+        lastSeen: rawIdentity.lastSeen || Date.now(),
+        color: rawIdentity.color || '#1264A3',
+        hasCustomName: rawIdentity.hasCustomName ?? true,
       },
-      keys: raw.keys || { publicKey: raw.masterPubkey || raw.mp || '', privateKey: 'synced' },
+      keys: raw.keys
+        ? expandPairedKeys(raw.keys)
+        : {
+            signPublicKey: '',
+            signPrivateKey: '',
+            encPublicKey: '',
+            encPrivateKey: '',
+          },
       workspaces: raw.workspaces || (raw.workspace ? [raw.workspace] : []),
       timestamp: raw.timestamp || raw.ts || Date.now(),
     };

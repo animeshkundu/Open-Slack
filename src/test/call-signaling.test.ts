@@ -44,6 +44,42 @@ describe('Multi-Device Sync and Call Signaling Logic', () => {
     expect(decoded.workspaces?.[0].name).toBe('Open-Slack Engineering');
   });
 
+  it('compacts cryptographic keys for QR pairing and reconstructs usable JWKs', () => {
+    const key = (x: string, y: string, d?: string) =>
+      JSON.stringify({ kty: 'EC', crv: 'P-256', x, y, ...(d ? { d } : {}) });
+    const keys: StoredPrivateKeyPair = {
+      signPublicKey: key('sign-x', 'sign-y'),
+      signPrivateKey: key('sign-x', 'sign-y', 'sign-d'),
+      encPublicKey: key('enc-x', 'enc-y'),
+      encPrivateKey: key('enc-x', 'enc-y', 'enc-d'),
+    };
+
+    const decoded = decodeDeviceSyncPayload(encodeDeviceSyncPayload(mockIdentity, keys, [mockWorkspace]));
+
+    expect(decoded.keys.signPrivateKey).toContain('"d":"sign-d"');
+    expect(decoded.keys.encPrivateKey).toContain('"d":"enc-d"');
+    expect(decoded.keys.signPublicKey).not.toContain('"d"');
+    expect(decoded.keys.encPublicKey).not.toContain('"d"');
+    expect(decoded.identity.avatarUrl).toBe('');
+  });
+
+  it('accepts legacy pairing payloads without keys or a full identity object', () => {
+    const payload = btoa(
+      JSON.stringify({
+        masterPubkey: 'legacy-master',
+        workspace: mockWorkspace,
+        handle: '@legacy',
+        displayName: 'Legacy User',
+      })
+    );
+
+    const decoded = decodeDeviceSyncPayload(payload);
+
+    expect(decoded.identity.displayName).toBe('Legacy User');
+    expect(decoded.workspaces?.[0].id).toBe(mockWorkspace.id);
+    expect(decoded.keys.signPrivateKey).toBe('');
+  });
+
   it('handles simultaneous incoming calls and first-answerer resolution', () => {
     const desktopManager = new MultiDeviceCallManager('dev_desktop_1', 'MacBook Pro');
     const mobileManager = new MultiDeviceCallManager('dev_mobile_1', 'iPhone');
