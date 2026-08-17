@@ -107,4 +107,4 @@ To enable Pages for a fork, set **Settings → Pages → Build and deployment �
 
 ## 📜 License
 
-MIT License. Designed with craftsmanship for open, privacy-preserving decentralized team collaboration.
+AGPLv3 License. Designed with craftsmanship for open, privacy-preserving decentralized team collaboration.
