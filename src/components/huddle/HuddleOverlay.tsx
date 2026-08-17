@@ -187,7 +187,10 @@ export const HuddleOverlay: React.FC<HuddleOverlayProps> = ({ onOpenInvite }) =>
               <span className="text-xs font-bold truncate max-w-[100px] sm:max-w-[130px]">
                 #{huddleState.channelName}
               </span>
-              <span className="text-[10px] text-neutral-400">
+              <span
+                data-huddle-participant-count={participantsList.length}
+                className="text-[10px] text-neutral-400"
+              >
                 {participantsList.length} in huddle
               </span>
             </div>

@@ -14,24 +14,32 @@ const localBaseURL = previewBuild
     ? `http://localhost:4173/${repositoryName}/`
     : 'http://localhost:4173/'
   : 'http://localhost:3000/';
+const e2eRelayPort = process.env.E2E_NOSTR_RELAY_PORT || '7777';
+
+const localNostrRelayServer = {
+  command: 'node tests/e2e/localNostrRelay.mjs',
+  url: `http://127.0.0.1:${e2eRelayPort}`,
+  reuseExistingServer: !process.env.CI,
+  timeout: 60000,
+};
 
 export default defineConfig({
   testDir: './tests/e2e',
-  timeout: 15000,
-  fullyParallel: true,
+  timeout: 90000,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: 3,
+  // The local relay is shared by every browser context, so parallel workers
+  // can leak presence and huddle events between otherwise isolated tests.
+  workers: 1,
   reporter: 'html',
   expect: {
-    timeout: 5000,
+    timeout: 10000,
   },
   use: {
     baseURL: deployedBaseURL ?? localBaseURL,
-    actionTimeout: 5000,
-    navigationTimeout: 10000,
+    actionTimeout: 10000,
+    navigationTimeout: 15000,
     trace: 'on-first-retry',
-    permissions: ['camera', 'microphone'],
     launchOptions: {
       args: [
         '--use-fake-device-for-media-stream',
@@ -44,19 +52,39 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: {
+        ...devices['Desktop Chrome'],
+        permissions: ['camera', 'microphone'],
+      },
+    },
+    {
+      // Cross-browser huddle validation (Chromium <-> Firefox)
+      name: 'firefox',
+      use: {
+        ...devices['Desktop Firefox'],
+        launchOptions: {
+          firefoxUserPrefs: {
+            'media.navigator.streams.fake': true,
+            'media.navigator.permission.disabled': true,
+          },
+        },
+      },
+      testMatch: /huddle\.spec\.ts|p2p-multibrowser\.spec\.ts/,
     },
   ],
   webServer: deployedBaseURL
-    ? undefined
-    : {
-        command: previewBuild
-          ? isCI
-            ? `npm run preview -- --host 0.0.0.0 --port 4173 --base /${repositoryName}/`
-            : 'npm run preview -- --host 0.0.0.0 --port 4173'
-          : 'npm run dev',
-        url: localBaseURL,
-        reuseExistingServer: !process.env.CI,
-        timeout: 120000,
-      },
+    ? [localNostrRelayServer]
+    : [
+        localNostrRelayServer,
+        {
+          command: previewBuild
+            ? isCI
+              ? `npm run preview -- --host 0.0.0.0 --port 4173 --base /${repositoryName}/`
+              : 'npm run preview -- --host 0.0.0.0 --port 4173'
+            : 'npm run dev',
+          url: localBaseURL,
+          reuseExistingServer: !process.env.CI,
+          timeout: 120000,
+        },
+      ],
 });

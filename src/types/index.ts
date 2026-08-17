@@ -170,6 +170,8 @@ export interface Attachment {
   opfsPath?: string;
 }
 
+export type MessageType = 'text' | 'system' | 'huddle_started' | 'huddle_ended';
+
 export interface Message {
   id: string;
   channelId?: string;
@@ -177,6 +179,8 @@ export interface Message {
   senderId?: string;         // Alias for authorPubkey
   authorPubkey: string;
   content: string;
+  /** Structured message kind. Defaults to plain text chat when omitted. */
+  type?: MessageType;
   mentions?: string[];       // User pubkeys/IDs mentioned (e.g. ['u1', 'u2']) or special tokens ('@channel', '@here', '@everyone')
   timestamp: number;
   createdAt?: string;

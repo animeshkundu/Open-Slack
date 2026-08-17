@@ -35,7 +35,12 @@ const VideoTile: React.FC<VideoTileProps> = ({ participant, isLocal }) => {
   return (
     <div
       data-huddle-participant={participant.pubkey}
+      data-huddle-participant-name={participant.displayName}
       data-huddle-screen-sharing={participant.isScreenSharing ? 'true' : 'false'}
+      data-huddle-video-on={participant.isVideoOn ? 'true' : 'false'}
+      data-huddle-muted={participant.isMuted ? 'true' : 'false'}
+      data-huddle-has-stream={participant.stream ? 'true' : 'false'}
+      data-huddle-local={isLocal ? 'true' : 'false'}
       className="relative bg-neutral-900 rounded-xl overflow-hidden aspect-video flex items-center justify-center border border-neutral-800 shadow-md group"
     >
       {/* Hidden audio element ensures remote audio always plays even when video is off */}
@@ -55,17 +60,21 @@ const VideoTile: React.FC<VideoTileProps> = ({ participant, isLocal }) => {
         <div className="flex flex-col items-center gap-2">
           {participant.avatarUrl ? (
             <img
+              data-huddle-avatar={participant.pubkey}
               src={participant.avatarUrl}
               alt={participant.displayName}
               className="w-16 h-16 rounded-full object-cover ring-2 ring-neutral-700"
               referrerPolicy="no-referrer"
             />
           ) : (
-            <div className="w-16 h-16 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-xl">
+            <div
+              data-huddle-avatar-fallback={participant.pubkey}
+              className="w-16 h-16 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-xl"
+            >
               {participant.displayName.slice(0, 2).toUpperCase()}
             </div>
           )}
-          <span className="text-xs font-semibold text-neutral-300">
+          <span data-huddle-display-name={participant.pubkey} className="text-xs font-semibold text-neutral-300">
             {participant.displayName} {isLocal && '(You)'}
           </span>
         </div>

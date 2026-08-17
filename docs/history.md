@@ -2,6 +2,41 @@
 
 This is a concise, human-readable record of meaningful repository evolution. Detailed implementation history remains in Git.
 
+## 2026-08-17 (E2E Relay Isolation)
+
+- Playwright E2E tests now run through one worker because the shared local Nostr relay can otherwise leak presence and huddle events between parallel test contexts.
+- Vitest's jsdom setup always uses its in-memory WebSocket mock so Node's native WebSocket cannot emit cross-realm EventTarget errors during coverage runs.
+
+## 2026-08-17 (CI Browser Parity & Seed Message Deduplication)
+
+- CI and GitHub Pages validation now install both configured Playwright browsers, including Firefox coverage for the multi-browser huddle suites.
+- Chromium huddle contexts explicitly grant media permissions while Firefox uses its supported fake-media preferences.
+- Message state filters duplicate CRDT entries by ID so concurrent workspace initialization cannot render repeated seeded welcome messages with conflicting React keys.
+
+## 2026-08-17 (Coverage Regression Guard)
+
+- Added a focused P2P huddle roster assertion so newly introduced channel filtering remains covered and CI stays above the configured statement threshold.
+
+## 2026-08-17 (Flawless Huddle Mesh, Channel Notices, True Multi-Browser E2E, PWA Release Busting)
+
+- **PWA cache busting for browser + installed app**:
+  - Manual `virtual:pwa-register` in `src/main.tsx` with immediate activation, `onNeedRefresh` reload, and periodic/visibility/online update checks.
+  - Build injects `__APP_VERSION__` + `__BUILD_ID__`; Workbox uses build-scoped runtime caches, `NetworkFirst` navigations, content-hashed assets, `skipWaiting`, `clientsClaim`, and `cleanupOutdatedCaches`.
+- **Huddle reliability fixes**:
+  - Listen-only (mic denied) joins now still call `startHuddle` so peers always share the same channel-scoped room.
+  - Mute/camera/screen-share flags are broadcast on join/update and re-announced to peers who connect mid-call.
+  - Switching channel huddles cleanly leaves the previous room before joining the next.
+  - Remote stream handling no longer mis-labels single video tracks as screen shares.
+- **Channel huddle notifications**:
+  - Starting/leaving a huddle posts CRDT `huddle_started` / `huddle_ended` system messages into the channel.
+  - Remote peers get in-app huddle toasts, browser notifications, and a Join Huddle button on the notice chip.
+- **True multi-browser Playwright validation**:
+  - Added shared local Nostr relay (`tests/e2e/localNostrRelay.mjs`) and redirected E2E WebSockets to it so isolated contexts peer-connect for real.
+  - Expanded `huddle.spec.ts` and `p2p-multibrowser.spec.ts` to assert 2–3 peer convergence, real names/avatars, A/V + screenshare flags, remote stream presence, and disconnect drops; Firefox project covers huddle/P2P specs alongside Chromium.
+  - Fixed multi-peer WebRTC join failures caused by React StrictMode double-mount: removed StrictMode around the app root because Trystero's module-level Nostr relay manager cannot survive async `room.leave()` racing an immediate re-join (offers never became remote descriptions).
+  - Kept `leaveWorkspace` epoch-gated/deferred as defense-in-depth for fast remounts, and pinned a single E2E relay via `window.__OPENSLACK_E2E_RELAYS`.
+  - Late huddle joiners now receive the existing roster: peers already in-channel reply to `join` with a targeted `update` (+ stream), and local activate seeds from `getPeersInHuddle()`.
+
 ## 2026-08-16 (Linked Device Sync, Teammate Invites, Multi-Browser Huddle Parity & Cache Busting)
 
 - **Device Sync & QR Code Pairing Fix**:

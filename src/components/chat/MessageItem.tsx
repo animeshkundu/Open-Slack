@@ -4,6 +4,7 @@ import {
   Copy,
   Download,
   FileText,
+  Headphones,
   Link2,
   MessageSquare,
   Pin,
@@ -41,6 +42,8 @@ export const MessageItem: React.FC<MessageItemProps> = ({
     deleteMessage,
     openThread,
     openUserProfile,
+    startOrJoinHuddle,
+    huddleState,
   } = useWorkspace();
 
   const [showPicker, setShowPicker] = useState(false);
@@ -83,9 +86,48 @@ export const MessageItem: React.FC<MessageItemProps> = ({
     setTimeout(() => setCopiedLink(false), 1500);
   };
 
+  // Slack-style centered system / huddle notices in the channel timeline
+  if (message.type === 'huddle_started' || message.type === 'huddle_ended' || message.type === 'system') {
+    const channelId = message.channelId || activeChannel?.id;
+    const canJoin =
+      message.type === 'huddle_started' &&
+      channelId &&
+      !(huddleState.isActive && huddleState.channelId === channelId);
+
+    return (
+      <div
+        id={`message-${message.id}`}
+        data-message-type={message.type}
+        data-huddle-notice={message.type.startsWith('huddle_') ? 'true' : 'false'}
+        className="flex flex-col items-center justify-center gap-2 px-4 sm:px-6 py-3"
+      >
+        <div className="inline-flex items-center gap-2 max-w-full rounded-full border border-emerald-200 bg-emerald-50/80 px-3 py-1.5 text-xs text-emerald-900 shadow-sm">
+          <Headphones className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+          <span className="font-medium truncate">
+            <Markdown remarkPlugins={[remarkGfm]} components={{ p: ({ children }) => <>{children}</> }}>
+              {message.content}
+            </Markdown>
+          </span>
+          <span className="text-[10px] text-emerald-700/70 flex-shrink-0">{timeString}</span>
+        </div>
+        {canJoin && (
+          <button
+            id={`join-huddle-from-notice-${message.id}`}
+            type="button"
+            onClick={() => startOrJoinHuddle(channelId)}
+            className="text-[11px] font-semibold text-white bg-[#007a5a] hover:bg-[#006b4f] px-3 py-1 rounded-full transition"
+          >
+            Join Huddle
+          </button>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div
       id={`message-${message.id}`}
+      data-message-type={message.type || 'text'}
       className={`group relative flex space-x-3 px-4 sm:px-6 py-2 hover:bg-neutral-50/80 transition-colors rounded-none ${
         message.pinned ? 'bg-amber-50/50 border-l-2 border-amber-400' : ''
       } ${

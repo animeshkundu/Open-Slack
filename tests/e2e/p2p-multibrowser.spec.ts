@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { ensureOnboardingCompleted, injectNostrRelayMocks } from './helpers';
+import { createMediaContext, ensureOnboardingCompleted, injectNostrRelayMocks, waitForPeerMesh } from './helpers';
 
 async function createWorkspace(page: import('@playwright/test').Page, name: string): Promise<void> {
   await page.locator('#add-workspace-rail-btn').click();
@@ -12,9 +12,7 @@ async function createWorkspace(page: import('@playwright/test').Page, name: stri
 test.describe('Multi-Browser P2P Interaction & CRDT Synchronization', () => {
   test('opens the exact invited workspace in two isolated browser contexts', async ({ browser }) => {
     // 1. Create Peer A Context
-    const contextA = await browser.newContext({
-      permissions: ['microphone', 'camera'],
-    });
+    const contextA = await createMediaContext(browser);
     await injectNostrRelayMocks(contextA);
     const pageA = await contextA.newPage();
     await pageA.goto('./');
@@ -37,9 +35,7 @@ test.describe('Multi-Browser P2P Interaction & CRDT Synchronization', () => {
     await pageA.locator('#close-invite-modal-btn').click();
 
     // 3. Create Peer B Context in isolated incognito session
-    const contextB = await browser.newContext({
-      permissions: ['microphone', 'camera'],
-    });
+    const contextB = await createMediaContext(browser);
     await injectNostrRelayMocks(contextB);
     const pageB = await contextB.newPage();
     await pageB.goto(inviteUrl);
@@ -97,11 +93,12 @@ test.describe('Multi-Browser P2P Interaction & CRDT Synchronization', () => {
     await contextB.close();
   });
 
-  test('two browsers join the same channel huddle and start screen sharing', async ({ browser }) => {
+  test('two browsers join the same channel huddle, share media flags, and drop on leave', async ({
+    browser,
+  }) => {
+    test.setTimeout(120000);
     // 1. Create Peer A Context
-    const contextA = await browser.newContext({
-      permissions: ['microphone', 'camera'],
-    });
+    const contextA = await createMediaContext(browser);
     await injectNostrRelayMocks(contextA);
     const pageA = await contextA.newPage();
     await pageA.goto('./');
@@ -120,17 +117,21 @@ test.describe('Multi-Browser P2P Interaction & CRDT Synchronization', () => {
     await expect(huddleBtnA).toBeVisible();
     await huddleBtnA.click();
     await expect(pageA.locator('#huddle-floating-dock')).toBeVisible({ timeout: 10000 });
+    await expect(pageA.locator('[data-message-type="huddle_started"]').first()).toBeVisible();
 
     // 2. Peer B joins same workspace via invite link
-    const contextB = await browser.newContext({
-      permissions: ['microphone', 'camera'],
-    });
+    const contextB = await createMediaContext(browser);
     await injectNostrRelayMocks(contextB);
     const pageB = await contextB.newPage();
     await pageB.goto(inviteUrl);
     await ensureOnboardingCompleted(pageB, 'Bob');
 
-    // Peer B joins huddle on same channel
+    await waitForPeerMesh(pageA, 1, 25000);
+    await waitForPeerMesh(pageB, 1, 25000);
+    // Peer B sees huddle notice then joins huddle on same channel
+    await expect(pageB.locator('[data-message-type="huddle_started"]').first()).toBeVisible({
+      timeout: 20000,
+    });
     const huddleBtnB = pageB.locator('#channel-huddle-btn');
     await expect(huddleBtnB).toBeVisible();
     await huddleBtnB.click();
@@ -142,15 +143,33 @@ test.describe('Multi-Browser P2P Interaction & CRDT Synchronization', () => {
     await pageB.locator('#huddle-expand-btn').click();
     await expect(pageB.locator('#huddle-expanded-modal')).toContainText('Huddle in #general');
 
+    await expect
+      .poll(async () => pageA.locator('[data-huddle-participant]').count(), { timeout: 25000 })
+      .toBeGreaterThanOrEqual(2);
+    await expect
+      .poll(async () => pageB.locator('[data-huddle-participant]').count(), { timeout: 25000 })
+      .toBeGreaterThanOrEqual(2);
+
+    await expect(pageA.locator('#huddle-expanded-modal')).toContainText('Bob');
+    await expect(pageB.locator('#huddle-expanded-modal')).toContainText('Alice');
+
     await pageA.locator('#huddle-screen-btn-exp').click();
     await expect(pageA.locator('#huddle-screen-btn-exp')).toHaveClass(/bg-emerald-600/);
-    await pageB.locator('#huddle-screen-btn-exp').click();
-    await expect(pageB.locator('#huddle-screen-btn-exp')).toHaveClass(/bg-emerald-600/);
+    await expect
+      .poll(
+        async () =>
+          pageB.locator('[data-huddle-participant][data-huddle-screen-sharing="true"]').count(),
+        { timeout: 25000 }
+      )
+      .toBeGreaterThanOrEqual(1);
 
     await pageA.locator('#huddle-leave-btn-exp').click();
-    await pageB.locator('#huddle-leave-btn-exp').click();
-
     await expect(pageA.locator('#huddle-floating-dock')).not.toBeVisible();
+    await expect
+      .poll(async () => pageB.locator('[data-huddle-participant]').count(), { timeout: 25000 })
+      .toBe(1);
+
+    await pageB.locator('#huddle-leave-btn-exp').click();
     await expect(pageB.locator('#huddle-floating-dock')).not.toBeVisible();
 
     await contextA.close();

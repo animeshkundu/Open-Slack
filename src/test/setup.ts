@@ -48,8 +48,9 @@ if (typeof globalThis.RTCPeerConnection === 'undefined') {
   (globalThis as any).RTCPeerConnection = MockRTCPeerConnection;
 }
 
-// Polyfill global WebSocket with in-memory Nostr relay mock for tests
-if (typeof globalThis.WebSocket === 'undefined') {
+// Use the in-memory relay mock in jsdom even when Node 22 exposes a native
+// WebSocket; the native EventTarget is not compatible with jsdom's Event.
+if (typeof window !== 'undefined') {
   type Listener = (event: any) => void;
 
   class MockTestWebSocket extends EventTarget {

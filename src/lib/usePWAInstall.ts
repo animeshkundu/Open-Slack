@@ -21,7 +21,11 @@ export function usePWAInstall() {
   const [isDismissed, setIsDismissed] = useState(false);
   const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
   const [updateAvailable, setUpdateAvailable] = useState(false);
-  const [swVersion, setSwVersion] = useState('1.0.0');
+  const [swVersion] = useState(() => {
+    const version = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.0.0';
+    const build = typeof __BUILD_ID__ !== 'undefined' ? __BUILD_ID__ : 'dev';
+    return `${version}+${build}`;
+  });
 
   useEffect(() => {
     // 1. Detect if standalone mode (already installed)
@@ -44,7 +48,7 @@ export function usePWAInstall() {
       }
     } catch (_) {}
 
-    // 3. Service Worker Auto-Update listeners
+    // 3. Service Worker update availability (reload is owned by virtual:pwa-register in main.tsx)
     if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
       navigator.serviceWorker.ready.then((registration) => {
         registration.addEventListener('updatefound', () => {
@@ -127,12 +131,18 @@ export function usePWAInstall() {
         const registration = await navigator.serviceWorker.getRegistration();
         if (registration) {
           await registration.update();
+          const waitingWorker = registration.waiting;
+          const hasUpdate = Boolean(waitingWorker) || updateAvailable;
+          if (waitingWorker) {
+            waitingWorker.postMessage({ type: 'SKIP_WAITING' });
+            setUpdateAvailable(true);
+          }
           setIsCheckingUpdate(false);
           return {
-            updated: updateAvailable,
-            message: updateAvailable
-              ? 'A new version is ready. Reload to apply updates.'
-              : 'You are running the latest version of Open-Slack.',
+            updated: hasUpdate,
+            message: hasUpdate
+              ? 'A new version is ready. Reloading onto the latest release…'
+              : `You are running the latest version of Open-Slack (${swVersion}).`,
           };
         }
       }
@@ -141,7 +151,7 @@ export function usePWAInstall() {
       setIsCheckingUpdate(false);
       return {
         updated: false,
-        message: 'Open-Slack client is up to date (v1.0.0).',
+        message: `Open-Slack client is up to date (${swVersion}).`,
       };
     } catch (err) {
       setIsCheckingUpdate(false);
