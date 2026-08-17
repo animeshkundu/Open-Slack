@@ -26,7 +26,6 @@ const localNostrRelayServer = {
 export default defineConfig({
   testDir: './tests/e2e',
   timeout: 90000,
-  fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   // The local relay is shared by every browser context, so parallel workers
