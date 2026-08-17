@@ -169,6 +169,7 @@ describe('P2P Network & CRDT Synchronization', () => {
     manager.refreshMediaStream();
     manager.setHuddleScreenSharing(true);
     manager.leaveHuddle();
+    expect(() => manager.wakeUpAndCatchUp()).not.toThrow();
     // startHuddle without identity must not send
     manager.startHuddle('chan_general');
     manager.setHuddleScreenSharing(false);
