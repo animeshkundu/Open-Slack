@@ -36,6 +36,7 @@ export default defineConfig({
   },
   use: {
     baseURL: deployedBaseURL ?? localBaseURL,
+    permissions: ['camera', 'microphone'],
     actionTimeout: 10000,
     navigationTimeout: 15000,
     trace: 'on-first-retry',
