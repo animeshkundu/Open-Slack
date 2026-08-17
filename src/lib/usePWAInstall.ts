@@ -131,10 +131,10 @@ export function usePWAInstall() {
         const registration = await navigator.serviceWorker.getRegistration();
         if (registration) {
           await registration.update();
-          const waiting = Boolean(registration.waiting);
-          const hasUpdate = waiting || updateAvailable;
-          if (waiting) {
-            registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+          const waitingWorker = registration.waiting;
+          const hasUpdate = Boolean(waitingWorker) || updateAvailable;
+          if (waitingWorker) {
+            waitingWorker.postMessage({ type: 'SKIP_WAITING' });
             setUpdateAvailable(true);
           }
           setIsCheckingUpdate(false);

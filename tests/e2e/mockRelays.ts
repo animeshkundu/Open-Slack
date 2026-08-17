@@ -18,19 +18,24 @@ export const MOCK_NOSTR_RELAYS_INIT_SCRIPT = `
   window.__OPENSLACK_E2E_RELAYS = window.__OPENSLACK_E2E_RELAYS || ['wss://e2e.openslack.local'];
 
   const NativeWebSocket = window.WebSocket;
-  const E2E_RELAY_BASE = 'ws://127.0.0.1:' + (window.__OPENSLACK_E2E_RELAY_PORT || 7777);
+  const E2E_RELAY_PORT = String(window.__OPENSLACK_E2E_RELAY_PORT || 7777);
+  const E2E_RELAY_BASE = 'ws://127.0.0.1:' + E2E_RELAY_PORT;
+  const pageHost = location.hostname;
+  const pagePort = location.port || (location.protocol === 'https:' ? '443' : '80');
 
   // Intercept WebSocket instantiation
   window.WebSocket = function (url, protocols) {
     const urlStr = String(url);
-    // Allow local Vite dev server / HMR WebSockets to pass through natively
-    if (
-      urlStr.includes('/vite-hmr') ||
-      urlStr.includes('localhost:3000') ||
-      urlStr.includes('localhost:4173') ||
-      urlStr.includes('127.0.0.1:3000') ||
-      urlStr.includes('127.0.0.1:4173')
-    ) {
+    // Allow same-origin app/HMR sockets and the local e2e relay itself to pass through.
+    let isLocalAppSocket = urlStr.includes('/vite-hmr');
+    try {
+      const parsed = new URL(urlStr, location.href);
+      const isLoopback = parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
+      const isSameHost = parsed.hostname === pageHost && parsed.port === pagePort;
+      const isE2ERelay = isLoopback && parsed.port === E2E_RELAY_PORT;
+      isLocalAppSocket = isLocalAppSocket || isSameHost || isE2ERelay;
+    } catch (_) {}
+    if (isLocalAppSocket) {
       return new NativeWebSocket(url, protocols);
     }
 

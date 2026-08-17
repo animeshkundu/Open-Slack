@@ -14,6 +14,14 @@ const localBaseURL = previewBuild
     ? `http://localhost:4173/${repositoryName}/`
     : 'http://localhost:4173/'
   : 'http://localhost:3000/';
+const e2eRelayPort = process.env.E2E_NOSTR_RELAY_PORT || '7777';
+
+const localNostrRelayServer = {
+  command: 'node tests/e2e/localNostrRelay.mjs',
+  url: `http://127.0.0.1:${e2eRelayPort}`,
+  reuseExistingServer: !process.env.CI,
+  timeout: 60000,
+};
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -61,21 +69,9 @@ export default defineConfig({
     },
   ],
   webServer: deployedBaseURL
-    ? [
-        {
-          command: 'node tests/e2e/localNostrRelay.mjs',
-          url: 'http://127.0.0.1:7777',
-          reuseExistingServer: !process.env.CI,
-          timeout: 60000,
-        },
-      ]
+    ? [localNostrRelayServer]
     : [
-        {
-          command: 'node tests/e2e/localNostrRelay.mjs',
-          url: 'http://127.0.0.1:7777',
-          reuseExistingServer: !process.env.CI,
-          timeout: 60000,
-        },
+        localNostrRelayServer,
         {
           command: previewBuild
             ? isCI

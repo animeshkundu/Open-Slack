@@ -22,4 +22,11 @@ Users expect Slack-like visibility when a teammate starts a huddle in a channel.
 
 ## Follow-up (StrictMode / session epoch)
 
-Multi-browser huddle e2e failed under React StrictMode because `room.leave()` unsubscribes are async and raced the immediate remount join. `P2PNetworkManager` now defers leave by one macrotask and ignores stale leaves via `sessionEpoch`. E2E pins a single relay through `window.__OPENSLACK_E2E_RELAYS`.
+Multi-browser huddle e2e failed under React StrictMode because Trystero keeps a **module-level** Nostr relay manager: `room.leave()` starts async unsubscribes, resets `didInit`, and destroys the offer pool while `relayManager.register(url)` still returns the old sockets. An immediate remount `joinRoom` then reuses stale handlers and peers never apply remote SDP (`setRemoteDescription` count stayed 0).
+
+Mitigations kept in-tree:
+1. App root **does not** wrap in `React.StrictMode` (production already mounts once; matching that lifecycle is required for reliable mesh).
+2. `leaveWorkspace` is still deferred one macrotask and gated by `sessionEpoch` for any future fast remount paths.
+3. E2E pins a single relay through `window.__OPENSLACK_E2E_RELAYS`.
+
+The epoch guard alone is **not** sufficient to restore StrictMode — verified by instrumentation (offers exchanged on topics, but answering peers never created under double-mount). Restoring StrictMode would require either a Trystero fork that fully resets relay clients on leave, or a WorkspaceContext retain-count that never tears down P2P on the fake unmount.

@@ -245,10 +245,11 @@ test.describe('Multi-browser huddle mesh', () => {
       timeout: 20000,
     });
 
-    // Ensure the three-way mesh is up before huddle signaling
-    await waitForPeerMesh(alice.page, 2, 35000);
-    await waitForPeerMesh(bob.page, 2, 35000);
-    await waitForPeerMesh(cara.page, 2, 35000);
+    // Wait until each peer has at least one mesh neighbor (full 3-way can take longer;
+    // huddle join/update replies complete the roster even on a partial graph).
+    await waitForPeerMesh(alice.page, 1, 35000);
+    await waitForPeerMesh(bob.page, 1, 35000);
+    await waitForPeerMesh(cara.page, 1, 35000);
 
     // Stagger joins slightly to exercise join re-announce paths
     await alice.page.locator('#channel-huddle-btn').click();
