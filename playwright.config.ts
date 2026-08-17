@@ -29,7 +29,9 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: 3,
+  // The local relay is shared by every browser context, so parallel workers
+  // can leak presence and huddle events between otherwise isolated tests.
+  workers: 1,
   reporter: 'html',
   expect: {
     timeout: 10000,

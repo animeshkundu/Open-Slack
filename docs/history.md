@@ -2,6 +2,10 @@
 
 This is a concise, human-readable record of meaningful repository evolution. Detailed implementation history remains in Git.
 
+## 2026-08-17 (E2E Relay Isolation)
+
+- Playwright E2E tests now run through one worker because the shared local Nostr relay can otherwise leak presence and huddle events between parallel test contexts.
+
 ## 2026-08-17 (CI Browser Parity & Seed Message Deduplication)
 
 - CI and GitHub Pages validation now install both configured Playwright browsers, including Firefox coverage for the multi-browser huddle suites.
