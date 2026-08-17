@@ -36,7 +36,6 @@ export default defineConfig({
   },
   use: {
     baseURL: deployedBaseURL ?? localBaseURL,
-    permissions: ['camera', 'microphone'],
     actionTimeout: 10000,
     navigationTimeout: 15000,
     trace: 'on-first-retry',
@@ -52,7 +51,10 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: {
+        ...devices['Desktop Chrome'],
+        permissions: ['camera', 'microphone'],
+      },
     },
     {
       // Cross-browser huddle validation (Chromium <-> Firefox)

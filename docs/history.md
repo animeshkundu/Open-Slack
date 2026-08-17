@@ -5,6 +5,7 @@ This is a concise, human-readable record of meaningful repository evolution. Det
 ## 2026-08-17 (CI Browser Parity & Seed Message Deduplication)
 
 - CI and GitHub Pages validation now install both configured Playwright browsers, including Firefox coverage for the multi-browser huddle suites.
+- Chromium huddle contexts explicitly grant media permissions while Firefox uses its supported fake-media preferences.
 - Message state filters duplicate CRDT entries by ID so concurrent workspace initialization cannot render repeated seeded welcome messages with conflicting React keys.
 
 ## 2026-08-17 (Coverage Regression Guard)
